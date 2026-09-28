@@ -490,7 +490,7 @@ end
 -- The next street view toward `heading` (within 35 degrees of it), looking that way.
 function V.GoToward(heading)
   if not cur or not heading then return end
-  local q = D.Ahead(cur.p, heading, 150, math.rad(35))
+  local q = D.Ahead(cur.p, heading, 300, math.rad(35))
   if not q then
     UIErrorsFrame:AddMessage("No street view that way yet", 1, 0.82, 0)
     return

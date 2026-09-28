@@ -93,9 +93,9 @@ function D.Compass(heading)
 end
 
 -- The nearest other view ahead of point p, looking along `heading`: within maxDist yards and
--- maxAngle of straight ahead (defaults 150 yd, 50 degrees), preferring near and straight.
+-- maxAngle of straight ahead (defaults 300 yd, 50 degrees), preferring near and straight.
 function D.Ahead(p, heading, maxDist, maxAngle)
-  maxDist, maxAngle = maxDist or 150, maxAngle or math.rad(50)
+  maxDist, maxAngle = maxDist or 300, maxAngle or math.rad(50)
   local best, bestScore
   for _, q in ipairs(D.byCont[p.cont] or {}) do
     if q ~= p then
@@ -177,7 +177,7 @@ end
 -- once. `roads` is AzerothGPS's road network of the spot's continent ({ e = { { a, b, len,
 -- source, x, y, x, y, ... } } }), nil for none.
 function D.Directions(p, roads, radius, near, merge)
-  radius, near, merge = radius or 12, near or 150, merge or math.rad(25)
+  radius, near, merge = radius or 12, near or 300, merge or math.rad(25)
   local dirs = {}
   local function add(h)
     h = h % (2 * math.pi)
