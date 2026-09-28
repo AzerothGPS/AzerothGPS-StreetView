@@ -63,6 +63,7 @@ Use the AzerothGPS venv: `%USERPROFILE%\.venvs\azerothgps\Scripts\python.exe`.
 python tools/sv.py install     # copy StreetView and the continent packs into the game (--capture: + manual AGPS_Capture)
 python tools/sv.py import      # AGPS_Capture screenshots -> stitched spots -> build/packs, then install
 python tools/sv.py watch       # the same on every /reload
+python tools/sv.py pull [--from //PC/agps-work] [--watch 10]  # harvested spots from the capture PC's share (LAN)
 python tools/sv.py release-data  # dry run: build, zip and check the packs (--upload: to CurseForge)
 python tools/sv.py build       # rebuild the packs and print their sizes
 python tools/sv.py media       # regenerate Media/ (Figure.tga, Probe.jpg)

@@ -6,6 +6,9 @@
   sv.cmd watch                    the same by itself on every /reload (Ctrl+C stops)
   sv.cmd stitch [--id ID] [--force]  (re)stitch imported spots
   sv.cmd import-harvest <folder>  spots stitched by streetview-harvester -> the packs, then install
+  sv.cmd pull [--from //PC/agps-work] [--watch MIN]
+                                  the same straight from the capture PC's share over the LAN (new
+                                  and changed spots only; --from is remembered; --watch repeats)
   sv.cmd build                    rebuild the packs (build/packs/) and print their sizes
   sv.cmd release-data [--upload]  zip the packs for CurseForge and check them (a dry run);
                                   --upload sends them (needs CF_API_TOKEN and the project ids in packs.json)
@@ -80,6 +83,24 @@ def build_and_report(flush: bool = False) -> list[dict]:
     return reports
 
 
+def pull_loop(wow: Path, src_arg: str | None, every_min: float | None, do_install: bool) -> None:
+    import time
+    from svtools import pull
+    src = pull.resolve_source(src_arg, BUILD)
+    while True:
+        stats = pull.pull(src, BUILD)
+        print(f"{time.strftime('%H:%M')} {src}: {stats['on_share']} spots on the share, "
+              f"{stats['points']} new imported ({stats['skipped']} skipped), "
+              f"{stats['reviews']} review pictures -> {BUILD / 'harvest-review'}", flush=True)
+        if stats["points"]:
+            build_and_report(flush=True)
+            if do_install:
+                install(wow, False)
+        if not every_min:
+            return
+        time.sleep(every_min * 60)
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--wow", type=Path, default=DEFAULT_WOW, help="the _classic_beta_ folder")
@@ -96,6 +117,10 @@ def main(argv=None) -> None:
     p_h = sub.add_parser("import-harvest")
     p_h.add_argument("folder", type=Path)
     p_h.add_argument("--no-install", action="store_true")
+    p_p = sub.add_parser("pull")
+    p_p.add_argument("--from", dest="src", help=r"the capture PC's share, e.g. //CAPTURE-PC/agps-work (remembered)")
+    p_p.add_argument("--watch", type=float, metavar="MIN", help="pull again every MIN minutes (Ctrl+C stops)")
+    p_p.add_argument("--no-install", action="store_true")
     sub.add_parser("build")
     p_r = sub.add_parser("release-data")
     p_r.add_argument("--upload", action="store_true", help="upload to CurseForge (otherwise a dry run)")
@@ -127,6 +152,8 @@ def main(argv=None) -> None:
         build_and_report()
         if not a.no_install:
             install(a.wow, False)
+    elif a.cmd == "pull":
+        pull_loop(a.wow, a.src, a.watch, not a.no_install)
     elif a.cmd == "build":
         build_and_report()
     elif a.cmd == "release-data":

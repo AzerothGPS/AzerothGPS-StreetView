@@ -116,6 +116,40 @@ def test_import_harvest(tmp_path):
     assert 'id = "1-100--200"' in index and "facing = 2.5000" in index and "cube = { pad = 0.08 }" in index
 
 
+def test_pull_copies_only_new_or_changed_spots(tmp_path):
+    from svtools import pull
+    share = tmp_path / "share"
+    spot = share / "out" / "1-100--200"
+    (spot / "cube").mkdir(parents=True)
+    for f in "FRBLUD":
+        for i in (0, 1):
+            for j in (0, 1):
+                Image.new("RGB", (16, 16)).save(spot / "cube" / f"{f}{i}{j}.jpg")
+    meta = '{"id": "1-100--200", "cont": 1, "x": 100, "y": -200, "cube": {"size": 16, "pad": 0.08}}'
+    (spot / "meta.json").write_text(meta, encoding="utf-8")
+    half = share / "out" / "1-300-300"  # still being stitched: no meta.json yet
+    (half / "cube").mkdir(parents=True)
+    (share / "review").mkdir()
+    Image.new("RGB", (8, 4)).save(share / "review" / "1-100--200.jpg")
+    build = tmp_path / "build"
+    quiet = lambda *_: None  # noqa: E731
+
+    first = pull.pull(share, build, log=quiet)
+    assert (first["points"], first["reviews"], first["on_share"]) == (1, 1, 1)
+    assert (build / "master" / "1-100--200" / "cube" / "U11.jpg").exists()
+    assert (build / "harvest-review" / "1-100--200.jpg").exists()
+    assert not (build / "harvest-staging").exists()
+
+    again = pull.pull(share, build, log=quiet)
+    assert (again["points"], again["reviews"]) == (0, 0)
+
+    (spot / "meta.json").write_text(meta.replace('"x": 100', '"x": 100.1'), encoding="utf-8")
+    assert pull.pull(share, build, log=quiet)["points"] == 1
+
+    assert pull.resolve_source("//PC/agps-work", build) == Path("//PC/agps-work")
+    assert pull.resolve_source(None, build) == Path("//PC/agps-work")  # remembered
+
+
 def test_stitch_measures_the_camera_and_rebuilds_the_panorama():
     """Pictures rendered from a known panorama with a known field of view, shallow up/down
     views, small yaw offsets and aiming errors: calibrate recovers them and the panorama
