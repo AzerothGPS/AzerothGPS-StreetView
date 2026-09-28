@@ -1,3 +1,4 @@
 *.tga binary
 *.jpg binary
 *.png binary
+*.cmd text eol=crlf

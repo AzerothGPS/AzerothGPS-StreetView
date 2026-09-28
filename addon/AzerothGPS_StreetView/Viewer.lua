@@ -1,5 +1,7 @@
 -- The street view window: one view at a time (2:1 images), turned with the arrows, the mouse
 -- wheel or by dragging across the picture. Its spot and direction show on the AzerothGPS map.
+-- Framed like the AzerothGPS map: the game's own window frame (metal border, title bar, round
+-- portrait with the logo, close button), or a plain dark border if this client lacks it.
 local _, ns = ...
 
 local V = {}
@@ -7,12 +9,18 @@ ns.Viewer = V
 local D = ns.Data
 
 local MEDIA = "Interface\\AddOns\\AzerothGPS_StreetView\\Media\\"
-local PAD, TITLE_H, BAR_H = 4, 22, 28
+local PAD = 4 -- picture inset from the frame's edge
+local BORDER = 3 -- the dark border (as the AzerothGPS map's)
+local CHROME_TITLE = 22 -- the game frame's title bar, above the frame (as the map's)
+local TITLE_H = 22 -- our own title bar, inside the frame, when the game frame isn't there
+local BAR_H = 30 -- the controls strip along the top
+local CONTROLS_X = 60 -- controls start right of the portrait (or badge)
 local MIN_W, MAX_W = 360, 1400
 local DRAG_STEP = 60 -- UI units of dragging across the picture per view turned
 local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "level", [45] = "looking up", [90] = "straight up" }
 
-local frame, img, missing, title, info, preload
+local frame, chrome, img, missing, title, info, preload
+local topH = TITLE_H -- our own title bar's height (0 with the game frame)
 local cur -- { p, yaw, pitch (index into D.PITCHES) }
 
 local function Button(parent, text, width, onClick)
@@ -41,21 +49,105 @@ end
 local function SetWidth(w)
   w = math.max(MIN_W, math.min(MAX_W, w))
   local imgW = w - 2 * PAD
-  frame:SetSize(w, imgW / 2 + TITLE_H + BAR_H + 2 * PAD)
+  frame:SetSize(w, imgW / 2 + topH + BAR_H + 2 * PAD)
+end
+
+local function SetTitle(text)
+  if chrome then
+    if chrome.SetTitle then
+      chrome:SetTitle(text)
+    elseif chrome.TitleContainer and chrome.TitleContainer.TitleText then
+      chrome.TitleContainer.TitleText:SetText(text)
+    end
+  elseif title then
+    title:SetText(text)
+  end
+end
+
+-- Dragging `f` moves the window.
+local function MoveHandle(f)
+  f:EnableMouse(true)
+  f:SetScript("OnMouseDown", function() frame:StartMoving() end)
+  f:SetScript("OnMouseUp", function()
+    frame:StopMovingOrSizing()
+    SavePosition()
+  end)
+end
+
+-- The game's own window frame around the viewer, set up as AzerothGPS's map does it
+-- (GPSFrame.lua there): only its border, title bar, portrait and close button draw; the
+-- picture stays clickable. nil if this client has no PortraitFrameTemplate.
+local function WindowFrame()
+  local ok, c = pcall(CreateFrame, "Frame", nil, frame, "PortraitFrameTemplate")
+  if not ok or not c or not c.NineSlice then return nil end
+  c:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, CHROME_TITLE)
+  c:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 2, -2)
+  c:SetFrameLevel(frame:GetFrameLevel() + 12)
+  c:EnableMouse(false)
+  if c.Bg then c.Bg:Hide() end -- (the picture is the window's content)
+  if c.TopTileStreaks then c.TopTileStreaks:Hide() end
+  local strip = c:CreateTexture(nil, "BACKGROUND") -- behind the title only
+  strip:SetPoint("TOPLEFT", 2, -2)
+  strip:SetPoint("BOTTOMRIGHT", c, "TOPRIGHT", -2, -CHROME_TITLE)
+  strip:SetColorTexture(0.06, 0.06, 0.07, 1)
+  local portrait = c.GetPortrait and c:GetPortrait() or (c.PortraitContainer and c.PortraitContainer.portrait)
+  if portrait then portrait:SetTexture(MEDIA .. "Logo") end
+  if c.CloseButton then c.CloseButton:SetScript("OnClick", function() V.Hide() end) end
+  local grab = CreateFrame("Frame", nil, c) -- the title bar moves the window
+  grab:SetPoint("TOPLEFT", 56, 0)
+  grab:SetPoint("TOPRIGHT", -26, 0)
+  grab:SetHeight(CHROME_TITLE)
+  MoveHandle(grab)
+  return c
+end
+
+-- Without the game frame: our own title bar, the logo as a badge over the corner, a close button.
+local function PlainTitle()
+  local bar = CreateFrame("Frame", nil, frame)
+  bar:SetPoint("TOPLEFT", PAD, -PAD)
+  bar:SetPoint("TOPRIGHT", -PAD - 22, -PAD)
+  bar:SetHeight(TITLE_H - 2)
+  MoveHandle(bar)
+  local badge = CreateFrame("Frame", nil, frame)
+  badge:SetSize(56, 56)
+  badge:SetPoint("CENTER", frame, "TOPLEFT", 12, -10)
+  badge:SetFrameLevel(frame:GetFrameLevel() + 10)
+  MoveHandle(badge)
+  local logo = badge:CreateTexture(nil, "ARTWORK")
+  logo:SetAllPoints()
+  logo:SetTexture(MEDIA .. "Logo")
+  title = bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  title:SetPoint("LEFT", 40, 0) -- (clear of the badge)
+  title:SetPoint("RIGHT", -4, 0)
+  title:SetJustifyH("LEFT")
+  local ok, close = pcall(CreateFrame, "Button", nil, frame, "UIPanelCloseButton")
+  if not ok or not close then close = Button(frame, "X", 20, nil) end
+  close:SetPoint("TOPRIGHT", 0, 0)
+  close:SetScript("OnClick", function() V.Hide() end)
 end
 
 function V.Build()
   frame = CreateFrame("Frame", "AzerothGPSStreetViewFrame", UIParent, "BackdropTemplate")
   frame:SetFrameStrata("HIGH")
   frame:SetClampedToScreen(true)
-  frame:SetClampRectInsets(-18, 0, 20, 0) -- (the logo badge sticks out over the corner)
   frame:SetMovable(true)
   frame:EnableMouse(true)
   frame:Hide()
-  if frame.SetBackdrop then
-    frame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
-    frame:SetBackdropColor(0.03, 0.03, 0.05, 0.95)
-    frame:SetBackdropBorderColor(0.3, 0.55, 0.9, 1)
+  if frame.SetBackdrop then -- (the AzerothGPS map's border)
+    frame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = BORDER })
+    frame:SetBackdropColor(0.05, 0.05, 0.05, 1)
+    frame:SetBackdropBorderColor(0.15, 0.15, 0.15, 1)
+  end
+  table.insert(UISpecialFrames, "AzerothGPSStreetViewFrame") -- Escape closes it
+
+  chrome = WindowFrame()
+  if chrome then
+    topH = 0
+    frame:SetClampRectInsets(-8, 2, CHROME_TITLE + 8, -2) -- (the frame's title bar and portrait stick out)
+  else
+    topH = TITLE_H
+    PlainTitle()
+    frame:SetClampRectInsets(-18, 0, 20, 0) -- (the badge sticks out over the corner)
   end
   local pos = ns.db.viewer.point
   if pos then
@@ -64,49 +156,28 @@ function V.Build()
     frame:SetPoint("CENTER", 0, 120)
   end
   SetWidth(ns.db.viewer.width or 640)
-  table.insert(UISpecialFrames, "AzerothGPSStreetViewFrame") -- Escape closes it
 
-  -- title bar: drag to move
-  local bar = CreateFrame("Frame", nil, frame)
-  bar:SetPoint("TOPLEFT", PAD, -PAD)
-  bar:SetPoint("TOPRIGHT", -PAD - 22, -PAD)
-  bar:SetHeight(TITLE_H - 2)
-  bar:EnableMouse(true)
-  bar:SetScript("OnMouseDown", function() frame:StartMoving() end)
-  bar:SetScript("OnMouseUp", function()
-    frame:StopMovingOrSizing()
-    SavePosition()
-  end)
-  -- the logo as a badge over the top-left corner (like AzerothGPS's portrait); drag it to move too
-  local badge = CreateFrame("Frame", nil, frame)
-  badge:SetSize(56, 56)
-  badge:SetPoint("CENTER", frame, "TOPLEFT", 12, -10)
-  badge:SetFrameLevel(frame:GetFrameLevel() + 10)
-  badge:EnableMouse(true)
-  badge:SetScript("OnMouseDown", function() frame:StartMoving() end)
-  badge:SetScript("OnMouseUp", function()
-    frame:StopMovingOrSizing()
-    SavePosition()
-  end)
-  local logo = badge:CreateTexture(nil, "ARTWORK")
-  logo:SetAllPoints()
-  logo:SetTexture(MEDIA .. "Logo")
-  title = bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  title:SetPoint("LEFT", 40, 0) -- (clear of the badge)
-  title:SetPoint("RIGHT", -4, 0)
-  title:SetJustifyH("LEFT")
-
-  local ok, close = pcall(CreateFrame, "Button", nil, frame, "UIPanelCloseButton")
-  if not ok or not close then
-    close = Button(frame, "X", 20, nil)
-  end
-  close:SetPoint("TOPRIGHT", 0, 0)
-  close:SetScript("OnClick", function() V.Hide() end)
+  -- controls along the top, right of the portrait
+  local top = -(PAD + topH + (BAR_H - 22) / 2)
+  local left = Button(frame, "<", 28, function() V.TurnBy(-1) end)
+  left:SetPoint("TOPLEFT", CONTROLS_X, top)
+  local right = Button(frame, ">", 28, function() V.TurnBy(1) end)
+  right:SetPoint("LEFT", left, "RIGHT", 2, 0)
+  local up = Button(frame, "Up", 40, function() V.Tilt(1) end)
+  up:SetPoint("LEFT", right, "RIGHT", 8, 0)
+  local down = Button(frame, "Down", 48, function() V.Tilt(-1) end)
+  down:SetPoint("LEFT", up, "RIGHT", 2, 0)
+  local ahead = Button(frame, "Go ahead", 72, function() V.GoAhead() end)
+  ahead:SetPoint("LEFT", down, "RIGHT", 8, 0)
+  info = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  info:SetPoint("LEFT", ahead, "RIGHT", 8, 0)
+  info:SetPoint("RIGHT", -10, 0)
+  info:SetJustifyH("RIGHT")
 
   -- the picture
   local view = CreateFrame("Frame", nil, frame)
-  view:SetPoint("TOPLEFT", PAD, -(PAD + TITLE_H))
-  view:SetPoint("BOTTOMRIGHT", -PAD, PAD + BAR_H)
+  view:SetPoint("TOPLEFT", PAD, -(PAD + topH + BAR_H))
+  view:SetPoint("BOTTOMRIGHT", -PAD, PAD)
   view:EnableMouse(true)
   view:EnableMouseWheel(true)
   img = view:CreateTexture(nil, "ARTWORK")
@@ -145,30 +216,15 @@ function V.Build()
     preload[i] = t
   end
 
-  -- controls
-  local left = Button(frame, "<", 28, function() V.TurnBy(-1) end)
-  left:SetPoint("BOTTOMLEFT", PAD, PAD + 3)
-  local right = Button(frame, ">", 28, function() V.TurnBy(1) end)
-  right:SetPoint("LEFT", left, "RIGHT", 2, 0)
-  local up = Button(frame, "Up", 40, function() V.Tilt(1) end)
-  up:SetPoint("LEFT", right, "RIGHT", 8, 0)
-  local down = Button(frame, "Down", 48, function() V.Tilt(-1) end)
-  down:SetPoint("LEFT", up, "RIGHT", 2, 0)
-  local ahead = Button(frame, "Go ahead", 72, function() V.GoAhead() end)
-  ahead:SetPoint("LEFT", down, "RIGHT", 8, 0)
-  info = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  info:SetPoint("LEFT", ahead, "RIGHT", 8, 0)
-  info:SetPoint("RIGHT", -24, 0)
-  info:SetJustifyH("RIGHT")
-
-  -- resize from the corner (the picture keeps its 2:1 shape)
+  -- resize from the corner (the picture keeps its 2:1 shape); above the game frame's border
   local grip = CreateFrame("Button", nil, frame)
   grip:SetSize(16, 16)
-  grip:SetPoint("BOTTOMRIGHT", -2, 2)
+  grip:SetPoint("BOTTOMRIGHT", -4, 4)
+  grip:SetFrameLevel(frame:GetFrameLevel() + 14)
   local gbg = grip:CreateTexture(nil, "BACKGROUND") -- (visible even if the old art is missing here)
   gbg:SetPoint("BOTTOMRIGHT")
   gbg:SetSize(8, 8)
-  gbg:SetColorTexture(0.3, 0.55, 0.9, 0.6)
+  gbg:SetColorTexture(0.6, 0.5, 0.25, 0.6)
   grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
   grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
   grip:SetScript("OnMouseDown", function(self)
@@ -211,7 +267,7 @@ function V.Refresh()
   local mapID, zone, u, v
   if API then mapID, zone, u, v = API.LocateWorld(p.cont, p.x, p.y) end -- (not `API and ...`: one value only)
   if mapID then where = string.format("%s  %.1f, %.1f", zone, u * 100, v * 100) end
-  title:SetText(where)
+  SetTitle(where)
   local facing = (pitch == 90 or pitch == -90) and "" or (D.Compass(heading) .. "  ")
   info:SetText(facing .. PITCH_NAMES[pitch])
   -- load the neighbors ahead of time
@@ -275,7 +331,7 @@ function V.Probe()
   cur = nil
   frame:Show()
   local ok = img:SetTexture(MEDIA .. "Probe.jpg")
-  title:SetText("JPEG check")
+  SetTitle("JPEG check")
   info:SetText("")
   if ok == false then
     img:SetColorTexture(0.2, 0.02, 0.02, 1)
