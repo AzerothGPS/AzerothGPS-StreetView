@@ -134,6 +134,10 @@ def toc(version: str, title: str = "AzerothGPS StreetView Data") -> str:
         "## Notes: Street view pictures for AzerothGPS StreetView. Screenshots of World of Warcraft (c) Blizzard Entertainment.",
         "## Author: AzerothGPS",
         f"## Version: {version}",
+        # (a dependency of the viewer: the game lists the pack under it; the viewer reads the
+        # packs at login, after every add-on has loaded, so it doesn't list them itself)
+        "## Dependencies: AzerothGPS_StreetView",
+        "## IconTexture: Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Figure",
         "",
         "Index.lua",
         "",

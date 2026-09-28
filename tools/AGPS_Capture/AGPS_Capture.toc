@@ -4,6 +4,8 @@
 ## Author: AzerothGPS
 ## Version: 0.1.0
 ## SavedVariables: AGPSCaptureDB
+## Dependencies: AzerothGPS_StreetView
+## IconTexture: Interface\AddOns\AzerothGPS_StreetView\Media\Figure
 
 Poses.lua
 Capture.lua

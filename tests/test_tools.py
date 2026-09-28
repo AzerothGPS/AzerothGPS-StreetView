@@ -216,15 +216,19 @@ def test_cube_tiles_render_the_panorama():
         assert np.abs(img.reshape(-1, 3).astype(float) - want).mean() < 10, name
 
 
-def test_every_point_has_one_pack_and_the_viewer_loads_after_them():
+def test_every_point_has_one_pack_and_packs_sit_under_the_viewer():
     cfg = pack.CONFIG
     names = [p["name"] for p in cfg["sd"]["packs"]]
     for cont in (0, 1, 2991):
         assert pack.pack_for(cfg, {"cont": cont}) is not None
     assert len({c for p in cfg["sd"]["packs"] for c in p["continents"]}) == sum(len(p["continents"]) for p in cfg["sd"]["packs"])
-    toc = (ROOT / "addon" / "AzerothGPS_StreetView" / "AzerothGPS_StreetView.toc").read_text(encoding="utf-8")
-    deps = next(l for l in toc.splitlines() if l.startswith("## OptionalDeps:"))
-    assert all(n in deps for n in names)  # (so the packs load before the viewer reads them)
+    # the packs (and the capture tool) depend on the viewer, so the game lists them under it, with
+    # its figure as their icon; the viewer names none of them (that would be a loop)
+    viewer = (ROOT / "addon" / "AzerothGPS_StreetView" / "AzerothGPS_StreetView.toc").read_text(encoding="utf-8")
+    assert not any(n in viewer for n in names)
+    figure = "## IconTexture: Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Figure"
+    for text in (pack.toc("v", "t"), (ROOT / "tools" / "AGPS_Capture" / "AGPS_Capture.toc").read_text(encoding="utf-8")):
+        assert "## Dependencies: AzerothGPS_StreetView" in text and figure in text
     for pk in cfg["sd"]["packs"]:  # (planned sizes stay under the limit at the measured SD size)
         assert pk["planned"] * 700_000 < cfg["budget_bytes"], pk["name"]
 
