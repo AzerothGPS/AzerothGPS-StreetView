@@ -22,9 +22,10 @@ Status: early development, private.
   - `Viewer.lua`: the street view window.
   - `Figure.lua`: the figure on the map, the road highlight and the view marker.
   - `Core.lua`: settings and `/sv` commands.
-  - `Media/`: our own art, made by `tools/sv.py media`: the map figure, the JPEG test card,
-    and `Logo.tga` (128x128, from `assets/logo.png`: the addon icon and the viewer's badge).
-- `assets/logo.png`: the StreetView logo, full size (also for the CurseForge page later).
+  - `Media/`: our own art, made by `tools/sv.py media`: `Figure.tga` (64x64, from
+    `assets/figure.png`: the map's drag figure), `Logo.tga` (128x128, from `assets/logo.png`:
+    the addon icon and the viewer's portrait) and the JPEG test card.
+- `assets/`: the full-size art: `logo.png` (also for the CurseForge page later) and `figure.png`.
 - `tools/AGPS_Capture/`: manual developer addon for example views on your own client. It
   never moves the character or the camera: you turn and press the game's own Set View keys,
   and it hides names and takes one screenshot per key press. Never shipped, and only

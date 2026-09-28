@@ -9,7 +9,6 @@ ns.Figure = F
 local D = ns.Data
 
 local ICON = "Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Figure"
-local LOGO = "Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Logo"
 local ROADS = { 0.25, 0.6, 1 } -- the road network while carrying
 local ROAD_HOT = { 0.55, 0.85, 1 } -- the road under the pointer
 local VIEWS = { 0.05, 0.3, 0.95 } -- street views
@@ -117,7 +116,23 @@ function F.Init()
 
   button = CreateFrame("Button", nil, parent)
   button:SetSize(28, 28)
-  button:SetPoint("BOTTOMRIGHT", -6, 70) -- above AzerothGPS's recenter button
+  -- In AzerothGPS's bottom-right column: right above its import button, or above its "Back to
+  -- your position" button while that one shows (only when the map is panned away from you).
+  local recenter, import = API.MapButton and API.MapButton("recenter"), API.MapButton and API.MapButton("import")
+  local function Place()
+    button:ClearAllPoints()
+    local below = (recenter and recenter:IsShown() and recenter) or import
+    if below then
+      button:SetPoint("BOTTOM", below, "TOP", 0, 4)
+    else
+      button:SetPoint("BOTTOMRIGHT", -6, 70) -- (an AzerothGPS without MapButton)
+    end
+  end
+  Place()
+  if recenter then
+    recenter:HookScript("OnShow", Place)
+    recenter:HookScript("OnHide", Place)
+  end
   local bg = button:CreateTexture(nil, "BACKGROUND")
   bg:SetAllPoints()
   bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
@@ -135,7 +150,7 @@ function F.Init()
   end)
   button:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("|T" .. LOGO .. ":40|t  Street view")
+    GameTooltip:AddLine("Street view")
     GameTooltip:AddLine("Drag onto a road to look around there.", 1, 1, 1, true)
     GameTooltip:AddLine("Click: the street view nearest you.", 0.8, 0.8, 0.8, true)
     GameTooltip:AddLine(string.format("%d views installed.", D.count), 0.6, 0.6, 0.6)
