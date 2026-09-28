@@ -91,23 +91,26 @@ def test_import_and_build_pack(tmp_path):
 
 def test_import_harvest(tmp_path):
     exp = tmp_path / "export" / "1-100--200"
-    (exp / "views").mkdir(parents=True)
-    for name in pack.ALL_POSES[:2]:
-        Image.new("RGB", (1024, 512), (10, 20, 30)).save(exp / "views" / f"{name}.jpg")
+    (exp / "cube").mkdir(parents=True)
+    for f in "FRBLUD":
+        for i in (0, 1):
+            for j in (0, 1):
+                Image.new("RGB", (64, 64), (10, 20, 30)).save(exp / "cube" / f"{f}{i}{j}.jpg")
     (exp / "meta.json").write_text(
         '{"id": "1-100--200", "cont": 1, "x": 100.2, "y": -199.8, "facing": 2.5, "zone": "Durotar",'
-        ' "captured": "2026-10-01T00:00:00+00:00"}', encoding="utf-8")
+        ' "captured": "2026-10-01T00:00:00+00:00", "cube": {"size": 64, "pad": 0.08, "mismatch": 9.5}}',
+        encoding="utf-8")
     bad = tmp_path / "export" / "junk"
     bad.mkdir()
     (bad / "meta.json").write_text('{"id": "1-0-0", "cont": 1, "x": 50, "y": 50}', encoding="utf-8")
     build = tmp_path / "build"
     stats = pack.import_harvest(tmp_path / "export", build, log=lambda *_: None)
-    assert stats == {"points": 1, "images": 2, "skipped": 1}
+    assert stats == {"points": 1, "images": 24, "skipped": 1}
     n, _ = pack.build_pack(build, "2026.10.01")
     assert n == 1
-    assert (build / pack.PACK / "Images" / "1-100--200" / "y000_p+00.jpg").exists()
+    assert (build / pack.PACK / "Images" / "1-100--200" / "cube" / "F00.jpg").exists()
     index = (build / pack.PACK / "Index.lua").read_text(encoding="utf-8")
-    assert 'id = "1-100--200"' in index and "facing = 2.5000" in index
+    assert 'id = "1-100--200"' in index and "facing = 2.5000" in index and "cube = { pad = 0.08 }" in index
 
 
 def test_stitch_measures_the_camera_and_rebuilds_the_panorama():

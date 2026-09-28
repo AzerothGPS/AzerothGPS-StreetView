@@ -288,33 +288,32 @@ def budget(build: Path) -> str:
 
 
 def import_harvest(folder: Path, build: Path, log=print) -> dict:
-    """Points exported by streetview-harvester (<folder>/<id>/meta.json + views/*.jpg) into
-    build/points.json and the pack's images. Only the views are used for now (the viewer shows
-    one view at a time); the panoramas stay in the export folder."""
+    """Points exported by streetview-harvester (<folder>/<id>/meta.json + cube/*.jpg, stitched
+    there with this repo's write_cube) into build/points.json and the pack's images."""
     points_file = build / "points.json"
     points = json.loads(points_file.read_text(encoding="utf-8")) if points_file.exists() else {}
     stats = {"points": 0, "images": 0, "skipped": 0}
     for meta_file in sorted(folder.glob("*/meta.json")):
         meta = json.loads(meta_file.read_text(encoding="utf-8"))
         pid = meta.get("id")
-        views = meta_file.parent / "views"
-        if not pid or pid != point_id(meta["cont"], meta["x"], meta["y"]) or not views.is_dir():
+        cube = meta_file.parent / "cube"
+        tiles = sorted(cube.glob("*.jpg")) if cube.is_dir() else []
+        if not pid or pid != point_id(meta["cont"], meta["x"], meta["y"]) or len(tiles) != 24 or not meta.get("cube"):
             stats["skipped"] += 1
-            log(f"  skipped {meta_file.parent.name}: no id, a mismatched id or no views")
+            log(f"  skipped {meta_file.parent.name}: no id, a mismatched id, or not a whole cube")
             continue
-        out_dir = build / PACK / "Images" / pid
-        out_dir.mkdir(parents=True, exist_ok=True)
-        poses = []
-        for img in sorted(views.glob("*.jpg")):
-            if img.stem in ALL_POSES:
-                shutil.copy2(img, out_dir / img.name)
-                poses.append(img.stem)
-                stats["images"] += 1
+        base = build / PACK / "Images" / pid
+        if base.exists():
+            shutil.rmtree(base)
+        (base / "cube").mkdir(parents=True)
+        for t in tiles:
+            shutil.copy2(t, base / "cube" / t.name)
+            stats["images"] += 1
         points[pid] = {
             "id": pid, "cont": meta["cont"], "x": meta["x"], "y": meta["y"], "z": meta.get("z") or 0,
             "facing": meta.get("facing") or 0, "zone": meta.get("zone") or "", "mapID": meta.get("mapID"),
-            "date": meta.get("captured", ""), "build": meta.get("client_build", ""), "poses": sorted(poses),
-            "source": "harvester",
+            "date": meta.get("captured", ""), "build": meta.get("client_build", ""), "poses": [],
+            "cube": meta["cube"], "source": "harvester",
         }
         stats["points"] += 1
     build.mkdir(parents=True, exist_ok=True)
