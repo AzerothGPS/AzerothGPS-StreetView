@@ -33,7 +33,10 @@ Status: early development, private.
   server lives in the separate private repo AzerothGPS/streetview-harvester.
 - `tools/sv.py`: install the addons; import manual captures (`import`) or points exported by
   the harvester on the capture PC (`import-harvest <folder>`) into the data pack.
-- `build/`: the generated `AzerothGPS_StreetView_Data` pack (git-ignored).
+- `packs.json`: the continent packs (what each holds, tile sizes, CurseForge projects, the size
+  budget).
+- `build/` (git-ignored): `master/<id>/` each spot's tiles at full resolution, `packs/<name>/`
+  the continent pack addons built from them.
 - `tests/`: `python -m pytest tests -q`.
 
 ## Taking example views on your own PC (manual)
@@ -62,3 +65,21 @@ Status: early development, private.
 `sv.cmd` in this folder runs `tools/sv.py` with the AzerothGPS venv's Python (it has Pillow
 and lupa). It works from any folder in PowerShell or Command Prompt when called by its full
 path, for example `C:\Users\<you>\OneDrive\Documents\Claude\AzerothGPS-StreetView\sv.cmd import`.
+
+## Releases
+
+The viewer and its pictures ship separately, both on CurseForge:
+
+- **The viewer** (`addon/AzerothGPS_StreetView`, code only): bump `## Version` in its toc, add a
+  `## <version>` section to `CHANGELOG.md`, commit, then tag and push `v<version>`. The workflow
+  (`.github/workflows/release.yml`) makes the GitHub release and uploads to CurseForge, where the
+  viewer requires AzerothGPS and the continent packs (`packs.json`), so installing it brings them.
+- **The continent packs** (the pictures, never in git): `sv.cmd release-data` builds, zips and
+  checks each pack (size under the budget, only pack files, nothing personal) as a dry run;
+  `sv.cmd release-data --upload` sends each to its own CurseForge project. It needs `CF_API_TOKEN`
+  set and the projects' ids and slugs filled in `packs.json`. Uploads are logged in
+  `data-releases.jsonl`.
+
+One pack per continent keeps every file under CurseForge's 2 GB limit (each is about 1.1 GB at
+100-yard spacing). Every build prints each pack's size and its projection to all planned spots.
+HD packs are not made for now; the master tiles keep full resolution so they can be later.

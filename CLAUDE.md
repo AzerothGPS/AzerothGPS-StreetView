@@ -21,6 +21,21 @@ AzerothGPS/AzerothGPS). This repo is **private**: https://github.com/AzerothGPS/
   other PC only. Never install anything from it into this PC's WoW folder.
 - American spelling in user-facing text.
 
+## Size and shipping (the user: always consider the CurseForge limit)
+
+- CurseForge refuses files of 2 GB or more. `packs.json` has one SD pack per continent
+  (Kalimdor with Zephras Isle; Eastern Kingdoms), each a separate CurseForge project that the
+  viewer requires. Budget 1.8 GB per zip; `build_packs` refuses more, and every build prints the
+  projection to all planned spots (100-yard spacing, about 4,120 spots).
+- Measured: SD (512 side tiles, 256 up/down, q75) about 470 KB a spot, about 1.1 GB per
+  continent; master/HD (1024/512) about 1.45 MB a spot. Check any change to tiles, quality or
+  spacing against these before it goes in.
+- HD packs: not made or shipped for now (the user may consider them later). Selling or
+  paywalling them would clash with Blizzard's add-on policy (add-ons free) and Fan Content
+  Policy (no selling game imagery): flag that if it comes up.
+- Releases: the viewer by tag (workflow); the packs by `sv.cmd release-data --upload`, only when
+  the user asks.
+
 ## Talking to AzerothGPS
 
 Only through its public API, the `AzerothGPS` global (`../azerothgps/addon/AzerothGPS/Api.lua`,
@@ -45,9 +60,11 @@ additive, with a lupa test) rather than reaching into AzerothGPS's private names
 Use the AzerothGPS venv: `%USERPROFILE%\.venvs\azerothgps\Scripts\python.exe`.
 
 ```
-python tools/sv.py install     # copy StreetView and the data pack into the game (--capture: + manual AGPS_Capture)
-python tools/sv.py import      # AGPS_Capture screenshots -> build/AzerothGPS_StreetView_Data, then install
-python tools/sv.py build       # rewrite the pack's Index.lua from build/points.json
+python tools/sv.py install     # copy StreetView and the continent packs into the game (--capture: + manual AGPS_Capture)
+python tools/sv.py import      # AGPS_Capture screenshots -> stitched spots -> build/packs, then install
+python tools/sv.py watch       # the same on every /reload
+python tools/sv.py release-data  # dry run: build, zip and check the packs (--upload: to CurseForge)
+python tools/sv.py build       # rebuild the packs and print their sizes
 python tools/sv.py media       # regenerate Media/ (Figure.tga, Probe.jpg)
 python -m pytest tests -q
 ```

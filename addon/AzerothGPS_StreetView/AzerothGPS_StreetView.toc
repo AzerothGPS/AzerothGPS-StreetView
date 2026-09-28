@@ -6,7 +6,7 @@
 ## X-Copyright: Copyright (c) 2026 AzerothGPS
 ## Version: 0.1.0
 ## Dependencies: AzerothGPS
-## OptionalDeps: AzerothGPS_StreetView_Data
+## OptionalDeps: AzerothGPS_StreetView_Kalimdor, AzerothGPS_StreetView_EasternKingdoms
 ## SavedVariables: AzerothGPSStreetViewDB
 ## IconTexture: Interface\AddOns\AzerothGPS_StreetView\Media\Logo
 

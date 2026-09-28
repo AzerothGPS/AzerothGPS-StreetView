@@ -1,0 +1,20 @@
+{
+  "about": "How AzerothGPS StreetView ships its pictures: standard (SD) packs, one per continent, uploaded to CurseForge as required dependencies of the viewer, so installing the viewer brings them. Every pack's zip stays under budget_bytes (CurseForge refuses files of 2 GB or more). 'planned' is the number of street view points at spacing_yd in that pack (streetview-harvester points.py on the current roads), for projecting full sizes. The master tiles in build/master are kept at HD resolution; HD packs are not made or shipped for now.",
+  "budget_bytes": 1800000000,
+  "spacing_yd": 100,
+  "master": {"tile": 1024, "pole": 512, "quality": 75},
+  "viewer": {
+    "name": "AzerothGPS_StreetView",
+    "curseforge_project": null,
+    "curseforge_requires": ["azerothgps"]
+  },
+  "sd": {
+    "tile": 512,
+    "pole": 256,
+    "quality": 75,
+    "packs": [
+      {"name": "AzerothGPS_StreetView_Kalimdor", "title": "Kalimdor and Zephras Isle", "continents": [1, 2991], "planned": 1796, "curseforge_project": null, "curseforge_slug": null},
+      {"name": "AzerothGPS_StreetView_EasternKingdoms", "title": "Eastern Kingdoms", "continents": [0], "planned": 2324, "curseforge_project": null, "curseforge_slug": null}
+    ]
+  }
+}

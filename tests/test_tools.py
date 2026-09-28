@@ -14,6 +14,8 @@ from svtools import pack  # noqa: E402
 
 lupa = pytest.importorskip("lupa")
 
+KAL = "AzerothGPS_StreetView_Kalimdor"
+
 
 def test_capture_sequence_covers_every_view_once():
     """The manual capture's 28 steps, shot at the facing the guide asks for, name exactly the
@@ -74,18 +76,19 @@ def test_import_and_build_pack(tmp_path):
     assert stats == {"captures": 1, "skipped": 1, "images": 3, "missing": 0}
     n, size = pack.build_pack(build, "2026.09.28")
     assert n == 1 and size > 0
-    img = build / pack.PACK / "Images" / "1-1629--4373" / "y000_p+00.jpg"
+    assert (build / "master" / "1-1629--4373" / "views" / "y000_p+00.jpg").exists()
+    img = build / "packs" / KAL / "Images" / "1-1629--4373" / "y000_p+00.jpg"
     assert Image.open(img).size == (1024, 512)
     # the generated Index.lua loads and the addon's Data.lua reads it
     lua = lupa.LuaRuntime()
-    lua.execute((build / pack.PACK / "Index.lua").read_text(encoding="utf-8"))
+    lua.execute((build / "packs" / KAL / "Index.lua").read_text(encoding="utf-8"))
     ns = lua.table()
     lua.eval("function(src) return assert(load(src)) end")(
         (ROOT / "addon" / "AzerothGPS_StreetView" / "Data.lua").read_text(encoding="utf-8"))("x", ns)
     assert ns.Data.Load() == 1
     p = ns.Data.byId["1-1629--4373"]
     assert p.zone == "Razor Hill" and p.facing == pytest.approx(1.5)
-    assert ns.Data.ImagePath(p, 0, 0) == "Interface\\AddOns\\AzerothGPS_StreetView_Data\\Images\\1-1629--4373\\y000_p+00.jpg"
+    assert ns.Data.ImagePath(p, 0, 0) == "Interface\\AddOns\\AzerothGPS_StreetView_Kalimdor\\Images\\1-1629--4373\\y000_p+00.jpg"
     assert ns.Data.HasPose(p, 1, 0) and not ns.Data.HasPose(p, 3, 0)
 
 
@@ -108,8 +111,8 @@ def test_import_harvest(tmp_path):
     assert stats == {"points": 1, "images": 24, "skipped": 1}
     n, _ = pack.build_pack(build, "2026.10.01")
     assert n == 1
-    assert (build / pack.PACK / "Images" / "1-100--200" / "cube" / "F00.jpg").exists()
-    index = (build / pack.PACK / "Index.lua").read_text(encoding="utf-8")
+    assert (build / "packs" / KAL / "Images" / "1-100--200" / "cube" / "F00.jpg").exists()
+    index = (build / "packs" / KAL / "Index.lua").read_text(encoding="utf-8")
     assert 'id = "1-100--200"' in index and "facing = 2.5000" in index and "cube = { pad = 0.08 }" in index
 
 
@@ -144,10 +147,11 @@ def test_stitch_measures_the_camera_and_rebuilds_the_panorama():
     assert np.abs(back.astype(float) - pano.astype(float)).mean() < 8
 
 
-def test_index_lists_panoramas():
+def test_index_lists_cubes():
     pts = [{"id": "0-1-1", "cont": 0, "x": 1, "y": 1, "facing": 0.5, "zone": "Z", "poses": ["y000_p+00"],
-            "pano": {"cols": 8, "rows": 4}}]
-    assert "pano = { cols = 8, rows = 4 }" in pack.index_lua(pts, "v")
+            "cube": {"pad": 0.08}}]
+    text = pack.index_lua(pts, "v", "AzerothGPS_StreetView_EasternKingdoms")
+    assert "cube = { pad = 0.08 }" in text and "AzerothGPS_StreetView_EasternKingdoms" in text
 
 
 def test_viewer_cells_sample_the_cube_where_they_look():
@@ -210,3 +214,88 @@ def test_cube_tiles_render_the_panorama():
         py = np.clip((0.5 - lat / math.pi) * 256 - 0.5, 0, 254.999)
         want = st.sample(pano.astype(np.float32), px, py)
         assert np.abs(img.reshape(-1, 3).astype(float) - want).mean() < 10, name
+
+
+def test_every_point_has_one_pack_and_the_viewer_loads_after_them():
+    cfg = pack.CONFIG
+    names = [p["name"] for p in cfg["sd"]["packs"]]
+    for cont in (0, 1, 2991):
+        assert pack.pack_for(cfg, {"cont": cont}) is not None
+    assert len({c for p in cfg["sd"]["packs"] for c in p["continents"]}) == sum(len(p["continents"]) for p in cfg["sd"]["packs"])
+    toc = (ROOT / "addon" / "AzerothGPS_StreetView" / "AzerothGPS_StreetView.toc").read_text(encoding="utf-8")
+    deps = next(l for l in toc.splitlines() if l.startswith("## OptionalDeps:"))
+    assert all(n in deps for n in names)  # (so the packs load before the viewer reads them)
+    for pk in cfg["sd"]["packs"]:  # (planned sizes stay under the limit at the measured SD size)
+        assert pk["planned"] * 700_000 < cfg["budget_bytes"], pk["name"]
+
+
+def fake_spot(build, pid, cont, x, y, px=128):
+    import json as js
+    d = build / "master" / pid / "cube"
+    d.mkdir(parents=True)
+    rng = __import__("numpy").random.default_rng(1)
+    for f in "FRBLUD":
+        for i in (0, 1):
+            for j in (0, 1):
+                n = px // 2 if f in "UD" else px
+                Image.fromarray(rng.integers(0, 255, (n, n, 3)).astype("uint8")).save(d / f"{f}{i}{j}.jpg")
+    pts = js.loads((build / "points.json").read_text()) if (build / "points.json").exists() else {}
+    pts[pid] = {"id": pid, "cont": cont, "x": x, "y": y, "facing": 0.0, "zone": "Z", "poses": [], "cube": {"pad": 0.08}}
+    (build / "points.json").write_text(js.dumps(pts))
+
+
+def test_packs_split_by_continent_scale_down_and_respect_the_budget(tmp_path):
+    import copy
+    cfg = copy.deepcopy(pack.CONFIG)
+    cfg["sd"]["tile"], cfg["sd"]["pole"] = 64, 32
+    build = tmp_path / "build"
+    fake_spot(build, "1-5-5", 1, 5, 5)
+    fake_spot(build, "0-7-7", 0, 7, 7)
+    fake_spot(build, "2991-1-1", 2991, 1, 1)
+    reports = {r["name"]: r for r in pack.build_packs(build, "2026.10.01", cfg)}
+    assert reports["AzerothGPS_StreetView_Kalimdor"]["points"] == 2  # (Kalimdor and Zephras Isle)
+    assert reports["AzerothGPS_StreetView_EasternKingdoms"]["points"] == 1
+    tile = build / "packs" / "AzerothGPS_StreetView_EasternKingdoms" / "Images" / "0-7-7" / "cube"
+    assert Image.open(tile / "F00.jpg").size == (64, 64) and Image.open(tile / "U00.jpg").size == (32, 32)
+    assert not (build / "packs" / "AzerothGPS_StreetView_Kalimdor" / "Images" / "0-7-7").exists()
+    assert "packs (limit" in pack.budget(list(reports.values()), cfg)
+    cfg["budget_bytes"] = 1000
+    with pytest.raises(SystemExit):
+        pack.build_packs(build, "2026.10.01", cfg)
+
+
+def test_old_single_pack_moves_into_the_master(tmp_path):
+    build = tmp_path / "build"
+    old = build / "AzerothGPS_StreetView_Data" / "Images" / "1-5-5" / "cube"
+    old.mkdir(parents=True)
+    Image.new("RGB", (8, 8)).save(old / "F00.jpg")
+    pack.migrate(build)
+    assert (build / "master" / "1-5-5" / "cube" / "F00.jpg").exists()
+    assert not (build / "AzerothGPS_StreetView_Data").exists()
+
+
+def test_release_zips_are_checked(tmp_path):
+    import copy
+    import zipfile
+    from svtools import release
+    cfg = copy.deepcopy(pack.CONFIG)
+    cfg["sd"]["tile"], cfg["sd"]["pole"] = 64, 32
+    build = tmp_path / "build"
+    fake_spot(build, "1-5-5", 1, 5, 5)
+    ready = release.release_data(build, tmp_path / "dist", "2026.10.01", upload=False, cfg=cfg, log=lambda *_: None)
+    assert [x["pack"]["name"] for x in ready] == ["AzerothGPS_StreetView_Kalimdor"]  # (no empty packs)
+    z = ready[0]["zip"]
+    with zipfile.ZipFile(z) as f:
+        names = f.namelist()
+    assert "AzerothGPS_StreetView_Kalimdor/AzerothGPS_StreetView_Kalimdor.toc" in names
+    assert release.check_zip(z, "AzerothGPS_StreetView_Kalimdor", cfg["budget_bytes"]) == []
+    bad = tmp_path / "bad.zip"
+    with zipfile.ZipFile(bad, "w") as f:
+        f.writestr("P/Index.lua", 'x = "C:\\Users\\someone\\WoW"')
+        f.writestr("P/notes.txt", "hi")
+        f.writestr("Other/a.jpg", "x")
+    problems = release.check_zip(bad, "P", cfg["budget_bytes"])
+    assert any("personal" in p for p in problems) and any("notes.txt" in p for p in problems)
+    assert any("outside" in p for p in problems)
+    with pytest.raises(SystemExit):  # (no project ids or token: refuses to upload)
+        release.release_data(build, tmp_path / "dist", "2026.10.01", upload=True, cfg=cfg, log=lambda *_: None)

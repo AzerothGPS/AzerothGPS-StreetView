@@ -7,6 +7,8 @@ Written 2026-09-28. This file is the brief for two Claude sessions:
 
 **Status 2026-09-28:** the REMOTE tools (Parts 2 and 5: AGPS_Harvester, driver, stitcher, point generator) are built in the private repo AzerothGPS/streetview-harvester; start from its README. LOCAL imports its exports with `tools/sv.py import-harvest`.
 
+**Distribution decided 2026-09-28:** 100-yard spacing; one standard (SD) pack per continent on CurseForge, each a required dependency of the viewer and under the 2 GB file limit (`packs.json`, README Releases); no HD packs for now. This supersedes Part 4.1 and 4.8's pack layout where they differ.
+
 Sections are tagged LOCAL or REMOTE. REMOTE owns Part 2 and Part 6. LOCAL owns Parts 3, 4, 5. Both follow the interfaces in Part 1 and Part 7.
 
 REMOTE: there is no guide to follow. A Reddit post exists that claims a personal WoW Forever server on 1.60.1, but it cannot be read from these sessions, so the server is planned from first principles in 2.1. The user's part on the capture PC is small and fixed: install Battle.net, sign in, download the WoW Forever beta client, sign out, leave. Everything after that is yours. Never open Battle.net, never sign in to anything, never type the user's credentials anywhere.
