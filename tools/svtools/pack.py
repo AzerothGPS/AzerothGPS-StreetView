@@ -16,7 +16,13 @@ from .savedvars import load_savedvariables
 
 PACK = "AzerothGPS_StreetView_Data"
 IMAGE_SIZE = (1024, 512)  # 2:1, powers of two (the game needs power-of-two textures)
-JPEG_QUALITY = 85
+JPEG_QUALITY = 85  # (single views)
+CUBE_QUALITY = 75  # cube tiles: measured on real spots, q85 -> q75 saves 15% with no visible loss
+# CurseForge refuses files of 2 GB or more; every pack zip stays under this (PLAN.md 4.1).
+BUDGET_BYTES = 1_800_000_000
+# Street view points planned at 75 yd spacing (streetview-harvester points.py on the current
+# roads), for projecting a full pack from the spots built so far.
+PLANNED_POINTS = {"Kalimdor": 2144, "Eastern Kingdoms": 2837, "Zephras Isle": 129}
 SHOT_EXTS = (".jpg", ".jpeg", ".tga", ".png")
 STAMP = "WoWScrnShot_%m%d%y_%H%M%S"
 
@@ -88,7 +94,7 @@ def index_lua(points: list[dict], version: str) -> str:
         "  points = {",
     ]
     for p in sorted(points, key=lambda q: q["id"]):
-        poses = ", ".join(f'["{n}"] = true' for n in p["poses"])
+        poses = "" if p.get("cube") else ", ".join(f'["{n}"] = true' for n in p["poses"])
         pano = p.get("pano")
         pano_lua = f' pano = {{ cols = {pano["cols"]}, rows = {pano["rows"]} }},' if pano else ""
         cube = p.get("cube")
@@ -147,6 +153,7 @@ def import_captures(wow: Path, build: Path, log=print) -> dict:
             continue  # a newer capture of this spot is already in
         out_dir = images / pid
         poses, raw = [], []
+        keep_cube = bool(old and old.get("date") == cap.get("date", "") and old.get("cube"))
         for shot in cap.get("shots") or []:
             src = match_shot(shot.get("file", ""), shots, used)
             if not src:
@@ -154,10 +161,11 @@ def import_captures(wow: Path, build: Path, log=print) -> dict:
                 log(f"  {pid} {shot.get('pose')}: no screenshot named like {shot.get('file')}")
                 continue
             used.add(src.stem)
-            out_dir.mkdir(parents=True, exist_ok=True)
-            with Image.open(src) as im:
-                crop_2to1(im.convert("RGB")).save(out_dir / f"{shot['pose']}.jpg", "JPEG", quality=JPEG_QUALITY,
-                                                  optimize=True, subsampling=2)
+            if not keep_cube:  # (a stitched spot shows its cube: the single views would only add size)
+                out_dir.mkdir(parents=True, exist_ok=True)
+                with Image.open(src) as im:
+                    crop_2to1(im.convert("RGB")).save(out_dir / f"{shot['pose']}.jpg", "JPEG", quality=JPEG_QUALITY,
+                                                      optimize=True, subsampling=2)
             poses.append(shot["pose"])
             raw.append({"pose": shot["pose"], "file": src.name, "facing": shot.get("facing")})
             stats["images"] += 1
@@ -169,23 +177,50 @@ def import_captures(wow: Path, build: Path, log=print) -> dict:
             "mapID": cap.get("mapID"), "date": cap.get("date", ""), "build": cap.get("build", ""),
             "poses": sorted(poses), "shots": raw,
         }
-        if old and old.get("date") == cap.get("date", "") and old.get("pano"):
-            points[pid]["pano"] = old["pano"]  # (the same capture again: its panorama still fits)
+        if keep_cube:
+            points[pid]["cube"] = old["cube"]  # (the same capture again: its cube still fits)
         stats["captures"] += 1
     build.mkdir(parents=True, exist_ok=True)
     points_file.write_text(json.dumps(points, indent=1), encoding="utf-8")
     return stats
 
 
-CUBE_SIZE = 1024  # pixels per cube tile (a quarter face, plus its pad): about 20 per degree
+CUBE_SIZE = 1024  # pixels per side-face tile (a quarter face plus its pad): about 20 per degree
+POLE_SIZE = 512  # ... per straight-up / straight-down tile: sky and ground need less detail
+
+
+def write_cube(shots, out_dir: Path, size: int = CUBE_SIZE, pole: int = POLE_SIZE,
+               quality: int = CUBE_QUALITY, log=print) -> dict:
+    """Calibrate and stitch one spot's pictures (stitch.Shot list) into its cube tiles in
+    out_dir (<face><col><row>.jpg). Returns the spot's cube description for the pack (and a
+    flat preview under the key "preview": an RGB array). Shared with streetview-harvester."""
+    import numpy as np
+
+    from . import stitch
+
+    rig = stitch.calibrate(shots, log=log)
+    flat = stitch.panorama(shots, rig, 2048)  # (fills any gap; also a picture to look at)
+    grays = [stitch._gray(sh.img, 320) for sh in shots]
+    mismatch = stitch.mismatch(shots, grays, rig, stitch.pairs(shots))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for f in out_dir.glob("*.jpg"):
+        f.unlink()
+    for face in stitch.FACES:
+        n = pole if face in ("U", "D") else size
+        for name, arr in stitch.cube_tiles(shots, rig, n, stitch.CUBE_PAD, fill=flat, faces=[face]).items():
+            Image.fromarray(arr).save(out_dir / f"{name}.jpg", "JPEG", quality=quality, optimize=True, subsampling=2)
+    return {"size": size, "pole": pole, "quality": quality, "pad": stitch.CUBE_PAD, "hfov": round(rig.hfov, 2),
+            "pitch": {k: round(v, 2) for k, v in rig.pitch.items()},
+            "yaw_off": {k: round(v, 2) for k, v in rig.yaw_off.items()},
+            "mismatch": round(float(mismatch), 2), "preview": np.asarray(flat)}
 
 
 def stitch_points(wow: Path, build: Path, size: int = CUBE_SIZE, only: set[str] | None = None,
                   force: bool = False, log=print) -> int:
-    """Stitch each captured spot's screenshots into a cube the viewer can look around in: six
-    faces in 24 tiles, build/<PACK>/Images/<id>/cube/<face><col><row>.jpg, rendered straight
-    from the screenshots; and a flat 360-degree copy in build/debug/<id>.jpg to look at. Spots
-    that already have one are skipped unless `force`."""
+    """Stitch each captured spot's screenshots into a cube the viewer can look around in (see
+    write_cube): build/<PACK>/Images/<id>/cube/, plus a flat 360-degree copy in
+    build/debug/<id>.jpg to look at. The spot's single views leave the pack (the cube replaces
+    them). Spots that already have one are skipped unless `force`."""
     import math
     import shutil as sh
 
@@ -214,25 +249,42 @@ def stitch_points(wow: Path, build: Path, size: int = CUBE_SIZE, only: set[str] 
             log(f"  {pid}: only {len(shots)} screenshots found, not stitched")
             continue
         log(f"stitching {pid} ({len(shots)} pictures)")
-        rig = stitch.calibrate(shots, log=log)
-        flat = stitch.panorama(shots, rig, 2048)  # (for filling any gap, and to look at)
-        tiles = stitch.cube_tiles(shots, rig, size, stitch.CUBE_PAD, fill=flat)
         base = build / PACK / "Images" / pid
+        cube = write_cube(shots, base / "cube", size, log=log)
+        preview = cube.pop("preview")
         if (base / "pano").exists():
             sh.rmtree(base / "pano")  # (the older flat tiles)
-        out = base / "cube"
-        out.mkdir(parents=True, exist_ok=True)
-        for name, arr in tiles.items():
-            Image.fromarray(arr).save(out / f"{name}.jpg", "JPEG", quality=JPEG_QUALITY, optimize=True, subsampling=2)
+        for f in base.glob("*.jpg"):
+            f.unlink()  # (the single views: the cube replaces them)
         (build / "debug").mkdir(parents=True, exist_ok=True)
-        Image.fromarray(flat).save(build / "debug" / f"{pid}.jpg", "JPEG", quality=90)
+        Image.fromarray(preview).save(build / "debug" / f"{pid}.jpg", "JPEG", quality=90)
         p.pop("pano", None)
-        p["cube"] = {"size": size, "pad": stitch.CUBE_PAD, "hfov": round(rig.hfov, 2),
-                     "pitch": {k: round(v, 2) for k, v in rig.pitch.items()},
-                     "yaw_off": {k: round(v, 2) for k, v in rig.yaw_off.items()}}
+        p["cube"] = cube
         done += 1
         points_file.write_text(json.dumps(points, indent=1), encoding="utf-8")
     return done
+
+
+def budget(build: Path) -> str:
+    """How big a full pack would be at the size per spot built so far, against CurseForge's
+    limit: a few lines for the tools to print."""
+    points_file = build / "points.json"
+    points = json.loads(points_file.read_text(encoding="utf-8")) if points_file.exists() else {}
+    sizes = []
+    for pid, p in points.items():
+        d = build / PACK / "Images" / pid
+        if p.get("cube") and d.exists():
+            sizes.append(sum(f.stat().st_size for f in d.rglob("*.jpg")))
+    if not sizes:
+        return "size: no stitched spots yet"
+    avg = sum(sizes) / len(sizes)
+    total = sum(PLANNED_POINTS.values())
+    lines = [f"size: {avg / 1e3:.0f} KB per spot (average of {len(sizes)}); all {total} planned spots "
+             f"would be {avg * total / 1e9:.2f} GB (limit per CurseForge file {BUDGET_BYTES / 1e9:.1f} GB)"]
+    for name, n in PLANNED_POINTS.items():
+        gb = avg * n / 1e9
+        lines.append(f"  {name}: {n} spots, {gb:.2f} GB" + ("  OVER THE LIMIT" if gb * 1e9 > BUDGET_BYTES else ""))
+    return "\n".join(lines)
 
 
 def import_harvest(folder: Path, build: Path, log=print) -> dict:
@@ -284,4 +336,7 @@ def build_pack(build: Path, version: str | None = None) -> tuple[int, int]:
     (pack / f"{PACK}.toc").write_text(toc(version), encoding="utf-8")
     (pack / "Index.lua").write_text(index_lua(list(points.values()), version), encoding="utf-8")
     size = sum(f.stat().st_size for f in (pack / "Images").rglob("*.jpg"))
+    if size > BUDGET_BYTES:
+        raise SystemExit(f"The pack is {size / 1e9:.2f} GB: over the {BUDGET_BYTES / 1e9:.1f} GB budget "
+                         "for one CurseForge file. Split it or lower the tile size first.")
     return len(points), size

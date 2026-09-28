@@ -84,6 +84,8 @@ def main(argv=None) -> None:
     p_h.add_argument("--no-install", action="store_true")
     sub.add_parser("build")
     sub.add_parser("media")
+    p_w = sub.add_parser("watch")
+    p_w.add_argument("--every", type=float, default=3.0, help="seconds between checks")
     a = ap.parse_args(argv)
 
     if a.cmd == "install":
@@ -95,12 +97,14 @@ def main(argv=None) -> None:
         n, size = pack.build_pack(BUILD)
         print(f"imported {stats['captures']} spots ({stats['images']} pictures; {stats['missing']} screenshots not found,"
               f" {stats['skipped']} unfinished captures skipped). The pack has {n} street views, {size / 1e6:.1f} MB.")
+        print(pack.budget(BUILD))
         if not a.no_install:
             install(a.wow, False)
     elif a.cmd == "stitch":
         k = pack.stitch_points(a.wow, BUILD, a.size, set(a.id) if a.id else None, a.force)
         n, size = pack.build_pack(BUILD)
         print(f"stitched {k} panoramas. The pack has {n} street views, {size / 1e6:.1f} MB.")
+        print(pack.budget(BUILD))
         if not a.no_install:
             install(a.wow, False)
     elif a.cmd == "import-harvest":
@@ -115,6 +119,44 @@ def main(argv=None) -> None:
     elif a.cmd == "media":
         from svtools import media
         media.make(ROOT / "addon" / "AzerothGPS_StreetView" / "Media")
+    elif a.cmd == "watch":
+        watch(a.wow, a.every)
+
+
+def watch(wow: Path, every: float) -> None:
+    """Import new spots on their own: whenever the game saves AGPS_Capture's list (on /reload
+    or logging out), import and stitch what's new, then install. Stop with Ctrl+C."""
+    import time
+
+    def stamps():
+        return {f: (f.stat().st_mtime, f.stat().st_size)
+                for f in (wow / "WTF" / "Account").glob("*/SavedVariables/AGPS_Capture.lua")}
+
+    seen = stamps()
+    print(f"watching {len(seen)} saved capture list(s); /reload in game after capturing. Ctrl+C stops.", flush=True)
+    while True:
+        time.sleep(every)
+        now = stamps()
+        if now == seen:
+            continue
+        time.sleep(every)  # (let the game finish writing)
+        if stamps() != now:
+            continue
+        seen = stamps()
+        stamp = time.strftime("%H:%M:%S")
+        try:
+            stats = pack.import_captures(wow, BUILD)
+            k = pack.stitch_points(wow, BUILD)
+            n, size = pack.build_pack(BUILD)
+            print(f"[{stamp}] {stats['captures']} spots in the list, {k} new stitched; "
+                  f"the pack has {n} street views, {size / 1e6:.1f} MB.", flush=True)
+            print(pack.budget(BUILD), flush=True)
+            if k:
+                install(wow, False)
+            else:
+                print(f"[{stamp}] nothing new to install.", flush=True)
+        except Exception as e:  # (keep watching: the next save may be fine)
+            print(f"[{stamp}] import failed: {e!r}", flush=True)
 
 
 if __name__ == "__main__":

@@ -279,11 +279,12 @@ def tile_dirs(face: str, ti: int, tj: int, n: int, pad: float = CUBE_PAD) -> np.
     return d / np.linalg.norm(d, axis=1, keepdims=True)
 
 
-def cube_tiles(shots: list[Shot], rig: Rig, size: int = 1024, pad: float = CUBE_PAD, fill=None):
+def cube_tiles(shots: list[Shot], rig: Rig, size: int = 1024, pad: float = CUBE_PAD, fill=None,
+               faces=None):
     """The 24 cube tiles {"F00": (size, size, 3) uint8, ...}, rendered straight from the
     pictures. `fill`: a gap-filled panorama to take directions no picture saw from."""
     out = {}
-    for face in FACES:
+    for face in (faces or FACES):
         for ti in (0, 1):
             for tj in (0, 1):
                 d = tile_dirs(face, ti, tj, size, pad)

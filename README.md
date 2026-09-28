@@ -51,6 +51,7 @@ Status: early development, private.
    press the capture key for each of the 28 shots (8 directions at level, up and down, then
    straight up and straight down twice each, 90 degrees apart). Take a step to cancel.
 5. Repeat 50 to 100 yards apart, then `/reload` so the game saves the list.
+   With `sv.cmd watch` running, the import below happens by itself on every `/reload`.
 6. `sv.cmd import` builds the data pack, stitches each new spot into a 360-degree panorama
    (about 40 seconds a spot; `sv.cmd stitch --force` redoes them), and installs it (not the
    capture tool). Restart the game (new files).
