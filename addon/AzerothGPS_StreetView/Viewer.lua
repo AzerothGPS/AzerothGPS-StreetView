@@ -23,7 +23,7 @@ local FOV, FOV_MIN, FOV_MAX = 90, 40, 110 -- panorama: degrees across the window
 local TURN_DEG, TILT_DEG = 45, 20 -- panorama: the arrow and Up/Down buttons
 local ARROW_SIZE, ARROW_LAT = 56, -15 -- way-to-go arrows: size, and degrees below the horizon
 local STEP_HFOV = 85 -- single views: their field of view across (the capture's, measured)
-local CUBE_FOV = 75 -- cube views: degrees across the window to start with
+local CUBE_FOV = FOV_MAX -- cube views open fully zoomed out (standing still and turning); the wheel zooms in
 local GRID_COLS, GRID_ROWS = 24, 12 -- cube views: the window is drawn as this many cells
 local MAX_LAT = 85 -- cube views: how far up or down you can look
 local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "level", [45] = "looking up", [90] = "straight up" }
@@ -512,7 +512,7 @@ function V.Open(p, heading)
   if not frame then V.Build() end
   if D.HasCube(p) then
     cur = { p = p, pano = true, cube = true, lon = heading and D.PanoLon(p, heading) or 0, lat = 0,
-      fov = (cur and cur.cube and cur.fov) or CUBE_FOV }
+      fov = CUBE_FOV } -- (every spot opens fully zoomed out, Go ahead too)
   elseif D.HasPano(p) then
     cur = { p = p, pano = true, lon = heading and D.PanoLon(p, heading) or 0, lat = 0, fov = (cur and cur.fov) or FOV }
   else
