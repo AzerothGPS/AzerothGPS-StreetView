@@ -145,3 +145,65 @@ def test_index_lists_panoramas():
     pts = [{"id": "0-1-1", "cont": 0, "x": 1, "y": 1, "facing": 0.5, "zone": "Z", "poses": ["y000_p+00"],
             "pano": {"cols": 8, "rows": 4}}]
     assert "pano = { cols = 8, rows = 4 }" in pack.index_lua(pts, "v")
+
+
+def test_viewer_cells_sample_the_cube_where_they_look():
+    """The viewer's Lua (Data.lua D.CubeCells) and the stitcher's Python (stitch.FACES,
+    tile_bounds) agree: every cell corner's texture coordinate in its tile is the direction
+    that screen point looks along, for views all around, straight up and straight down."""
+    import math
+    import numpy as np
+    from svtools import stitch as st
+
+    lua = lupa.LuaRuntime()
+    ns = lua.table()
+    lua.eval("function(src) return assert(load(src)) end")(
+        (ROOT / "addon" / "AzerothGPS_StreetView" / "Data.lua").read_text(encoding="utf-8"))("x", ns)
+    D = ns.Data
+    p = lua.eval("{ id = 'q', cube = { pad = 0.08 } }")
+    w, h, cols, rows = 640.0, 320.0, 16, 8
+    for lon, lat, fov in ((0, 0, 75), (37, 12, 90), (-150, -30, 60), (95, 84, 75), (200, -85, 100)):
+        cells = D.CubeCells(p, lon, lat, fov, w, h, cols, rows)
+        assert len(cells) >= cols * rows
+        area = sum(cells[i].cw * cells[i].ch for i in range(1, len(cells) + 1))
+        assert area == pytest.approx(w * h)  # (the whole window, no holes)
+        r, u, fw = st.axes(-math.radians(lon), math.radians(lat))
+        f = (w / 2) / math.tan(math.radians(fov) / 2)
+        for c in (cells[i] for i in range(1, len(cells) + 1)):
+            nrm, fr, fu = (np.array(v, dtype=float) for v in st.FACES[c.face])
+            a_lo, a_hi, b_lo, b_hi = st.tile_bounds(c.col, c.row)
+            corners = [(c.x, c.y), (c.x, c.y + c.ch), (c.x + c.cw, c.y), (c.x + c.cw, c.y + c.ch)]
+            for k, (sx, sy) in enumerate(corners):
+                uu, vv = c.uv[2 * k + 1], c.uv[2 * k + 2]
+                assert -0.001 <= uu <= 1.001 and -0.001 <= vv <= 1.001  # (inside the tile's image)
+                a = a_lo + uu * (a_hi - a_lo)
+                b = b_hi - vv * (b_hi - b_lo)
+                got = a * fr + b * fu + nrm
+                want = (sx - w / 2) * r + (h / 2 - sy) * u + f * fw
+                cos = got @ want / np.linalg.norm(got) / np.linalg.norm(want)
+                assert cos > 1 - 1e-9, (lon, lat, c.face, k)
+
+
+def test_cube_tiles_render_the_panorama():
+    """Cube tiles rendered from pictures of a known panorama show that panorama."""
+    import math
+    import numpy as np
+    from svtools import stitch as st
+
+    rng = np.random.default_rng(3)
+    pano = np.asarray(Image.fromarray(rng.integers(0, 255, (8, 16, 3)).astype(np.uint8)).resize((512, 256), Image.BICUBIC))
+    rig = st.Rig(hfov=90.0, pitch={"level": 0.0, "up": 45.0, "down": -45.0, "zenith": 90.0, "nadir": -90.0})
+    shots = [st.Shot(st.render(pano, math.radians(-45 * k), math.radians(rig.pitch[ring]), 320, 180, 90), math.radians(-45 * k), ring)
+             for k in range(8) for ring in ("level", "up", "down")]
+    shots += [st.Shot(st.render(pano, math.radians(t), math.radians(rig.pitch[ring]), 320, 180, 90), math.radians(t), ring)
+              for ring in ("zenith", "nadir") for t in (0, -90)]
+    tiles = st.cube_tiles(shots, rig, 64)
+    assert sorted(tiles) == sorted(f"{f}{i}{j}" for f in "FRBLUD" for i in (0, 1) for j in (0, 1))
+    for name, img in tiles.items():
+        d = st.tile_dirs(name[0], int(name[1]), int(name[2]), 64)
+        lon = np.arctan2(d[:, 0], d[:, 2])
+        lat = np.arcsin(np.clip(d[:, 1], -1, 1))
+        px = np.clip((lon / math.pi + 1) / 2 * 512 - 0.5, 0, 510.999)
+        py = np.clip((0.5 - lat / math.pi) * 256 - 0.5, 0, 254.999)
+        want = st.sample(pano.astype(np.float32), px, py)
+        assert np.abs(img.reshape(-1, 3).astype(float) - want).mean() < 10, name

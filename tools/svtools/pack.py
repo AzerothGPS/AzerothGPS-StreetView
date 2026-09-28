@@ -91,6 +91,9 @@ def index_lua(points: list[dict], version: str) -> str:
         poses = ", ".join(f'["{n}"] = true' for n in p["poses"])
         pano = p.get("pano")
         pano_lua = f' pano = {{ cols = {pano["cols"]}, rows = {pano["rows"]} }},' if pano else ""
+        cube = p.get("cube")
+        if cube:
+            pano_lua = f' cube = {{ pad = {cube["pad"]} }},'
         lines.append(
             f'    {{ id = {lua_str(p["id"])}, cont = {int(p["cont"])}, x = {p["x"]:.1f}, y = {p["y"]:.1f}, '
             f'z = {p.get("z") or 0:.1f}, facing = {p["facing"]:.4f}, zone = {lua_str(p.get("zone") or "")}, '
@@ -174,15 +177,17 @@ def import_captures(wow: Path, build: Path, log=print) -> dict:
     return stats
 
 
-PANO_TILE = 512
+CUBE_SIZE = 1024  # pixels per cube tile (a quarter face, plus its pad): about 20 per degree
 
 
-def stitch_points(wow: Path, build: Path, width: int = 4096, only: set[str] | None = None,
+def stitch_points(wow: Path, build: Path, size: int = CUBE_SIZE, only: set[str] | None = None,
                   force: bool = False, log=print) -> int:
-    """Stitch each captured spot's screenshots into a 360-degree panorama, cut into
-    PANO_TILE-pixel tiles: build/<PACK>/Images/<id>/pano/t<col><row>.jpg (and a full copy in
-    build/debug/<id>.jpg to look at). Spots that already have one are skipped unless `force`."""
+    """Stitch each captured spot's screenshots into a cube the viewer can look around in: six
+    faces in 24 tiles, build/<PACK>/Images/<id>/cube/<face><col><row>.jpg, rendered straight
+    from the screenshots; and a flat 360-degree copy in build/debug/<id>.jpg to look at. Spots
+    that already have one are skipped unless `force`."""
     import math
+    import shutil as sh
 
     import numpy as np
 
@@ -193,7 +198,7 @@ def stitch_points(wow: Path, build: Path, width: int = 4096, only: set[str] | No
     shots_dir = wow / "Screenshots"
     done = 0
     for pid, p in sorted(points.items()):
-        if (only and pid not in only) or (p.get("pano") and not force) or not p.get("shots"):
+        if (only and pid not in only) or (p.get("cube") and not force) or not p.get("shots"):
             continue
         facing0 = p["facing"]
         shots = []
@@ -210,23 +215,19 @@ def stitch_points(wow: Path, build: Path, width: int = 4096, only: set[str] | No
             continue
         log(f"stitching {pid} ({len(shots)} pictures)")
         rig = stitch.calibrate(shots, log=log)
-        # pictures a little sharper than the panorama needs (less shimmer when sampling)
-        target = round(width / 360 * rig.hfov * 1.5)
-        for s in shots:
-            h, w = s.img.shape[:2]
-            if w > target:
-                s.img = np.asarray(Image.fromarray(s.img).resize((target, round(h * target / w)), Image.LANCZOS))
-        pano = Image.fromarray(stitch.panorama(shots, rig, width))
-        cols, rows = width // PANO_TILE, width // 2 // PANO_TILE
-        out = build / PACK / "Images" / pid / "pano"
+        flat = stitch.panorama(shots, rig, 2048)  # (for filling any gap, and to look at)
+        tiles = stitch.cube_tiles(shots, rig, size, stitch.CUBE_PAD, fill=flat)
+        base = build / PACK / "Images" / pid
+        if (base / "pano").exists():
+            sh.rmtree(base / "pano")  # (the older flat tiles)
+        out = base / "cube"
         out.mkdir(parents=True, exist_ok=True)
-        for c in range(cols):
-            for r in range(rows):
-                pano.crop((c * PANO_TILE, r * PANO_TILE, (c + 1) * PANO_TILE, (r + 1) * PANO_TILE)).save(
-                    out / f"t{c}{r}.jpg", "JPEG", quality=JPEG_QUALITY, optimize=True, subsampling=2)
+        for name, arr in tiles.items():
+            Image.fromarray(arr).save(out / f"{name}.jpg", "JPEG", quality=JPEG_QUALITY, optimize=True, subsampling=2)
         (build / "debug").mkdir(parents=True, exist_ok=True)
-        pano.save(build / "debug" / f"{pid}.jpg", "JPEG", quality=90)
-        p["pano"] = {"cols": cols, "rows": rows, "width": width, "hfov": round(rig.hfov, 2),
+        Image.fromarray(flat).save(build / "debug" / f"{pid}.jpg", "JPEG", quality=90)
+        p.pop("pano", None)
+        p["cube"] = {"size": size, "pad": stitch.CUBE_PAD, "hfov": round(rig.hfov, 2),
                      "pitch": {k: round(v, 2) for k, v in rig.pitch.items()},
                      "yaw_off": {k: round(v, 2) for k, v in rig.yaw_off.items()}}
         done += 1

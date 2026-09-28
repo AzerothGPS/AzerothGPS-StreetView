@@ -214,3 +214,118 @@ function D.Directions(p, roads, radius, near, merge)
   end
   return dirs
 end
+
+-- Cubes (a point with `cube = { pad }`): the spot seen as six square faces, each in four
+-- tiles, Images/<id>/cube/<face><col><row>.jpg, drawn in true perspective (turning feels like
+-- turning your head). The faces as (normal, right, up) in the spot's frame: x right, y up,
+-- z forward along `facing`. Keep in step with tools/svtools/stitch.py FACES.
+D.FACES = {
+  F = { { 0, 0, 1 }, { 1, 0, 0 }, { 0, 1, 0 } },
+  R = { { 1, 0, 0 }, { 0, 0, -1 }, { 0, 1, 0 } },
+  B = { { 0, 0, -1 }, { -1, 0, 0 }, { 0, 1, 0 } },
+  L = { { -1, 0, 0 }, { 0, 0, 1 }, { 0, 1, 0 } },
+  U = { { 0, 1, 0 }, { 1, 0, 0 }, { 0, 0, -1 } },
+  D = { { 0, -1, 0 }, { 1, 0, 0 }, { 0, 0, 1 } },
+}
+D.FACE_NAMES = { "F", "R", "B", "L", "U", "D" }
+
+function D.HasCube(p)
+  return type(p.cube) == "table"
+end
+
+function D.CubePath(p, face, col, row)
+  local pack = p.pack or {}
+  return (pack.root or "") .. p.id .. "\\cube\\" .. face .. col .. row .. "." .. (pack.ext or "jpg")
+end
+
+local function dot(a, x, y, z) return a[1] * x + a[2] * y + a[3] * z end
+
+-- The face a direction points at most (largest component along a face's normal).
+function D.CubeFace(x, y, z)
+  local best, bestDot
+  for _, name in ipairs(D.FACE_NAMES) do
+    local d = dot(D.FACES[name][1], x, y, z)
+    if not bestDot or d > bestDot then best, bestDot = name, d end
+  end
+  return best
+end
+
+-- A direction's coordinates on a face (a right, b up; -1..1 on the face), nil behind it.
+function D.CubeCoords(face, x, y, z)
+  local f = D.FACES[face]
+  local n = dot(f[1], x, y, z)
+  if n <= 1e-6 then return nil end
+  return dot(f[2], x, y, z) / n, dot(f[3], x, y, z) / n
+end
+
+-- Right, up and forward of a view looking lon degrees clockwise from facing, lat degrees up.
+function D.ViewAxes(lon, lat)
+  local yaw, pitch = -math.rad(lon), math.rad(lat)
+  local L = -yaw
+  local cp, sp, cl, sl = math.cos(pitch), math.sin(pitch), math.cos(L), math.sin(L)
+  return { cl, 0, -sl }, { -sl * sp, cp, -cl * sp }, { sl * cp, sp, cl * cp }
+end
+
+-- The view as a grid of cols x rows cells over a window w x h (UI units), looking at
+-- (lon, lat) with fov degrees across: for each cell its rectangle (x, y from the window's
+-- top-left, y down; cw, ch), its tile (face, col, row) and the texture coordinates of its
+-- corners in that tile's image (ulx, uly, llx, lly, urx, ury, lrx, lry: SetTexCoord's order).
+-- Small cells cut in perspective: straight lines stay straight to the eye. A cell reaching
+-- past its tile's image (near a cube edge in a wide view) is split in four, up to twice.
+function D.CubeCells(p, lon, lat, fov, w, h, cols, rows)
+  local pad = (p.cube and p.cube.pad) or 0.08
+  local span = 1 + 2 * pad
+  local r, u, fw = D.ViewAxes(lon, lat)
+  local f = (w / 2) / math.tan(math.rad(fov) / 2)
+  local function dir(x, y) -- the direction screen point (x, y) looks along
+    local X, Y = x - w / 2, h / 2 - y
+    return X * r[1] + Y * u[1] + f * fw[1], X * r[2] + Y * u[2] + f * fw[2], X * r[3] + Y * u[3] + f * fw[3]
+  end
+  local out = {}
+  local function cell(x0, y0, x1, y1, depth)
+    local face = D.CubeFace(dir((x0 + x1) / 2, (y0 + y1) / 2))
+    local ca, cb = D.CubeCoords(face, dir((x0 + x1) / 2, (y0 + y1) / 2))
+    local col, row = ca < 0 and 0 or 1, cb >= 0 and 0 or 1
+    local a0 = (col == 0 and -1 or 0) - pad
+    local b1 = (row == 0 and 1 or 0) + pad
+    local uv, fits = {}, true
+    for _, c in ipairs({ { x0, y0 }, { x0, y1 }, { x1, y0 }, { x1, y1 } }) do -- (UL, LL, UR, LR)
+      local a, b = D.CubeCoords(face, dir(c[1], c[2]))
+      if not a then fits = false break end
+      local tu, tv = (a - a0) / span, (b1 - b) / span
+      if tu < -0.001 or tu > 1.001 or tv < -0.001 or tv > 1.001 then fits = false end
+      local n = #uv
+      uv[n + 1] = tu
+      uv[n + 2] = tv
+    end
+    if not fits and depth < 2 then
+      local mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+      cell(x0, y0, mx, my, depth + 1)
+      cell(mx, y0, x1, my, depth + 1)
+      cell(x0, my, mx, y1, depth + 1)
+      cell(mx, my, x1, y1, depth + 1)
+    elseif #uv == 8 then
+      out[#out + 1] = { x = x0, y = y0, cw = x1 - x0, ch = y1 - y0, face = face, col = col, row = row, uv = uv }
+    end
+  end
+  for j = 0, rows - 1 do
+    for i = 0, cols - 1 do
+      cell(i * w / cols, j * h / rows, (i + 1) * w / cols, (j + 1) * h / rows, 0)
+    end
+  end
+  return out
+end
+
+-- Where a ground direction appears in such a view: heading `dir` (radians), `below` degrees
+-- under the horizon; returns x, y from the window's top-left, or nil when behind the viewer.
+function D.CubeProject(p, lon, lat, fov, w, h, dir, below)
+  local r, u, fw = D.ViewAxes(lon, lat)
+  local f = (w / 2) / math.tan(math.rad(fov) / 2)
+  local L, el = math.rad(D.PanoLon(p, dir)), -math.rad(below)
+  local x, y, z = math.sin(L) * math.cos(el), math.sin(el), math.cos(L) * math.cos(el)
+  local zc = x * fw[1] + y * fw[2] + z * fw[3]
+  if zc <= 1e-3 then return nil end
+  local xc = x * r[1] + y * r[2] + z * r[3]
+  local yc = x * u[1] + y * u[2] + z * u[3]
+  return w / 2 + f * xc / zc, h / 2 - f * yc / zc
+end

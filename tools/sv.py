@@ -77,7 +77,7 @@ def main(argv=None) -> None:
     p_st = sub.add_parser("stitch")
     p_st.add_argument("--id", action="append", help="only this spot (repeatable)")
     p_st.add_argument("--force", action="store_true", help="rebuild panoramas that exist")
-    p_st.add_argument("--width", type=int, default=4096)
+    p_st.add_argument("--size", type=int, default=1024, help="cube tile size in pixels")
     p_st.add_argument("--no-install", action="store_true")
     p_h = sub.add_parser("import-harvest")
     p_h.add_argument("folder", type=Path)
@@ -98,7 +98,7 @@ def main(argv=None) -> None:
         if not a.no_install:
             install(a.wow, False)
     elif a.cmd == "stitch":
-        k = pack.stitch_points(a.wow, BUILD, a.width, set(a.id) if a.id else None, a.force)
+        k = pack.stitch_points(a.wow, BUILD, a.size, set(a.id) if a.id else None, a.force)
         n, size = pack.build_pack(BUILD)
         print(f"stitched {k} panoramas. The pack has {n} street views, {size / 1e6:.1f} MB.")
         if not a.no_install:

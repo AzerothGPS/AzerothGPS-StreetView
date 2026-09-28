@@ -23,10 +23,14 @@ local FOV, FOV_MIN, FOV_MAX = 90, 40, 110 -- panorama: degrees across the window
 local TURN_DEG, TILT_DEG = 45, 20 -- panorama: the arrow and Up/Down buttons
 local ARROW_SIZE, ARROW_LAT = 56, -15 -- way-to-go arrows: size, and degrees below the horizon
 local STEP_HFOV = 85 -- single views: their field of view across (the capture's, measured)
+local CUBE_FOV = 75 -- cube views: degrees across the window to start with
+local GRID_COLS, GRID_ROWS = 24, 12 -- cube views: the window is drawn as this many cells
+local MAX_LAT = 85 -- cube views: how far up or down you can look
 local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "level", [45] = "looking up", [90] = "straight up" }
 
 local frame, chrome, view, img, missing, title, info, preload
 local tiles = {} -- panorama tile textures by col * 100 + row
+local cells = {} -- cube view cell textures
 local lastMarkHeading -- heading last drawn on the map
 local arrows = {} -- way-to-go arrow buttons
 local dragging = false -- the picture is being dragged (arrows hidden)
@@ -225,9 +229,12 @@ function V.Build()
     if cur and cur.pano then
       -- smooth: the scenery follows the pointer (pull right: look left; pull up: look down)
       if dx ~= 0 or dy ~= 0 then
-        local ppd = view:GetWidth() / cur.fov
-        cur.lon = cur.lon - dx / ppd
-        cur.lat = cur.lat - dy / ppd
+        local dpu = cur.fov / view:GetWidth() -- degrees per UI unit (flat panorama)
+        if cur.cube then -- (in perspective: the angle a UI unit spans at the window's middle)
+          dpu = math.deg(math.tan(math.rad(cur.fov) / 2) / (view:GetWidth() / 2))
+        end
+        cur.lon = cur.lon - dx * dpu
+        cur.lat = cur.lat - dy * dpu
         dragX, dragY = x, y
         V.Refresh()
       end
@@ -330,20 +337,20 @@ HideArrows = function()
   for _, b in ipairs(arrows) do b:Hide() end
 end
 
--- Place the arrows for a view looking along centerHeading (radians), tilted centerLat
--- degrees, at ppd UI units per degree. An arrow whose spot on the ground is below the view
--- stays at its bottom edge, so the ways on are always in sight.
-local function PlaceArrows(centerHeading, centerLat, ppd)
+-- Place the arrows for a view looking along centerHeading (radians); project(dir) gives
+-- where the ground that way appears (x, y from the window's top-left), nil when behind. An
+-- arrow whose spot on the ground is below the view stays at its bottom edge, so the ways on
+-- are always in sight.
+local function PlaceArrowsAt(centerHeading, project)
   local dirs = cur and cur.dirs
   if dragging or not dirs or not centerHeading then return HideArrows() end
   local w, h = view:GetWidth(), view:GetHeight()
-  local top = centerLat + h / ppd / 2
-  local y = math.min((top - ARROW_LAT) * ppd, h - ARROW_SIZE * 0.75)
   for i, dir in ipairs(dirs) do
     local b = arrows[i] or NewArrow(i)
     local rel = math.deg(D.AngleDiff(centerHeading, dir)) -- degrees to the right
-    local x = w / 2 + rel * ppd
-    if y > ARROW_SIZE / 2 and x > ARROW_SIZE / 2 and x < w - ARROW_SIZE / 2 then
+    local x, y = project(dir)
+    if y then y = math.min(y, h - ARROW_SIZE * 0.75) end
+    if x and y and y > ARROW_SIZE / 2 and x > ARROW_SIZE / 2 and x < w - ARROW_SIZE / 2 then
       b.heading = dir
       b:ClearAllPoints()
       b:SetPoint("CENTER", view, "TOPLEFT", x, -y)
@@ -354,6 +361,65 @@ local function PlaceArrows(centerHeading, centerLat, ppd)
     end
   end
   for i = #dirs + 1, #arrows do arrows[i]:Hide() end
+end
+
+-- ... for a flat view: looking along centerHeading, tilted centerLat degrees, ppd UI units a degree.
+local function PlaceArrows(centerHeading, centerLat, ppd)
+  local w, h = view:GetWidth(), view:GetHeight()
+  local top = centerLat + h / ppd / 2
+  PlaceArrowsAt(centerHeading, function(dir)
+    return w / 2 + math.deg(D.AngleDiff(centerHeading, dir)) * ppd, (top - ARROW_LAT) * ppd
+  end)
+end
+
+local function HideCells(from)
+  for i = from or 1, #cells do cells[i]:Hide() end
+end
+
+-- The cube view: the window as a grid of small cells, each cut from the cube in perspective.
+local function CubeRefresh()
+  local p = cur.p
+  img:Hide()
+  missing:Hide()
+  HideTiles()
+  local w, h = view:GetWidth(), view:GetHeight()
+  if not w or w <= 0 or not h or h <= 0 then return end
+  cur.lon = (cur.lon + 180) % 360 - 180
+  cur.lat = math.max(-MAX_LAT, math.min(MAX_LAT, cur.lat))
+  local list = D.CubeCells(p, cur.lon, cur.lat, cur.fov, w, h, GRID_COLS, GRID_ROWS)
+  for i, c in ipairs(list) do
+    local tex = cells[i]
+    if not tex then
+      tex = view:CreateTexture(nil, "ARTWORK")
+      if tex.SetSnapToPixelGrid then tex:SetSnapToPixelGrid(false) end
+      if tex.SetTexelSnappingBias then tex:SetTexelSnappingBias(0) end
+      cells[i] = tex
+    end
+    local path = D.CubePath(p, c.face, c.col, c.row)
+    if tex.path ~= path then
+      if tex:SetTexture(path, "CLAMP", "CLAMP") == false then tex:SetColorTexture(0.06, 0.06, 0.08, 1) end
+      tex.path = path
+    end
+    tex:ClearAllPoints()
+    tex:SetPoint("TOPLEFT", view, "TOPLEFT", c.x, -c.y)
+    tex:SetSize(c.cw + 0.5, c.ch + 0.5) -- (a hair of overlap: no seams between cells)
+    local uv = c.uv
+    tex:SetTexCoord(uv[1], uv[2], uv[3], uv[4], uv[5], uv[6], uv[7], uv[8])
+    tex:Show()
+  end
+  HideCells(#list + 1)
+  Title(p)
+  local heading = D.PanoHeading(p, cur.lon)
+  local tilt = math.floor(cur.lat + 0.5)
+  local looking = tilt == 0 and "level" or (tilt > 0 and ("looking up " .. tilt) or ("looking down " .. -tilt))
+  info:SetText(D.Compass(heading) .. "  " .. looking)
+  PlaceArrowsAt(heading, function(dir)
+    return D.CubeProject(p, cur.lon, cur.lat, cur.fov, w, h, dir, -ARROW_LAT)
+  end)
+  if ns.Figure and (not lastMarkHeading or math.abs(D.AngleDiff(heading, lastMarkHeading)) > 0.03) then
+    lastMarkHeading = heading
+    ns.Figure.Redraw()
+  end
 end
 
 -- The panorama: the tiles in view, laid flat and slid into place.
@@ -406,6 +472,8 @@ end
 -- Draw the current view.
 function V.Refresh()
   if not frame or not cur then return end
+  if cur.cube then return CubeRefresh() end
+  HideCells()
   if cur.pano then return PanoRefresh() end
   HideTiles()
   img:Show()
@@ -442,7 +510,10 @@ end
 -- first view), level.
 function V.Open(p, heading)
   if not frame then V.Build() end
-  if D.HasPano(p) then
+  if D.HasCube(p) then
+    cur = { p = p, pano = true, cube = true, lon = heading and D.PanoLon(p, heading) or 0, lat = 0,
+      fov = (cur and cur.cube and cur.fov) or CUBE_FOV }
+  elseif D.HasPano(p) then
     cur = { p = p, pano = true, lon = heading and D.PanoLon(p, heading) or 0, lat = 0, fov = (cur and cur.fov) or FOV }
   else
     cur = { p = p, yaw = heading and D.YawFor(p, heading) or 0, pitch = D.LEVEL }
@@ -517,6 +588,7 @@ function V.Probe()
   if not frame then V.Build() end
   cur = nil
   HideTiles()
+  HideCells()
   HideArrows()
   img:Show()
   frame:Show()

@@ -200,36 +200,104 @@ def calibrate(shots: list[Shot], rig: Rig | None = None, width: int = 320, log=N
     return rig
 
 
+SHARP = 12  # blending: higher prefers the picture looking most straight at a spot (less ghosting)
+FEATHER = 0.06  # ... fading out over this share of a picture's width at its edges
+
+
+def colors(shots: list[Shot], rig: Rig, d: np.ndarray, skip_behind: bool = True):
+    """Colors seen along directions d (n, 3): each picture that sees a direction samples it,
+    weighted toward the picture most straight on it. Returns (n, 3) uint8 and a mask of the
+    directions some picture saw."""
+    acc = np.zeros((d.shape[0], 3), dtype=np.float32)
+    wsum = np.zeros(d.shape[0], dtype=np.float32)
+    mean = d.mean(axis=0)
+    mean = mean / (np.linalg.norm(mean) or 1)
+    for s in shots:
+        cam = camera(s, rig)
+        if skip_behind and len(d) > 1000 and float(mean @ cam[2]) < -0.3:
+            continue  # (a picture looking away from this whole patch)
+        h, w = s.img.shape[:2]
+        f = focal(w, rig.hfov)
+        px, py, z, ok = project(d, cam, w, h, f)
+        if not ok.any():
+            continue
+        edge = np.minimum.reduce([px, w - 1 - px, py, h - 1 - py]) / (FEATHER * w)
+        wt = np.where(ok, np.clip(edge, 0, 1) * np.clip(z, 0, 1) ** SHARP, 0).astype(np.float32)
+        idx = np.nonzero(wt > 1e-12)[0]
+        acc[idx] += sample(s.img, px[idx], py[idx]) * wt[idx, None]
+        wsum[idx] += wt[idx]
+    out = acc / np.maximum(wsum, 1e-30)[:, None]
+    return np.clip(out, 0, 255).astype(np.uint8), wsum > 0
+
+
 def panorama(shots: list[Shot], rig: Rig, width: int = 4096, band: int = 128) -> np.ndarray:
     """The equirectangular panorama (width x width/2, RGB uint8), in bands of rows."""
     height = width // 2
     out = np.zeros((height, width, 3), dtype=np.uint8)
     covered = np.zeros((height, width), dtype=bool)
     lon = ((np.arange(width) + 0.5) / width * 2 - 1) * math.pi
-    imgs = [s.img for s in shots]  # (uint8: sampling works in floats anyway; saves memory)
-    cams = [camera(s, rig) for s in shots]
     for top in range(0, height, band):
         rows = np.arange(top, min(top + band, height))
         lat = (0.5 - (rows + 0.5) / height) * math.pi
         LON, LAT = np.meshgrid(lon, lat)
         d = np.stack([np.sin(LON) * np.cos(LAT), np.sin(LAT), np.cos(LON) * np.cos(LAT)], axis=-1).reshape(-1, 3)
-        acc = np.zeros((d.shape[0], 3), dtype=np.float32)
-        wsum = np.zeros(d.shape[0], dtype=np.float32)
-        for img, cam in zip(imgs, cams):
-            h, w = img.shape[:2]
-            f = focal(w, rig.hfov)
-            px, py, z, ok = project(d, cam, w, h, f)
-            if not ok.any():
-                continue
-            edge = np.minimum.reduce([px, w - 1 - px, py, h - 1 - py]) / (0.12 * w)
-            wt = np.where(ok, np.clip(edge, 0, 1) * np.clip(z, 0, 1) ** 4, 0).astype(np.float32)
-            idx = np.nonzero(wt > 0)[0]
-            acc[idx] += sample(img, px[idx], py[idx]) * wt[idx, None]
-            wsum[idx] += wt[idx]
-        band_img = acc / np.maximum(wsum, 1e-9)[:, None]
-        out[rows[0]:rows[-1] + 1] = np.clip(band_img, 0, 255).astype(np.uint8).reshape(len(rows), width, 3)
-        covered[rows[0]:rows[-1] + 1] = (wsum > 0).reshape(len(rows), width)
+        c, seen = colors(shots, rig, d, skip_behind=False)
+        out[rows[0]:rows[-1] + 1] = c.reshape(len(rows), width, 3)
+        covered[rows[0]:rows[-1] + 1] = seen.reshape(len(rows), width)
     return fill_gaps(out, covered)
+
+
+# The cube the viewer draws from: six faces, each (normal, right, up) in the panorama's frame
+# (x right, y up, z forward along the spot's first facing). Keep in step with Data.lua D.FACES.
+FACES = {
+    "F": ((0, 0, 1), (1, 0, 0), (0, 1, 0)),
+    "R": ((1, 0, 0), (0, 0, -1), (0, 1, 0)),
+    "B": ((0, 0, -1), (-1, 0, 0), (0, 1, 0)),
+    "L": ((-1, 0, 0), (0, 0, 1), (0, 1, 0)),
+    "U": ((0, 1, 0), (1, 0, 0), (0, 0, -1)),
+    "D": ((0, -1, 0), (1, 0, 0), (0, 0, 1)),
+}
+CUBE_PAD = 0.08  # each tile reaches this far (in face units, a face is 2 across) past its quarter
+
+
+def tile_bounds(ti: int, tj: int, pad: float = CUBE_PAD):
+    """Face coordinates a (right) from a0 to a1 and b (up) from b0 to b1 a tile's image
+    covers: quarter ti (0 left, 1 right), tj (0 top, 1 bottom) of the face, plus the pad."""
+    a0, a1 = (-1.0, 0.0) if ti == 0 else (0.0, 1.0)
+    b0, b1 = (0.0, 1.0) if tj == 0 else (-1.0, 0.0)
+    return a0 - pad, a1 + pad, b0 - pad, b1 + pad
+
+
+def tile_dirs(face: str, ti: int, tj: int, n: int, pad: float = CUBE_PAD) -> np.ndarray:
+    """Directions of a tile image's pixels (row by row from the top), (n*n, 3)."""
+    nrm, r, u = (np.array(v, dtype=float) for v in FACES[face])
+    a_lo, a_hi, b_lo, b_hi = tile_bounds(ti, tj, pad)
+    a = a_lo + (np.arange(n) + 0.5) / n * (a_hi - a_lo)
+    b = b_hi - (np.arange(n) + 0.5) / n * (b_hi - b_lo)
+    A, B = np.meshgrid(a, b)
+    d = A.reshape(-1, 1) * r + B.reshape(-1, 1) * u + nrm
+    return d / np.linalg.norm(d, axis=1, keepdims=True)
+
+
+def cube_tiles(shots: list[Shot], rig: Rig, size: int = 1024, pad: float = CUBE_PAD, fill=None):
+    """The 24 cube tiles {"F00": (size, size, 3) uint8, ...}, rendered straight from the
+    pictures. `fill`: a gap-filled panorama to take directions no picture saw from."""
+    out = {}
+    for face in FACES:
+        for ti in (0, 1):
+            for tj in (0, 1):
+                d = tile_dirs(face, ti, tj, size, pad)
+                c, seen = colors(shots, rig, d)
+                if fill is not None and not seen.all():
+                    miss = ~seen
+                    ph, pw = fill.shape[:2]
+                    lon = np.arctan2(d[miss, 0], d[miss, 2])
+                    lat = np.arcsin(np.clip(d[miss, 1], -1, 1))
+                    px = np.clip((lon / math.pi + 1) / 2 * pw - 0.5, 0, pw - 1.001)
+                    py = np.clip((0.5 - lat / math.pi) * ph - 0.5, 0, ph - 1.001)
+                    c[miss] = sample(fill, px, py).astype(np.uint8)
+                out[f"{face}{ti}{tj}"] = c.reshape(size, size, 3)
+    return out
 
 
 def fill_gaps(img: np.ndarray, covered: np.ndarray) -> np.ndarray:

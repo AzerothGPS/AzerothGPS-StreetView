@@ -102,5 +102,5 @@ def make(media: Path) -> None:
     arrow().save(media / "Arrow.tga")  # the viewer's way-to-go chevrons
     if (assets / "logo.png").exists():
         fit(assets / "logo.png", 128).save(media / "Logo.tga")  # the addon list icon
-        fit(assets / "logo.png", 128, 0.68).save(media / "Portrait.tga")  # the viewer's portrait: small enough that its round frame shows all of "StreetView"
+        fit(assets / "logo.png", 128, 0.76).save(media / "Portrait.tga")  # the viewer's portrait: small enough that its round frame shows all of "StreetView"
     print(f"wrote Figure.tga, Logo.tga, Portrait.tga, Arrow.tga and Probe.jpg in {media}")
