@@ -303,3 +303,34 @@ def test_release_zips_are_checked(tmp_path):
     assert any("outside" in p for p in problems)
     with pytest.raises(SystemExit):  # (no project ids or token: refuses to upload)
         release.release_data(build, tmp_path / "dist", "2026.10.01", upload=True, cfg=cfg, log=lambda *_: None)
+
+
+def test_stitch_repairs_a_picture_taken_at_the_wrong_angle():
+    """One 'up' picture really looking down, and a 'straight up' one really level (both seen in
+    a manual capture): repair moves them to where they fit and the panorama comes out right."""
+    import math
+    import numpy as np
+    from svtools import stitch as st
+
+    rng = np.random.default_rng(7)
+    base = Image.fromarray(rng.integers(0, 255, (16, 32, 3)).astype(np.uint8)).resize((512, 256), Image.BICUBIC)
+    noise = Image.fromarray(rng.integers(0, 255, (64, 128, 3)).astype(np.uint8)).resize((512, 256), Image.BICUBIC)
+    pano = (np.asarray(base) * 0.6 + np.asarray(noise) * 0.4).astype(np.uint8)
+    true = {"level": 2.0, "up": 45.0, "down": -40.0, "zenith": 88.0, "nadir": -88.0}
+    shots = []
+    for k in range(8):
+        for ring in ("level", "up", "down"):
+            yaw = math.radians(-45 * k)
+            really = "down" if (k == 1 and ring == "up") else ring
+            shots.append(st.Shot(st.render(pano, yaw, math.radians(true[really]), 240, 135, 84), yaw, ring))
+    for ring, turn in (("zenith", 0), ("zenith", -90), ("nadir", -90), ("nadir", 0)):
+        really = "level" if (ring == "zenith" and turn == 0) else ring
+        shots.append(st.Shot(st.render(pano, math.radians(turn), math.radians(true[really]), 240, 135, 84),
+                             math.radians(turn), ring))
+    rig = st.calibrate(shots, width=160)
+    fixed, done = st.repair(shots, rig, width=160)
+    assert len(done) >= 2 and all("moved" in d or "left out" in d for d in done)
+    assert shots[4].ring == "down"  # (k = 1, taken as 'up')
+    rig = st.calibrate(fixed, rig, width=160)
+    back = st.panorama(fixed, rig, 512)
+    assert np.abs(back.astype(float) - pano.astype(float)).mean() < 8

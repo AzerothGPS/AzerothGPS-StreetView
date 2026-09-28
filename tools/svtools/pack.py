@@ -222,6 +222,9 @@ def write_cube(shots, out_dir: Path, size: int = CUBE_SIZE, pole: int = POLE_SIZ
     from . import stitch
 
     rig = stitch.calibrate(shots, log=log)
+    shots, repaired = stitch.repair(shots, rig, log=log)  # (pictures taken at the wrong angle)
+    if repaired:
+        rig = stitch.calibrate(shots, rig, log=log)
     flat = stitch.panorama(shots, rig, 2048)  # (fills any gap; also a picture to look at)
     grays = [stitch._gray(sh.img, 320) for sh in shots]
     mismatch = stitch.mismatch(shots, grays, rig, stitch.pairs(shots))
@@ -235,7 +238,7 @@ def write_cube(shots, out_dir: Path, size: int = CUBE_SIZE, pole: int = POLE_SIZ
     return {"size": size, "pole": pole, "quality": quality, "pad": stitch.CUBE_PAD, "hfov": round(rig.hfov, 2),
             "pitch": {k: round(v, 2) for k, v in rig.pitch.items()},
             "yaw_off": {k: round(v, 2) for k, v in rig.yaw_off.items()},
-            "mismatch": round(float(mismatch), 2), "preview": np.asarray(flat)}
+            "mismatch": round(float(mismatch), 2), "repaired": repaired, "preview": np.asarray(flat)}
 
 
 def stitch_points(wow: Path, build: Path, size: int = CUBE_SIZE, only: set[str] | None = None,

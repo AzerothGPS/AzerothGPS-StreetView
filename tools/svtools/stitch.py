@@ -141,6 +141,59 @@ def mismatch(shots, grays, rig: Rig, plist, step: int = 3) -> float:
     return total / max(count, 1)
 
 
+def shot_errors(shots, grays, rig: Rig) -> list[float]:
+    """Each picture's mismatch with its neighbors (see pairs)."""
+    plist = pairs(shots)
+    return [mismatch(shots, grays, rig, [p for p in plist if i in p]) for i in range(len(shots))]
+
+
+def repair(shots: list[Shot], rig: Rig, width: int = 320, log=None) -> tuple[list[Shot], list[str]]:
+    """Catch pictures taken at the wrong angle (a slip in a manual capture: the wrong Set View
+    key, the mouse moved after it): a picture that disagrees with its neighbors far more than
+    the rest is tried as every other kind of view (level, up, down, straight up, straight down)
+    and moved to the one it clearly fits; one that fits none is left out. Worst first, until
+    nothing changes. Returns the pictures to use and what was done."""
+    grays = [_gray(s.img, width) for s in shots]
+    done, dropped = [], set()
+    for _ in range(6):
+        live = [i for i in range(len(shots)) if i not in dropped]
+        sub = [shots[i] for i in live]
+        subg = [grays[i] for i in live]
+        errs = shot_errors(sub, subg, rig)
+        med = float(np.median(errs))
+        worst = max(range(len(sub)), key=lambda k: errs[k])
+        e = errs[worst]
+        if e <= max(1.5 * med, med + 6):
+            break
+        shot = sub[worst]
+        old = shot.ring
+        best, best_e = old, e
+        for ring in GUESS:
+            if ring == old:
+                continue
+            shot.ring = ring
+            plist = pairs(sub)
+            e2 = mismatch(sub, subg, rig, [p for p in plist if worst in p])
+            if e2 < best_e:
+                best, best_e = ring, e2
+        shot.ring = old
+        typical = max(1.5 * med, med + 6)
+        # moved only when it then fits like any other picture (a moving zeppelin makes a true
+        # picture disagree too, but it fits nowhere better); left out only when far off
+        if best != old and best_e < 0.7 * e and best_e <= typical:
+            shot.ring = best
+            done.append(f"a picture taken as '{old}' looks '{best}' (mismatch {e:.0f} -> {best_e:.0f}): moved")
+        elif e > 3.5 * med:
+            dropped.add(live[worst])
+            done.append(f"a '{old}' picture fits nowhere (mismatch {e:.0f}, typical {med:.0f}): left out")
+        else:
+            break
+    if log:
+        for d in done:
+            log("  " + d)
+    return [s for i, s in enumerate(shots) if i not in dropped], done
+
+
 def _descend(shots, grays, rig: Rig, plist, params, step: float, min_step: float = 0.05) -> float:
     """Coordinate descent: each parameter tries a few offsets (a small line search) in turn,
     until no step of at least min_step helps."""
