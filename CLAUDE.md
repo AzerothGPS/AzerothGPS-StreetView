@@ -34,8 +34,9 @@ additive, with a lupa test) rather than reaching into AzerothGPS's private names
 - A point's views: yaw index 0..7 (counter-clockwise; the capture measures the facing of each shot) at pitches -45, 0, 45 plus straight up and down; file
   names `y<deg>_p<+/-deg>` (`Data.lua` `D.PoseName`, `tools/svtools/pack.py` `pose_name`,
   the capture addon's list: keep all three in step; a test checks it).
-- `facing` in the pack is the heading of view 0. `D.yawSign` says which way FlipCameraYaw
-  turned (`/sv flipyaw` switches it if left and right come out swapped).
+- `facing` in the pack is the heading of view 0. Image names are always counter-clockwise
+  indexes: the manual capture names each shot from its measured facing, and the harvester
+  normalizes with its calibrated `yaw_sign`. `D.yawSign` stays 1 (`/sv flipyaw` is a fallback).
 - Images: 1024x512 JPEG (power of two). JPEG support on this client is checked with
   `/sv probe`; if it fails, switch the pack to BLP.
 
