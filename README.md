@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="AGPS StreetView logo" width="320">
+</p>
+
 # AzerothGPS StreetView
 
 A companion addon for [AzerothGPS](https://github.com/AzerothGPS/AzerothGPS) on World of
