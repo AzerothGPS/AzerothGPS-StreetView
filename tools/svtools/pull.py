@@ -39,9 +39,19 @@ def resolve_source(arg: str | None, build: Path) -> Path:
 
 def pull(src: Path, build: Path, log=print) -> dict:
     """Copy new or changed spots from <src>/out, import them, and fetch <src>/review/*.jpg."""
+    try:
+        os.listdir(src)
+    except OSError as e:
+        # 5 access denied, 1326 unknown user or bad password, 86 bad password, 1331 account
+        # disabled, 1907 password must change: all mean this PC hasn't signed in to the share yet
+        if isinstance(e, PermissionError) or getattr(e, "winerror", None) in (5, 86, 1326, 1331, 1907):
+            raise SystemExit(f"{src}: access denied. Sign in to the capture PC once: Win+R, type "
+                             f"{str(src)}, enter that PC's Windows sign-in and tick 'Remember my "
+                             "credentials'.")
+        raise SystemExit(f"{src} isn't reachable ({e.strerror}): is the capture PC on and the share set up?")
     out = src / "out"
-    if not out.is_dir():
-        raise SystemExit(f"{out} isn't reachable: is the capture PC on and the share set up?")
+    if not out.is_dir():  # the harvester hasn't finished a spot yet
+        return {"points": 0, "images": 0, "skipped": 0, "reviews": 0, "on_share": 0}
     pulled_file = build / PULLED_FILE
     pulled = json.loads(pulled_file.read_text(encoding="utf-8")) if pulled_file.exists() else {}
     staging = build / "harvest-staging"
