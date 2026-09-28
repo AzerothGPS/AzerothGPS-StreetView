@@ -50,8 +50,29 @@ def probe_card() -> Image.Image:
     return im
 
 
+def logo(src: Path, size: int = 128) -> Image.Image:
+    """The StreetView logo (assets/logo.png, our own art) squared around its visible part and
+    scaled with premultiplied alpha, so the see-through edges don't pick up stray colors."""
+    im = Image.open(src).convert("RGBA")
+    l, t, r, b = im.getchannel("A").getbbox()
+    side = max(r - l, b - t)
+    cx, cy = (l + r) // 2, (t + b) // 2
+    sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    sq.paste(im.crop((cx - side // 2, cy - side // 2, cx - side // 2 + side, cy - side // 2 + side)), (0, 0))
+    out = sq.convert("RGBa").resize((size, size), Image.LANCZOS).convert("RGBA")
+    px = out.load()
+    for y in range(size):  # (fully clear pixels: black, not leftover color)
+        for x in range(size):
+            if px[x, y][3] == 0:
+                px[x, y] = (0, 0, 0, 0)
+    return out
+
+
 def make(media: Path) -> None:
     media.mkdir(parents=True, exist_ok=True)
     figure().save(media / "Figure.tga")  # uncompressed 32-bit, like AzerothGPS's own art
     probe_card().save(media / "Probe.jpg", "JPEG", quality=90)
-    print(f"wrote {media / 'Figure.tga'} and {media / 'Probe.jpg'}")
+    src = media.parents[2] / "assets" / "logo.png"
+    if src.exists():
+        logo(src).save(media / "Logo.tga")
+    print(f"wrote Figure.tga, Probe.jpg" + (" and Logo.tga" if src.exists() else "") + f" in {media}")

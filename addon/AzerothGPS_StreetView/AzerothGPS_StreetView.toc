@@ -8,7 +8,7 @@
 ## Dependencies: AzerothGPS
 ## OptionalDeps: AzerothGPS_StreetView_Data
 ## SavedVariables: AzerothGPSStreetViewDB
-## IconTexture: Interface\AddOns\AzerothGPS_StreetView\Media\Figure
+## IconTexture: Interface\AddOns\AzerothGPS_StreetView\Media\Logo
 
 Data.lua
 Core.lua

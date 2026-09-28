@@ -9,6 +9,7 @@ ns.Figure = F
 local D = ns.Data
 
 local ICON = "Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Figure"
+local LOGO = "Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Logo"
 local ROADS = { 0.25, 0.6, 1 } -- the road network while carrying
 local ROAD_HOT = { 0.55, 0.85, 1 } -- the road under the pointer
 local VIEWS = { 0.05, 0.3, 0.95 } -- street views
@@ -134,7 +135,7 @@ function F.Init()
   end)
   button:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("Street view")
+    GameTooltip:AddLine("|T" .. LOGO .. ":40|t  Street view")
     GameTooltip:AddLine("Drag onto a road to look around there.", 1, 1, 1, true)
     GameTooltip:AddLine("Click: the street view nearest you.", 0.8, 0.8, 0.8, true)
     GameTooltip:AddLine(string.format("%d views installed.", D.count), 0.6, 0.6, 0.6)
