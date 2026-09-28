@@ -17,16 +17,13 @@ local CHROME_TITLE = 22 -- the game frame's title bar, above the frame (as the m
 local TITLE_H = 22 -- our own title bar, inside the frame, when the game frame isn't there
 local BAR_H = 30 -- the controls strip along the top
 local CONTROLS_X = 60 -- controls start right of the portrait (or badge)
-local MIN_W, MAX_W = 440, 1400 -- (room for the controls and the Panoramic box)
+local MIN_W, MAX_W = 360, 1400
 local DRAG_STEP = 60 -- UI units of dragging across the picture per view turned
 local FOV, FOV_MIN, FOV_MAX = 90, 40, 110 -- panorama: degrees across the window (the wheel zooms)
 local TURN_DEG, TILT_DEG = 45, 20 -- panorama: the arrow and Up/Down buttons
 local ARROW_SIZE, ARROW_LAT = 56, -15 -- way-to-go arrows: size, and degrees below the horizon
 local STEP_HFOV = 85 -- single views: their field of view across (the capture's, measured)
 local CUBE_FOV = 75 -- cube views: degrees across the window to start with
--- Panoramic off: the view jumps like flipping through photos: 45-degree turns lined up with
--- the directions the pictures were taken, these tilts, and the pictures' own field of view.
-local SNAP_TURN, SNAP_PITCHES, SNAP_FOV = 45, { -85, -45, 0, 45, 85 }, 85
 local GRID_COLS, GRID_ROWS = 24, 12 -- cube views: the window is drawn as this many cells
 local MAX_LAT = 85 -- cube views: how far up or down you can look
 local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "level", [45] = "looking up", [90] = "straight up" }
@@ -40,23 +37,6 @@ local dragging = false -- the picture is being dragged (arrows hidden)
 local HideArrows -- (defined further down; the drag handler in V.Build uses it)
 local topH = TITLE_H -- our own title bar's height (0 with the game frame)
 local cur -- { p, yaw, pitch (index into D.PITCHES) }, or { p, pano = true, lon, lat, fov }
-
--- The Panoramic box (saved): on, drag to look around smoothly; off, turn in steps.
-local function Panoramic() return ns.db.viewer.panoramic ~= false end
--- A cube spot shown in steps (Panoramic off).
-local function Snapping() return cur and cur.cube and not Panoramic() end
-local function Nearest(list, v)
-  local best
-  for _, x in ipairs(list) do
-    if not best or math.abs(x - v) < math.abs(best - v) then best = x end
-  end
-  return best
-end
--- Line a stepped view up: the nearest photo direction and tilt.
-local function Snap()
-  cur.lon = math.floor(cur.lon / SNAP_TURN + 0.5) * SNAP_TURN
-  cur.lat = Nearest(SNAP_PITCHES, cur.lat)
-end
 
 local function Button(parent, text, width, onClick)
   local ok, b = pcall(CreateFrame, "Button", nil, parent, "UIPanelButtonTemplate")
@@ -205,34 +185,7 @@ function V.Build()
   local ahead = Button(frame, "Go ahead", 72, function() V.GoAhead() end)
   ahead:SetPoint("LEFT", down, "RIGHT", 8, 0)
   info = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  -- Panoramic on/off (the game's check box, or a plain toggle if this client lacks it)
-  local okBox, box = pcall(CreateFrame, "CheckButton", nil, frame, "UICheckButtonTemplate")
-  if not okBox or not box then
-    box = CreateFrame("CheckButton", nil, frame)
-    box:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Up")
-    box:SetCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check")
-  end
-  box:SetSize(24, 24)
-  box:SetPoint("LEFT", ahead, "RIGHT", 8, 0)
-  box:SetChecked(Panoramic())
-  local boxLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  boxLabel:SetPoint("LEFT", box, "RIGHT", 0, 0)
-  boxLabel:SetText("Panoramic")
-  box:SetScript("OnClick", function(self)
-    ns.db.viewer.panoramic = self:GetChecked() and true or false
-    if cur and cur.cube and not Panoramic() then Snap() end
-    V.Refresh()
-  end)
-  box:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Panoramic", 1, 1, 1)
-    GameTooltip:AddLine("On: drag to look around smoothly; the mouse wheel zooms.", 1, 1, 1, true)
-    GameTooltip:AddLine("Off: turn in 45-degree steps, like flipping through photos; the mouse wheel turns.", 0.8, 0.8, 0.8, true)
-    GameTooltip:Show()
-  end)
-  box:SetScript("OnLeave", GameTooltip_Hide)
-  V.box, V.boxLabel = box, boxLabel
-  info:SetPoint("LEFT", boxLabel, "RIGHT", 8, 0)
+  info:SetPoint("LEFT", ahead, "RIGHT", 8, 0)
   info:SetPoint("RIGHT", -10, 0)
   info:SetJustifyH("RIGHT")
 
@@ -250,7 +203,7 @@ function V.Build()
   missing:SetWidth(400)
   missing:Hide()
   view:SetScript("OnMouseWheel", function(_, delta)
-    if cur and cur.pano and not Snapping() then V.Zoom(delta) else V.TurnBy(delta > 0 and -1 or 1) end
+    if cur and cur.pano then V.Zoom(delta) else V.TurnBy(delta > 0 and -1 or 1) end
   end)
   -- drag across the picture to look around (like pulling the scenery)
   local dragX, dragY
@@ -273,7 +226,7 @@ function V.Build()
     local x, y = GetCursorPosition()
     local s = frame:GetEffectiveScale()
     local dx, dy = (x - dragX) / s, (y - dragY) / s
-    if cur and cur.pano and not Snapping() then
+    if cur and cur.pano then
       -- smooth: the scenery follows the pointer (pull right: look left; pull up: look down)
       if dx ~= 0 or dy ~= 0 then
         local dpu = cur.fov / view:GetWidth() -- degrees per UI unit (flat panorama)
@@ -431,12 +384,9 @@ local function CubeRefresh()
   HideTiles()
   local w, h = view:GetWidth(), view:GetHeight()
   if not w or w <= 0 or not h or h <= 0 then return end
-  local snapping = Snapping()
-  if snapping then Snap() end
   cur.lon = (cur.lon + 180) % 360 - 180
   cur.lat = math.max(-MAX_LAT, math.min(MAX_LAT, cur.lat))
-  local fov = snapping and SNAP_FOV or cur.fov
-  local list = D.CubeCells(p, cur.lon, cur.lat, fov, w, h, GRID_COLS, GRID_ROWS)
+  local list = D.CubeCells(p, cur.lon, cur.lat, cur.fov, w, h, GRID_COLS, GRID_ROWS)
   for i, c in ipairs(list) do
     local tex = cells[i]
     if not tex then
@@ -464,7 +414,7 @@ local function CubeRefresh()
   local looking = tilt == 0 and "level" or (tilt > 0 and ("looking up " .. tilt) or ("looking down " .. -tilt))
   info:SetText(D.Compass(heading) .. "  " .. looking)
   PlaceArrowsAt(heading, function(dir)
-    return D.CubeProject(p, cur.lon, cur.lat, fov, w, h, dir, -ARROW_LAT)
+    return D.CubeProject(p, cur.lon, cur.lat, cur.fov, w, h, dir, -ARROW_LAT)
   end)
   if ns.Figure and (not lastMarkHeading or math.abs(D.AngleDiff(heading, lastMarkHeading)) > 0.03) then
     lastMarkHeading = heading
@@ -522,10 +472,6 @@ end
 -- Draw the current view.
 function V.Refresh()
   if not frame or not cur then return end
-  if V.box then
-    V.box:SetShown(cur.cube and true or false)
-    V.boxLabel:SetShown(cur.cube and true or false)
-  end
   if cur.cube then return CubeRefresh() end
   HideCells()
   if cur.pano then return PanoRefresh() end
@@ -585,12 +531,6 @@ end
 
 function V.TurnBy(dir)
   if not cur then return end
-  if Snapping() then
-    Snap()
-    if math.abs(cur.lat) > 60 then cur.lat = 0 end -- (straight up/down: back to level first, as before)
-    cur.lon = cur.lon + dir * SNAP_TURN
-    return V.Refresh()
-  end
   if cur.pano then
     cur.lon = cur.lon + dir * TURN_DEG -- (right: clockwise)
     return V.Refresh()
@@ -603,13 +543,6 @@ end
 
 function V.Tilt(dir)
   if not cur then return end
-  if Snapping() then
-    Snap()
-    for i, v in ipairs(SNAP_PITCHES) do
-      if v == cur.lat then cur.lat = SNAP_PITCHES[math.max(1, math.min(#SNAP_PITCHES, i + dir))] break end
-    end
-    return V.Refresh()
-  end
   if cur.pano then
     cur.lat = cur.lat + dir * TILT_DEG
     return V.Refresh()
