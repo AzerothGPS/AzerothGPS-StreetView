@@ -91,7 +91,7 @@ local function WindowFrame()
   strip:SetPoint("BOTTOMRIGHT", c, "TOPRIGHT", -2, -CHROME_TITLE)
   strip:SetColorTexture(0.06, 0.06, 0.07, 1)
   local portrait = c.GetPortrait and c:GetPortrait() or (c.PortraitContainer and c.PortraitContainer.portrait)
-  if portrait then portrait:SetTexture(MEDIA .. "Logo") end
+  if portrait then portrait:SetTexture(MEDIA .. "Portrait") end -- (the logo with a margin)
   if c.CloseButton then c.CloseButton:SetScript("OnClick", function() V.Hide() end) end
   local grab = CreateFrame("Frame", nil, c) -- the title bar moves the window
   grab:SetPoint("TOPLEFT", 56, 0)
@@ -115,7 +115,7 @@ local function PlainTitle()
   MoveHandle(badge)
   local logo = badge:CreateTexture(nil, "ARTWORK")
   logo:SetAllPoints()
-  logo:SetTexture(MEDIA .. "Logo")
+  logo:SetTexture(MEDIA .. "Portrait")
   title = bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   title:SetPoint("LEFT", 40, 0) -- (clear of the badge)
   title:SetPoint("RIGHT", -4, 0)

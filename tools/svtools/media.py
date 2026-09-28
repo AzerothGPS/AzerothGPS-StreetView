@@ -50,16 +50,20 @@ def probe_card() -> Image.Image:
     return im
 
 
-def fit(src: Path, size: int) -> Image.Image:
+def fit(src: Path, size: int, scale: float = 1.0) -> Image.Image:
     """Our own art from assets/ (logo.png, figure.png) squared around its visible part and
-    scaled with premultiplied alpha, so the see-through edges don't pick up stray colors."""
+    scaled with premultiplied alpha, so the see-through edges don't pick up stray colors.
+    scale < 1 leaves a clear margin: the art fills that share of the square."""
     im = Image.open(src).convert("RGBA")
     l, t, r, b = im.getchannel("A").getbbox()
     side = max(r - l, b - t)
     cx, cy = (l + r) // 2, (t + b) // 2
     sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
     sq.paste(im.crop((cx - side // 2, cy - side // 2, cx - side // 2 + side, cy - side // 2 + side)), (0, 0))
-    out = sq.convert("RGBa").resize((size, size), Image.LANCZOS).convert("RGBA")
+    inner = max(1, round(size * scale))
+    art = sq.convert("RGBa").resize((inner, inner), Image.LANCZOS).convert("RGBA")
+    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    out.paste(art, ((size - inner) // 2, (size - inner) // 2))
     px = out.load()
     for y in range(size):  # (fully clear pixels: black, not leftover color)
         for x in range(size):
@@ -70,7 +74,7 @@ def fit(src: Path, size: int) -> Image.Image:
 
 def make(media: Path) -> None:
     """Media/: Figure.tga (64x64, the map's drag figure: assets/figure.png, else drawn here),
-    Logo.tga (128x128, assets/logo.png) and Probe.jpg. TGAs are uncompressed 32-bit, like
+    Logo.tga and Portrait.tga (128x128, assets/logo.png; the portrait with a margin) and Probe.jpg. TGAs are uncompressed 32-bit, like
     AzerothGPS's own art."""
     media.mkdir(parents=True, exist_ok=True)
     assets = media.parents[2] / "assets"
@@ -78,5 +82,6 @@ def make(media: Path) -> None:
     (fit(fig, 64) if fig.exists() else figure()).save(media / "Figure.tga")
     probe_card().save(media / "Probe.jpg", "JPEG", quality=90)
     if (assets / "logo.png").exists():
-        fit(assets / "logo.png", 128).save(media / "Logo.tga")
-    print(f"wrote Figure.tga, Logo.tga and Probe.jpg in {media}")
+        fit(assets / "logo.png", 128).save(media / "Logo.tga")  # the addon list icon
+        fit(assets / "logo.png", 128, 0.9).save(media / "Portrait.tga")  # the viewer's portrait: 10% smaller
+    print(f"wrote Figure.tga, Logo.tga, Portrait.tga and Probe.jpg in {media}")
