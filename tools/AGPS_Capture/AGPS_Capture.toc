@@ -1,8 +1,9 @@
 ## Interface: 16001
 ## Title: AzerothGPS StreetView Capture (dev tool)
-## Notes: Developer tool, never shipped: takes the 26 camera views of a street view where you stand. Turns the camera and takes screenshots only; you do all moving.
+## Notes: Developer tool, never shipped: guides you through the 26 shots of a street view. Fully manual: you turn and set the camera yourself; it only hides names and takes a screenshot per key press.
 ## Author: AzerothGPS
 ## Version: 0.1.0
 ## SavedVariables: AGPSCaptureDB
 
+Poses.lua
 Capture.lua

@@ -15,21 +15,22 @@ from svtools import pack  # noqa: E402
 lupa = pytest.importorskip("lupa")
 
 
-def test_pose_names_match_the_capture_addon():
-    src = (ROOT / "tools" / "AGPS_Capture" / "Capture.lua").read_text(encoding="utf-8")
-    # the capture addon builds the same 26 names (checked by running its name loop)
+def test_capture_sequence_covers_every_view_once():
+    """The manual capture's 26 steps, shot at the facing the guide asks for, name exactly the
+    views the viewer and the pack use (turning right = the viewer's counter-clockwise order)."""
     lua = lupa.LuaRuntime()
-    names = lua.eval("""function()
-      local POSES = {}
-      local function Pose(name) POSES[#POSES + 1] = name end
-      for i = 0, 7 do Pose(string.format("y%03d_p+00", i * 45)) end
-      for i = 0, 7 do Pose(string.format("y%03d_p+45", i * 45)) end
-      for i = 0, 7 do Pose(string.format("y%03d_p-45", i * 45)) end
-      Pose("y000_p+90") Pose("y000_p-90")
-      return POSES end""")()
-    assert list(names.values()) == pack.ALL_POSES
-    assert 'Pose(string.format("y%03d_p+00", i * 45), "level", i)' in src
-    assert len(set(pack.ALL_POSES)) == 26
+    lua.execute((ROOT / "tools" / "AGPS_Capture" / "Poses.lua").read_text(encoding="utf-8"))
+    C = lua.globals().AGPSCapture
+    facing0 = 1.0
+    names = []
+    for i in range(1, len(C.SEQUENCE) + 1):
+        step = C.SEQUENCE[i]
+        facing = C.Target(facing0, step.turns) + 0.03  # a little off, within the tolerance
+        names.append(C.ShotName(step, facing0, facing))
+    assert len(names) == 26 and sorted(names) == sorted(pack.ALL_POSES)
+    # one turn right is view 7 (counter-clockwise index), as the viewer counts
+    assert C.YawIndex(facing0, C.Target(facing0, 1)) == 7
+    assert C.PoseName(3, 90) == pack.pose_name(3, 90) == "y000_p+90"
 
 
 def test_match_shot_tolerates_a_second_or_two():

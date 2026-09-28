@@ -12,8 +12,13 @@ AzerothGPS/AzerothGPS). This repo is **private**: https://github.com/AzerothGPS/
   content and large.
 - Nothing personal in the repo: no Windows user names or paths, WoW account folder names,
   character names or emails. Author is "AzerothGPS".
-- `tools/AGPS_Capture` is a developer tool: it turns the camera and takes screenshots, never
-  moves the character. It is never published.
+- `tools/AGPS_Capture` is a **manual** developer tool for the user's real Blizzard account:
+  it never moves the character or the camera (the user turns and presses the game's Set View
+  keys; it only hides names and takes a screenshot per key press). Never published, and
+  `sv.py install` leaves it out unless `--capture` is passed.
+- **No automation of any kind on this PC's game.** Automated teleporting and capture live in
+  the separate private repo AzerothGPS/streetview-harvester, for a private server on the
+  other PC only. Never install anything from it into this PC's WoW folder.
 - American spelling in user-facing text.
 
 ## Talking to AzerothGPS
@@ -26,7 +31,7 @@ additive, with a lupa test) rather than reaching into AzerothGPS's private names
 
 - World yards, x north, y west (AzerothGPS's convention). Headings are radians
   counter-clockwise from north (`GetPlayerFacing`'s convention).
-- A point's views: yaw index 0..7 at pitches -45, 0, 45 plus straight up and down; file
+- A point's views: yaw index 0..7 (counter-clockwise; the capture measures the facing of each shot) at pitches -45, 0, 45 plus straight up and down; file
   names `y<deg>_p<+/-deg>` (`Data.lua` `D.PoseName`, `tools/svtools/pack.py` `pose_name`,
   the capture addon's list: keep all three in step; a test checks it).
 - `facing` in the pack is the heading of view 0. `D.yawSign` says which way FlipCameraYaw
@@ -39,7 +44,7 @@ additive, with a lupa test) rather than reaching into AzerothGPS's private names
 Use the AzerothGPS venv: `%USERPROFILE%\.venvs\azerothgps\Scripts\python.exe`.
 
 ```
-python tools/sv.py install     # copy StreetView, the data pack and AGPS_Capture into the game
+python tools/sv.py install     # copy StreetView and the data pack into the game (--capture: + manual AGPS_Capture)
 python tools/sv.py import      # AGPS_Capture screenshots -> build/AzerothGPS_StreetView_Data, then install
 python tools/sv.py build       # rewrite the pack's Index.lua from build/points.json
 python tools/sv.py media       # regenerate Media/ (Figure.tga, Probe.jpg)
