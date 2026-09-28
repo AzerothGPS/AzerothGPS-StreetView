@@ -37,7 +37,7 @@ Status: early development, private.
 
 ## Taking example views on your own PC (manual)
 
-1. `python tools/sv.py install --capture`, then restart the game completely.
+1. `sv.cmd install --capture`, then restart the game completely.
 2. One time, in first person (mouse wheel all the way in), turning with the right mouse
    button: look level and type `/svcap save level`, look up about 45 degrees and
    `/svcap save up`, down about 45 degrees and `/svcap save down`, straight up and
@@ -48,8 +48,10 @@ Status: early development, private.
    the screen says which way to turn (right mouse button) and which Set View key to press;
    press the capture key for each of the 26 shots. Take a step to cancel.
 5. Repeat 50 to 100 yards apart, then `/reload` so the game saves the list.
-6. `python tools/sv.py import` builds the data pack and installs it (not the capture tool).
+6. `sv.cmd import` builds the data pack and installs it (not the capture tool).
    Restart the game (new files).
 7. Drag the figure from the map onto the road.
 
-Run the tools with the AzerothGPS venv's Python (it has Pillow and lupa).
+`sv.cmd` in this folder runs `tools/sv.py` with the AzerothGPS venv's Python (it has Pillow
+and lupa). It works from any folder in PowerShell or Command Prompt when called by its full
+path, for example `C:\Users\<you>\OneDrive\Documents\Claude\AzerothGPS-StreetView\sv.cmd import`.
