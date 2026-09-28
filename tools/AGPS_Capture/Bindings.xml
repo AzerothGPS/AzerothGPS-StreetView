@@ -1,0 +1,3 @@
+<Bindings>
+  <Binding name="AGPSC_CAPTURE" header="AGPSC" category="ADDONS">AGPSCapture_Go()</Binding>
+</Bindings>

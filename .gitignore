@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+# generated data pack and imported screenshots (Blizzard content: never in git)
+build/
+data/
+dist/
+*.zip
