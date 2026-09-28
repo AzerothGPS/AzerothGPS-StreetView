@@ -166,6 +166,41 @@ def import_captures(wow: Path, build: Path, log=print) -> dict:
     return stats
 
 
+def import_harvest(folder: Path, build: Path, log=print) -> dict:
+    """Points exported by streetview-harvester (<folder>/<id>/meta.json + views/*.jpg) into
+    build/points.json and the pack's images. Only the views are used for now (the viewer shows
+    one view at a time); the panoramas stay in the export folder."""
+    points_file = build / "points.json"
+    points = json.loads(points_file.read_text(encoding="utf-8")) if points_file.exists() else {}
+    stats = {"points": 0, "images": 0, "skipped": 0}
+    for meta_file in sorted(folder.glob("*/meta.json")):
+        meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        pid = meta.get("id")
+        views = meta_file.parent / "views"
+        if not pid or pid != point_id(meta["cont"], meta["x"], meta["y"]) or not views.is_dir():
+            stats["skipped"] += 1
+            log(f"  skipped {meta_file.parent.name}: no id, a mismatched id or no views")
+            continue
+        out_dir = build / PACK / "Images" / pid
+        out_dir.mkdir(parents=True, exist_ok=True)
+        poses = []
+        for img in sorted(views.glob("*.jpg")):
+            if img.stem in ALL_POSES:
+                shutil.copy2(img, out_dir / img.name)
+                poses.append(img.stem)
+                stats["images"] += 1
+        points[pid] = {
+            "id": pid, "cont": meta["cont"], "x": meta["x"], "y": meta["y"], "z": meta.get("z") or 0,
+            "facing": meta.get("facing") or 0, "zone": meta.get("zone") or "", "mapID": meta.get("mapID"),
+            "date": meta.get("captured", ""), "build": meta.get("client_build", ""), "poses": sorted(poses),
+            "source": "harvester",
+        }
+        stats["points"] += 1
+    build.mkdir(parents=True, exist_ok=True)
+    points_file.write_text(json.dumps(points, indent=1), encoding="utf-8")
+    return stats
+
+
 def build_pack(build: Path, version: str | None = None) -> tuple[int, int]:
     """Write the pack's toc and Index.lua from build/points.json and drop image folders of
     points no longer listed. Returns (points, bytes of images)."""

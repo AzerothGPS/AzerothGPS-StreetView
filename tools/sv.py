@@ -3,6 +3,7 @@
   python tools/sv.py install [--capture]      copy the addons into the game's AddOns folder
                                              (--capture adds the manual AGPS_Capture dev tool)
   python tools/sv.py import                   screenshots from AGPS_Capture -> the data pack, then install
+  python tools/sv.py import-harvest <folder>  points exported by streetview-harvester -> the data pack, then install
   python tools/sv.py build                    rewrite the data pack's Index.lua from build/points.json
   python tools/sv.py media                    regenerate the addon's own art (Media/)
 
@@ -70,6 +71,9 @@ def main(argv=None) -> None:
     p_inst.add_argument("--capture", action="store_true", help="also install the manual AGPS_Capture dev tool")
     p_imp = sub.add_parser("import")
     p_imp.add_argument("--no-install", action="store_true")
+    p_h = sub.add_parser("import-harvest")
+    p_h.add_argument("folder", type=Path)
+    p_h.add_argument("--no-install", action="store_true")
     sub.add_parser("build")
     sub.add_parser("media")
     a = ap.parse_args(argv)
@@ -81,6 +85,12 @@ def main(argv=None) -> None:
         n, size = pack.build_pack(BUILD)
         print(f"imported {stats['captures']} spots ({stats['images']} pictures; {stats['missing']} screenshots not found,"
               f" {stats['skipped']} unfinished captures skipped). The pack has {n} street views, {size / 1e6:.1f} MB.")
+        if not a.no_install:
+            install(a.wow, False)
+    elif a.cmd == "import-harvest":
+        stats = pack.import_harvest(a.folder, BUILD)
+        n, size = pack.build_pack(BUILD)
+        print(f"imported {stats['points']} harvested points ({stats['images']} pictures, {stats['skipped']} skipped). The pack has {n} street views, {size / 1e6:.1f} MB.")
         if not a.no_install:
             install(a.wow, False)
     elif a.cmd == "build":

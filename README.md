@@ -24,7 +24,8 @@ Status: early development, private.
   and it hides names and takes one screenshot per key press. Never shipped, and only
   installed on request (`sv.py install --capture`). The automated capture for a private
   server lives in the separate private repo AzerothGPS/streetview-harvester.
-- `tools/sv.py`: install the addons, import captured screenshots into the data pack.
+- `tools/sv.py`: install the addons; import manual captures (`import`) or points exported by
+  the harvester on the capture PC (`import-harvest <folder>`) into the data pack.
 - `build/`: the generated `AzerothGPS_StreetView_Data` pack (git-ignored).
 - `tests/`: `python -m pytest tests -q`.
 
