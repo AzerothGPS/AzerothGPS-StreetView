@@ -1,5 +1,7 @@
--- The street view window: one view at a time (2:1 images), turned with the arrows, the mouse
--- wheel or by dragging across the picture. Its spot and direction show on the AzerothGPS map.
+-- The street view window. A spot with a panorama pans smoothly: drag the picture (the scenery
+-- follows the pointer), the mouse wheel zooms, the arrows turn 45 degrees and Up/Down tilt.
+-- A spot without one shows its separate views, one at a time. Its spot and direction show on
+-- the AzerothGPS map.
 -- Framed like the AzerothGPS map: the game's own window frame (metal border, title bar, round
 -- portrait with the logo, close button), or a plain dark border if this client lacks it.
 local _, ns = ...
@@ -17,11 +19,15 @@ local BAR_H = 30 -- the controls strip along the top
 local CONTROLS_X = 60 -- controls start right of the portrait (or badge)
 local MIN_W, MAX_W = 360, 1400
 local DRAG_STEP = 60 -- UI units of dragging across the picture per view turned
+local FOV, FOV_MIN, FOV_MAX = 90, 40, 110 -- panorama: degrees across the window (the wheel zooms)
+local TURN_DEG, TILT_DEG = 45, 20 -- panorama: the arrow and Up/Down buttons
 local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "level", [45] = "looking up", [90] = "straight up" }
 
-local frame, chrome, img, missing, title, info, preload
+local frame, chrome, view, img, missing, title, info, preload
+local tiles = {} -- panorama tile textures by col * 100 + row
+local lastMarkHeading -- heading last drawn on the map
 local topH = TITLE_H -- our own title bar's height (0 with the game frame)
-local cur -- { p, yaw, pitch (index into D.PITCHES) }
+local cur -- { p, yaw, pitch (index into D.PITCHES) }, or { p, pano = true, lon, lat, fov }
 
 local function Button(parent, text, width, onClick)
   local ok, b = pcall(CreateFrame, "Button", nil, parent, "UIPanelButtonTemplate")
@@ -175,7 +181,8 @@ function V.Build()
   info:SetJustifyH("RIGHT")
 
   -- the picture
-  local view = CreateFrame("Frame", nil, frame)
+  view = CreateFrame("Frame", nil, frame)
+  view:SetClipsChildren(true) -- (panorama tiles slide past the edges)
   view:SetPoint("TOPLEFT", PAD, -(PAD + topH + BAR_H))
   view:SetPoint("BOTTOMRIGHT", -PAD, PAD)
   view:EnableMouse(true)
@@ -186,7 +193,9 @@ function V.Build()
   missing:SetPoint("CENTER")
   missing:SetWidth(400)
   missing:Hide()
-  view:SetScript("OnMouseWheel", function(_, delta) V.TurnBy(delta > 0 and -1 or 1) end)
+  view:SetScript("OnMouseWheel", function(_, delta)
+    if cur and cur.pano then V.Zoom(delta) else V.TurnBy(delta > 0 and -1 or 1) end
+  end)
   -- drag across the picture to look around (like pulling the scenery)
   local dragX, dragY
   view:SetScript("OnMouseDown", function(_, button)
@@ -198,7 +207,16 @@ function V.Build()
     local x, y = GetCursorPosition()
     local s = frame:GetEffectiveScale()
     local dx, dy = (x - dragX) / s, (y - dragY) / s
-    if math.abs(dx) >= DRAG_STEP then
+    if cur and cur.pano then
+      -- smooth: the scenery follows the pointer (pull right: look left; pull up: look down)
+      if dx ~= 0 or dy ~= 0 then
+        local ppd = view:GetWidth() / cur.fov
+        cur.lon = cur.lon - dx / ppd
+        cur.lat = cur.lat - dy / ppd
+        dragX, dragY = x, y
+        V.Refresh()
+      end
+    elseif math.abs(dx) >= DRAG_STEP then
       V.TurnBy(dx > 0 and -1 or 1) -- pulling the picture right turns to the left
       dragX = x
     elseif math.abs(dy) >= DRAG_STEP then
@@ -215,6 +233,10 @@ function V.Build()
     t:SetAlpha(0)
     preload[i] = t
   end
+
+  view:SetScript("OnSizeChanged", function()
+    if cur and cur.pano then V.Refresh() end
+  end)
 
   -- resize from the corner (the picture keeps its 2:1 shape); above the game frame's border
   local grip = CreateFrame("Button", nil, frame)
@@ -248,9 +270,72 @@ function V.Build()
   end)
 end
 
+-- The title: the spot's zone and map coordinates.
+local function Title(p)
+  local API = _G.AzerothGPS
+  local where = p.zone or "?"
+  local mapID, zone, u, v
+  if API then mapID, zone, u, v = API.LocateWorld(p.cont, p.x, p.y) end -- (not `API and ...`: one value only)
+  if mapID then where = string.format("%s  %.1f, %.1f", zone, u * 100, v * 100) end
+  SetTitle(where)
+end
+
+local function HideTiles()
+  for _, tex in pairs(tiles) do tex:Hide() end
+end
+
+-- The panorama: the tiles in view, laid flat and slid into place.
+local function PanoRefresh()
+  local p = cur.p
+  img:Hide()
+  missing:Hide()
+  local w, h = view:GetWidth(), view:GetHeight()
+  if not w or w <= 0 or not h or h <= 0 then return end
+  cur.lon = (cur.lon + 180) % 360 - 180
+  local list, lat = D.PanoTiles(p, cur.lon, cur.lat, cur.fov, w, h)
+  cur.lat = lat
+  local used = {}
+  for _, t in ipairs(list) do
+    local key = t.col * 100 + t.row
+    local tex = tiles[key]
+    if not tex then
+      tex = view:CreateTexture(nil, "ARTWORK")
+      if tex.SetSnapToPixelGrid then tex:SetSnapToPixelGrid(false) end
+      if tex.SetTexelSnappingBias then tex:SetTexelSnappingBias(0) end
+      tiles[key] = tex
+    end
+    local path = D.PanoPath(p, t.col, t.row)
+    if tex.path ~= path then
+      if tex:SetTexture(path) == false then tex:SetColorTexture(0.06, 0.06, 0.08, 1) end
+      tex.path = path
+    end
+    tex:ClearAllPoints()
+    tex:SetPoint("TOPLEFT", view, "TOPLEFT", t.x, -t.y)
+    tex:SetSize(t.size, t.size)
+    tex:Show()
+    used[key] = true
+  end
+  for key, tex in pairs(tiles) do
+    if not used[key] then tex:Hide() end
+  end
+  Title(p)
+  local heading = D.PanoHeading(p, cur.lon)
+  local tilt = math.floor(cur.lat + 0.5)
+  local looking = tilt == 0 and "level" or (tilt > 0 and ("looking up " .. tilt) or ("looking down " .. -tilt))
+  info:SetText(D.Compass(heading) .. "  " .. looking)
+  -- the map's marker: only when the heading moved noticeably (map redraws aren't free)
+  if ns.Figure and (not lastMarkHeading or math.abs(D.AngleDiff(heading, lastMarkHeading)) > 0.03) then
+    lastMarkHeading = heading
+    ns.Figure.Redraw()
+  end
+end
+
 -- Draw the current view.
 function V.Refresh()
   if not frame or not cur then return end
+  if cur.pano then return PanoRefresh() end
+  HideTiles()
+  img:Show()
   local p, pitch = cur.p, D.PITCHES[cur.pitch]
   local path = D.ImagePath(p, cur.yaw, pitch)
   local loaded = D.HasPose(p, cur.yaw, pitch) and img:SetTexture(path)
@@ -262,12 +347,7 @@ function V.Refresh()
     missing:Hide()
   end
   local heading = D.Heading(p, cur.yaw)
-  local API = _G.AzerothGPS
-  local where = p.zone or "?"
-  local mapID, zone, u, v
-  if API then mapID, zone, u, v = API.LocateWorld(p.cont, p.x, p.y) end -- (not `API and ...`: one value only)
-  if mapID then where = string.format("%s  %.1f, %.1f", zone, u * 100, v * 100) end
-  SetTitle(where)
+  Title(p)
   local facing = (pitch == 90 or pitch == -90) and "" or (D.Compass(heading) .. "  ")
   info:SetText(facing .. PITCH_NAMES[pitch])
   -- load the neighbors ahead of time
@@ -284,7 +364,12 @@ end
 -- first view), level.
 function V.Open(p, heading)
   if not frame then V.Build() end
-  cur = { p = p, yaw = heading and D.YawFor(p, heading) or 0, pitch = D.LEVEL }
+  if D.HasPano(p) then
+    cur = { p = p, pano = true, lon = heading and D.PanoLon(p, heading) or 0, lat = 0, fov = (cur and cur.fov) or FOV }
+  else
+    cur = { p = p, yaw = heading and D.YawFor(p, heading) or 0, pitch = D.LEVEL }
+  end
+  lastMarkHeading = nil
   frame:Show()
   V.Refresh()
 end
@@ -295,6 +380,10 @@ end
 
 function V.TurnBy(dir)
   if not cur then return end
+  if cur.pano then
+    cur.lon = cur.lon + dir * TURN_DEG -- (right: clockwise)
+    return V.Refresh()
+  end
   local pitch = D.PITCHES[cur.pitch]
   if pitch == 90 or pitch == -90 then cur.pitch = D.LEVEL end -- (straight up/down: back to level first)
   cur.yaw = D.Turn(cur.p, cur.yaw, dir)
@@ -303,18 +392,29 @@ end
 
 function V.Tilt(dir)
   if not cur then return end
+  if cur.pano then
+    cur.lat = cur.lat + dir * TILT_DEG
+    return V.Refresh()
+  end
   cur.pitch = math.max(1, math.min(#D.PITCHES, cur.pitch + dir))
+  V.Refresh()
+end
+
+-- Panorama zoom: the mouse wheel narrows or widens the view.
+function V.Zoom(delta)
+  if not (cur and cur.pano) then return end
+  cur.fov = math.max(FOV_MIN, math.min(FOV_MAX, cur.fov * (delta > 0 and 0.85 or 1 / 0.85)))
   V.Refresh()
 end
 
 function V.GoAhead()
   if not cur then return end
-  local q = D.Ahead(cur.p, D.Heading(cur.p, cur.yaw))
+  local q = D.Ahead(cur.p, V.Heading())
   if not q then
     UIErrorsFrame:AddMessage("No street view ahead", 1, 0.82, 0)
     return
   end
-  V.Open(q, D.Heading(cur.p, cur.yaw))
+  V.Open(q, V.Heading())
 end
 
 -- The view shown (nil when the window is closed): { p, yaw, pitch }, and its heading.
@@ -322,13 +422,17 @@ function V.Current()
   if frame and frame:IsShown() and cur then return cur end
 end
 function V.Heading()
-  return cur and D.Heading(cur.p, cur.yaw) or 0
+  if not cur then return 0 end
+  if cur.pano then return D.PanoHeading(cur.p, cur.lon) end
+  return D.Heading(cur.p, cur.yaw)
 end
 
 -- Show a JPEG shipped with the addon, to check this client draws JPEG files at all.
 function V.Probe()
   if not frame then V.Build() end
   cur = nil
+  HideTiles()
+  img:Show()
   frame:Show()
   local ok = img:SetTexture(MEDIA .. "Probe.jpg")
   SetTitle("JPEG check")

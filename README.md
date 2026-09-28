@@ -40,18 +40,22 @@ Status: early development, private.
 
 1. `sv.cmd install --capture`, then restart the game completely.
 2. One time, in first person (mouse wheel all the way in), turning with the right mouse
-   button: look level and type `/svcap save level`, look up about 45 degrees and
-   `/svcap save up`, down about 45 degrees and `/svcap save down`, straight up and
-   `/svcap save zenith`.
+   button: look level and type `/svcap save level`, look up about 50 degrees and
+   `/svcap save up`, down about 50 degrees and `/svcap save down`, straight up and
+   `/svcap save zenith`. (Steep up and down views leave no gaps above and below in the
+   panorama; the stitch measures the real angles, so they needn't be exact.)
 3. Bind the game's own Set View 2 to Set View 5 keys (Key Bindings > Camera) and the addon's
    "Capture a street view shot" key (Key Bindings > AddOns).
 4. Stand on a road, not mounted, no target, and press the capture key. A guide at the top of
    the screen says which way to turn (right mouse button) and which Set View key to press;
-   press the capture key for each of the 26 shots. Take a step to cancel.
+   press the capture key for each of the 28 shots (8 directions at level, up and down, then
+   straight up and straight down twice each, 90 degrees apart). Take a step to cancel.
 5. Repeat 50 to 100 yards apart, then `/reload` so the game saves the list.
-6. `sv.cmd import` builds the data pack and installs it (not the capture tool).
-   Restart the game (new files).
-7. Drag the figure from the map onto the road.
+6. `sv.cmd import` builds the data pack, stitches each new spot into a 360-degree panorama
+   (about 40 seconds a spot; `sv.cmd stitch --force` redoes them), and installs it (not the
+   capture tool). Restart the game (new files).
+7. Drag the figure from the map onto the road. Drag the picture to look around, the mouse
+   wheel zooms, the arrows turn 45 degrees.
 
 `sv.cmd` in this folder runs `tools/sv.py` with the AzerothGPS venv's Python (it has Pillow
 and lupa). It works from any folder in PowerShell or Command Prompt when called by its full

@@ -102,3 +102,51 @@ def test_pose_names_and_paths(env):
     assert D.ImagePath(p, 0, 0) == "Interface\\AddOns\\P\\Images\\1-0-100\\y000_p+00.jpg"
     assert D.HasPose(p, 0, 0) and not D.HasPose(p, 1, 0)
     assert D.HasPose(D.byId["1-0-0"], 5, 45)  # no pose list: all assumed
+
+
+@pytest.fixture
+def pano(env):
+    lua, D = env
+    p = lua.eval("{ id = '0-1-1', cont = 0, x = 1, y = 1, facing = 1.0, pano = { cols = 8, rows = 4 },"
+                 " pack = { root = 'R/', ext = 'jpg' } }")
+    return lua, D, p
+
+
+def tiles(lua, D, p, lon, lat, fov, w, h):
+    out, lat2 = multi(lua, D.PanoTiles, p, lon, lat, fov, w, h)
+    got = {(t.col, t.row): (round(t.x, 3), round(t.y, 3), round(t.size, 3)) for t in (out[i] for i in range(1, len(out) + 1))}
+    return got, lat2
+
+
+def test_pano_tiles_straight_ahead(pano):
+    lua, D, p = pano
+    got, lat = tiles(lua, D, p, 0.0, 0.0, 90.0, 640.0, 320.0)
+    ppd = 640 / 90
+    assert set(got) == {(3, 1), (4, 1), (3, 2), (4, 2)}
+    assert got[(3, 1)][0] == pytest.approx(0) and got[(4, 1)][0] == pytest.approx(45 * ppd, abs=1e-3)
+    assert got[(3, 1)][1] == pytest.approx(-22.5 * ppd, abs=1e-3) and got[(3, 2)][1] == pytest.approx(22.5 * ppd, abs=1e-3)
+    assert lat == 0
+
+
+def test_pano_tiles_wrap_around_the_back(pano):
+    lua, D, p = pano
+    got, _ = tiles(lua, D, p, 170.0, 0.0, 90.0, 640.0, 320.0)  # looking back: 125..215 degrees
+    cols = {c for c, _ in got}
+    assert cols == {6, 7, 0}  # 90..135 (part), 135..180, then -180..-135 past the seam
+    ppd = 640 / 90
+    assert got[(0, 1)][0] == pytest.approx(55 * ppd, abs=1e-3)
+
+
+def test_pano_lat_stays_inside_the_picture(pano):
+    lua, D, p = pano
+    _, lat = tiles(lua, D, p, 0.0, 80.0, 90.0, 640.0, 320.0)
+    assert lat == pytest.approx(90 - 22.5)
+
+
+def test_pano_heading_and_path(pano):
+    lua, D, p = pano
+    assert D.HasPano(p)
+    assert D.PanoHeading(p, 0.0) == pytest.approx(1.0)
+    assert D.PanoHeading(p, 90.0) == pytest.approx(1.0 - math.pi / 2)  # right of view 0: clockwise
+    assert D.PanoLon(p, D.PanoHeading(p, 37.0)) == pytest.approx(37.0)
+    assert D.PanoPath(p, 3, 1) == r"R/0-1-1\pano\t31.jpg"

@@ -9,8 +9,8 @@
 -- One-time setup, in first person (mouse wheel all the way in), turning with the RIGHT mouse
 -- button so the camera stays straight ahead of your character:
 --   look level at the horizon      /svcap save level     (saves the game's camera view 2)
---   look up about 45 degrees       /svcap save up        (view 3)
---   look down about 45 degrees     /svcap save down      (view 4)
+--   look up about 50 degrees       /svcap save up        (view 3)
+--   look down about 50 degrees     /svcap save down      (view 4)
 --   look straight up               /svcap save zenith    (view 5)
 -- Bind the game's own "Set View 2" to "Set View 5" keys (Key Bindings > Camera) and this
 -- addon's "Capture a street view shot" key (Key Bindings > AddOns).
@@ -103,12 +103,10 @@ end)
 -- What still has to happen before this step's shot: nil when ready, else a line to show.
 local function Pending(step)
   local facing = GetPlayerFacing()
-  if step.view ~= "zenith" and step.view ~= "nadir" then
-    local off = C.AngleDiff(C.Target(run.facing0, step.turns), facing)
-    if math.abs(off) > TOLERANCE then
-      return string.format("Turn %s %d degrees (right mouse button)", off < 0 and "right" or "left",
-        math.floor(math.abs(math.deg(off)) + 0.5))
-    end
+  local off = C.AngleDiff(C.Target(run.facing0, step.turns), facing)
+  if math.abs(off) > TOLERANCE then
+    return string.format("Turn %s %d degrees (right mouse button)", off < 0 and "right" or "left",
+      math.floor(math.abs(math.deg(off)) + 0.5))
   end
   local want = C.VIEWS[step.view]
   if want and run.viewSeen and (run.lastView ~= want or math.abs(C.AngleDiff(facing, run.viewFacing)) > math.rad(1)) then
@@ -305,11 +303,12 @@ SlashCmdList.AGPSCAPTURE = function(msg)
     Say("forgot all captured spots (the screenshots stay in the Screenshots folder).")
   else
     Say("one-time setup in first person, turning with the RIGHT mouse button:")
-    Say("  look level: /svcap save level    up ~45: /svcap save up")
-    Say("  down ~45: /svcap save down    straight up: /svcap save zenith")
+    Say("  look level: /svcap save level    up ~50: /svcap save up")
+    Say("  down ~50: /svcap save down    straight up: /svcap save zenith")
+    Say("  (steeper up and down views leave no gaps above and below in the panorama)")
     Say("bind the game's Set View 2-5 keys (Key Bindings > Camera) and the capture key (> AddOns).")
     Say("then stand on a road, not mounted, no target, and press the capture key: a guide")
-    Say("shows which way to turn and which view key to press for each of the 26 shots.")
+    Say("shows which way to turn and which view key to press for each of the 28 shots.")
     Say("/svcap status, /svcap stop, /svcap clear")
   end
 end

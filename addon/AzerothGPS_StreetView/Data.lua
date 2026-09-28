@@ -126,3 +126,47 @@ function D.ImagePath(p, yaw, pitch)
   local pack = p.pack or {}
   return (pack.root or "") .. p.id .. "\\" .. D.PoseName(yaw, pitch) .. "." .. (pack.ext or "jpg")
 end
+
+-- Panoramas (a point with `pano = { cols, rows }`): one 360-degree picture in tiles,
+-- Images/<id>/pano/t<col><row>.jpg. Its middle column looks along `facing`; columns to the
+-- right turn right. A direction in it is `lon` (degrees, clockwise from facing, -180..180)
+-- and `lat` (degrees up).
+function D.HasPano(p)
+  return type(p.pano) == "table" and (p.pano.cols or 0) > 0 and (p.pano.rows or 0) > 0
+end
+
+function D.PanoPath(p, col, row)
+  local pack = p.pack or {}
+  return (pack.root or "") .. p.id .. "\\pano\\t" .. col .. row .. "." .. (pack.ext or "jpg")
+end
+
+function D.PanoHeading(p, lon) return (p.facing or 0) - math.rad(lon) end
+function D.PanoLon(p, heading) return math.deg(D.AngleDiff(p.facing or 0, heading)) end
+
+-- The tiles a view of the panorama needs: looking at (lon, lat) with `fov` degrees across a
+-- window w x h UI units. Returns the list { col, row, x, y, size } (x, y: the tile's top-left
+-- from the window's top-left, y down; size: its edge in UI units) and lat kept inside the
+-- picture. The panorama is laid flat (a pan, not a perspective view).
+function D.PanoTiles(p, lon, lat, fov, w, h)
+  local cols, rows = p.pano.cols, p.pano.rows
+  local tw, th = 360 / cols, 180 / rows -- degrees per tile (square tiles: tw == th)
+  local ppd = w / fov
+  local vspan = h / ppd
+  local limit = math.max(0, 90 - vspan / 2)
+  lat = math.max(-limit, math.min(limit, lat))
+  local left, top = lon - fov / 2, lat + vspan / 2
+  local out = {}
+  for c = 0, cols - 1 do
+    local dx = ((-180 + c * tw) - left) % 360
+    if dx > 360 - tw then dx = dx - 360 end -- (a tile straddling the window's left edge)
+    if dx < fov and dx + tw > 0 then
+      for r = 0, rows - 1 do
+        local dy = top - (90 - r * th)
+        if dy < vspan and dy + th > 0 then
+          out[#out + 1] = { col = c, row = r, x = dx * ppd, y = dy * ppd, size = tw * ppd }
+        end
+      end
+    end
+  end
+  return out, lat
+end

@@ -29,6 +29,9 @@ def pose_name(yaw: int, pitch: int) -> str:
 
 
 ALL_POSES = [pose_name(i, p) for p in (0, 45, -45) for i in range(8)] + [pose_name(0, 90), pose_name(0, -90)]
+# the manual capture's second straight-up and straight-down shots (turned 90 degrees; for the
+# panorama only: the viewer's single views use y000)
+EXTRA_POSES = ["y270_p+90", "y270_p-90"]
 
 
 def point_id(cont: int, x: float, y: float) -> str:
@@ -86,10 +89,12 @@ def index_lua(points: list[dict], version: str) -> str:
     ]
     for p in sorted(points, key=lambda q: q["id"]):
         poses = ", ".join(f'["{n}"] = true' for n in p["poses"])
+        pano = p.get("pano")
+        pano_lua = f' pano = {{ cols = {pano["cols"]}, rows = {pano["rows"]} }},' if pano else ""
         lines.append(
             f'    {{ id = {lua_str(p["id"])}, cont = {int(p["cont"])}, x = {p["x"]:.1f}, y = {p["y"]:.1f}, '
             f'z = {p.get("z") or 0:.1f}, facing = {p["facing"]:.4f}, zone = {lua_str(p.get("zone") or "")}, '
-            f'poses = {{ {poses} }} }},'
+            f'poses = {{ {poses} }},{pano_lua} }},'
         )
     lines += ["  },", "})", ""]
     return "\n".join(lines)
@@ -138,7 +143,7 @@ def import_captures(wow: Path, build: Path, log=print) -> dict:
         if old and old.get("date", "") > cap.get("date", ""):
             continue  # a newer capture of this spot is already in
         out_dir = images / pid
-        poses = []
+        poses, raw = [], []
         for shot in cap.get("shots") or []:
             src = match_shot(shot.get("file", ""), shots, used)
             if not src:
@@ -151,6 +156,7 @@ def import_captures(wow: Path, build: Path, log=print) -> dict:
                 crop_2to1(im.convert("RGB")).save(out_dir / f"{shot['pose']}.jpg", "JPEG", quality=JPEG_QUALITY,
                                                   optimize=True, subsampling=2)
             poses.append(shot["pose"])
+            raw.append({"pose": shot["pose"], "file": src.name, "facing": shot.get("facing")})
             stats["images"] += 1
         if not poses:
             continue
@@ -158,12 +164,74 @@ def import_captures(wow: Path, build: Path, log=print) -> dict:
             "id": pid, "cont": cap["cont"], "x": cap["x"], "y": cap["y"], "z": cap.get("z") or 0,
             "facing": cap.get("facing") or 0, "zone": cap.get("subzone") or cap.get("zone") or "",
             "mapID": cap.get("mapID"), "date": cap.get("date", ""), "build": cap.get("build", ""),
-            "poses": sorted(poses),
+            "poses": sorted(poses), "shots": raw,
         }
+        if old and old.get("date") == cap.get("date", "") and old.get("pano"):
+            points[pid]["pano"] = old["pano"]  # (the same capture again: its panorama still fits)
         stats["captures"] += 1
     build.mkdir(parents=True, exist_ok=True)
     points_file.write_text(json.dumps(points, indent=1), encoding="utf-8")
     return stats
+
+
+PANO_TILE = 512
+
+
+def stitch_points(wow: Path, build: Path, width: int = 4096, only: set[str] | None = None,
+                  force: bool = False, log=print) -> int:
+    """Stitch each captured spot's screenshots into a 360-degree panorama, cut into
+    PANO_TILE-pixel tiles: build/<PACK>/Images/<id>/pano/t<col><row>.jpg (and a full copy in
+    build/debug/<id>.jpg to look at). Spots that already have one are skipped unless `force`."""
+    import math
+
+    import numpy as np
+
+    from . import stitch
+
+    points_file = build / "points.json"
+    points = json.loads(points_file.read_text(encoding="utf-8")) if points_file.exists() else {}
+    shots_dir = wow / "Screenshots"
+    done = 0
+    for pid, p in sorted(points.items()):
+        if (only and pid not in only) or (p.get("pano") and not force) or not p.get("shots"):
+            continue
+        facing0 = p["facing"]
+        shots = []
+        for s in p["shots"]:
+            src = shots_dir / s["file"]
+            pitch = int(s["pose"].split("_p")[1])
+            if not src.exists() or s.get("facing") is None or pitch not in stitch.RINGS:
+                continue
+            yaw = math.remainder(s["facing"] - facing0, 2 * math.pi)
+            with Image.open(src) as im:
+                shots.append(stitch.Shot(np.asarray(im.convert("RGB")), yaw, stitch.RINGS[pitch]))
+        if len(shots) < 8:
+            log(f"  {pid}: only {len(shots)} screenshots found, not stitched")
+            continue
+        log(f"stitching {pid} ({len(shots)} pictures)")
+        rig = stitch.calibrate(shots, log=log)
+        # pictures a little sharper than the panorama needs (less shimmer when sampling)
+        target = round(width / 360 * rig.hfov * 1.5)
+        for s in shots:
+            h, w = s.img.shape[:2]
+            if w > target:
+                s.img = np.asarray(Image.fromarray(s.img).resize((target, round(h * target / w)), Image.LANCZOS))
+        pano = Image.fromarray(stitch.panorama(shots, rig, width))
+        cols, rows = width // PANO_TILE, width // 2 // PANO_TILE
+        out = build / PACK / "Images" / pid / "pano"
+        out.mkdir(parents=True, exist_ok=True)
+        for c in range(cols):
+            for r in range(rows):
+                pano.crop((c * PANO_TILE, r * PANO_TILE, (c + 1) * PANO_TILE, (r + 1) * PANO_TILE)).save(
+                    out / f"t{c}{r}.jpg", "JPEG", quality=JPEG_QUALITY, optimize=True, subsampling=2)
+        (build / "debug").mkdir(parents=True, exist_ok=True)
+        pano.save(build / "debug" / f"{pid}.jpg", "JPEG", quality=90)
+        p["pano"] = {"cols": cols, "rows": rows, "width": width, "hfov": round(rig.hfov, 2),
+                     "pitch": {k: round(v, 2) for k, v in rig.pitch.items()},
+                     "yaw_off": {k: round(v, 2) for k, v in rig.yaw_off.items()}}
+        done += 1
+        points_file.write_text(json.dumps(points, indent=1), encoding="utf-8")
+    return done
 
 
 def import_harvest(folder: Path, build: Path, log=print) -> dict:
