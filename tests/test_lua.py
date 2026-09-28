@@ -150,3 +150,31 @@ def test_pano_heading_and_path(pano):
     assert D.PanoHeading(p, 90.0) == pytest.approx(1.0 - math.pi / 2)  # right of view 0: clockwise
     assert D.PanoLon(p, D.PanoHeading(p, 37.0)) == pytest.approx(37.0)
     assert D.PanoPath(p, 3, 1) == r"R/0-1-1\pano\t31.jpg"
+
+
+def headings(lua, D, point, roads):
+    t = D.Directions(point, roads)
+    return sorted(round(math.degrees(t[i]) % 360) for i in range(1, len(t) + 1))
+
+
+def test_directions_along_roads_and_to_nearby_views(env):
+    lua, D = env
+    here = lua.eval("{ id = 'here', cont = 9, x = 0, y = 0 }")
+    # a straight road through the spot, north-south: both ways
+    straight = lua.eval("{ e = { { 1, 2, 200, 0, -100, 0, 100, 0 } } }")
+    assert headings(lua, D, here, straight) == [0, 180]
+    # plus a road leaving west from the spot (a T-junction): three ways
+    tee = lua.eval("{ e = { { 1, 2, 200, 0, -100, 0, 100, 0 }, { 3, 4, 100, 0, 0, 0, 0, 100 } } }")
+    assert headings(lua, D, here, tee) == [0, 90, 180]
+    # the end of a road coming from the south: only back the way it came
+    dead = lua.eval("{ e = { { 1, 2, 100, 0, -100, 0, 0, 0 } } }")
+    assert headings(lua, D, here, dead) == [180]
+    # no roads nearby, but another street view 100 yd east (world y decreasing)
+    far = lua.eval("{ e = { { 1, 2, 100, 0, 5000, 5000, 5100, 5000 } } }")
+    lua.execute("function _set(D, a) D.byCont[9] = { a, { id = 'east', cont = 9, x = 0, y = -100 } } end")
+    lua.globals()._set(D, here)
+    assert headings(lua, D, here, far) == [270]
+    assert headings(lua, D, here, None) == [270]
+    # a road already going that way: the view doesn't add a second arrow
+    east_road = lua.eval("{ e = { { 1, 2, 100, 0, 0, 0, 0, -100 } } }")
+    assert headings(lua, D, here, east_road) == [270]

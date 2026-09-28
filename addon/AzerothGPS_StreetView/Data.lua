@@ -170,3 +170,47 @@ function D.PanoTiles(p, lon, lat, fov, w, h)
   end
   return out, lat
 end
+
+-- The ways you can go from a spot, as headings (radians, counter-clockwise from north): along
+-- every road within `radius` yards of it (both ways, except past a road's end) and toward
+-- other street views within `near` yards. Directions within `merge` of one already found count
+-- once. `roads` is AzerothGPS's road network of the spot's continent ({ e = { { a, b, len,
+-- source, x, y, x, y, ... } } }), nil for none.
+function D.Directions(p, roads, radius, near, merge)
+  radius, near, merge = radius or 12, near or 150, merge or math.rad(25)
+  local dirs = {}
+  local function add(h)
+    h = h % (2 * math.pi)
+    for _, d in ipairs(dirs) do
+      if math.abs(D.AngleDiff(h, d)) < merge then return end
+    end
+    dirs[#dirs + 1] = h
+  end
+  local x, y = p.x, p.y
+  if type(roads) == "table" and type(roads.e) == "table" then
+    local r2 = radius * radius
+    for _, e in ipairs(roads.e) do
+      for i = 5, #e - 3, 2 do
+        local ax, ay, bx, by = e[i], e[i + 1], e[i + 2], e[i + 3]
+        if not ((ax < x - radius and bx < x - radius) or (ax > x + radius and bx > x + radius)
+            or (ay < y - radius and by < y - radius) or (ay > y + radius and by > y + radius)) then
+          local vx, vy = bx - ax, by - ay
+          local len2 = vx * vx + vy * vy
+          if len2 > 0 then
+            local t = math.max(0, math.min(1, ((x - ax) * vx + (y - ay) * vy) / len2))
+            local dx, dy = ax + vx * t - x, ay + vy * t - y
+            if dx * dx + dy * dy <= r2 then
+              local h = D.Bearing(ax, ay, bx, by)
+              if t < 1 then add(h) end -- (road goes on ahead)
+              if t > 0 then add(h + math.pi) end -- (and back)
+            end
+          end
+        end
+      end
+    end
+  end
+  for _, q in ipairs(D.byCont[p.cont] or {}) do
+    if q ~= p and (q.x - x) ^ 2 + (q.y - y) ^ 2 <= near * near then add(D.Bearing(x, y, q.x, q.y)) end
+  end
+  return dirs
+end

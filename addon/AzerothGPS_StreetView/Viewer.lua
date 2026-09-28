@@ -21,11 +21,16 @@ local MIN_W, MAX_W = 360, 1400
 local DRAG_STEP = 60 -- UI units of dragging across the picture per view turned
 local FOV, FOV_MIN, FOV_MAX = 90, 40, 110 -- panorama: degrees across the window (the wheel zooms)
 local TURN_DEG, TILT_DEG = 45, 20 -- panorama: the arrow and Up/Down buttons
+local ARROW_SIZE, ARROW_LAT = 56, -15 -- way-to-go arrows: size, and degrees below the horizon
+local STEP_HFOV = 85 -- single views: their field of view across (the capture's, measured)
 local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "level", [45] = "looking up", [90] = "straight up" }
 
 local frame, chrome, view, img, missing, title, info, preload
 local tiles = {} -- panorama tile textures by col * 100 + row
 local lastMarkHeading -- heading last drawn on the map
+local arrows = {} -- way-to-go arrow buttons
+local dragging = false -- the picture is being dragged (arrows hidden)
+local HideArrows -- (defined further down; the drag handler in V.Build uses it)
 local topH = TITLE_H -- our own title bar's height (0 with the game frame)
 local cur -- { p, yaw, pitch (index into D.PITCHES) }, or { p, pano = true, lon, lat, fov }
 
@@ -199,9 +204,19 @@ function V.Build()
   -- drag across the picture to look around (like pulling the scenery)
   local dragX, dragY
   view:SetScript("OnMouseDown", function(_, button)
-    if button == "LeftButton" then dragX, dragY = GetCursorPosition() end
+    if button == "LeftButton" then
+      dragX, dragY = GetCursorPosition()
+      dragging = true
+      HideArrows()
+    end
   end)
-  view:SetScript("OnMouseUp", function() dragX = nil end)
+  view:SetScript("OnMouseUp", function()
+    dragX = nil
+    if dragging then
+      dragging = false
+      V.Refresh() -- (the arrows come back)
+    end
+  end)
   view:SetScript("OnUpdate", function()
     if not dragX then return end
     local x, y = GetCursorPosition()
@@ -284,6 +299,63 @@ local function HideTiles()
   for _, tex in pairs(tiles) do tex:Hide() end
 end
 
+-- The way-to-go arrows (white chevrons, like Google's): one per road leaving the spot and per
+-- nearby street view, standing on the ground in their direction. Hidden while the view is
+-- being dragged. Clicking one goes to the next street view that way.
+local function NewArrow(i)
+  local b = CreateFrame("Button", nil, view)
+  b:SetSize(ARROW_SIZE, ARROW_SIZE)
+  b:SetFrameLevel(view:GetFrameLevel() + 5)
+  b.tex = b:CreateTexture(nil, "OVERLAY")
+  b.tex:SetAllPoints()
+  b.tex:SetTexture(MEDIA .. "Arrow")
+  b:RegisterForClicks("LeftButtonUp")
+  b:SetScript("OnClick", function(self) V.GoToward(self.heading) end)
+  b:SetScript("OnEnter", function(self)
+    self.tex:SetVertexColor(1, 0.85, 0.35)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Go " .. D.Compass(self.heading), 1, 1, 1)
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function(self)
+    self.tex:SetVertexColor(1, 1, 1)
+    GameTooltip_Hide()
+  end)
+  b:Hide()
+  arrows[i] = b
+  return b
+end
+
+HideArrows = function()
+  for _, b in ipairs(arrows) do b:Hide() end
+end
+
+-- Place the arrows for a view looking along centerHeading (radians), tilted centerLat
+-- degrees, at ppd UI units per degree. An arrow whose spot on the ground is below the view
+-- stays at its bottom edge, so the ways on are always in sight.
+local function PlaceArrows(centerHeading, centerLat, ppd)
+  local dirs = cur and cur.dirs
+  if dragging or not dirs or not centerHeading then return HideArrows() end
+  local w, h = view:GetWidth(), view:GetHeight()
+  local top = centerLat + h / ppd / 2
+  local y = math.min((top - ARROW_LAT) * ppd, h - ARROW_SIZE * 0.75)
+  for i, dir in ipairs(dirs) do
+    local b = arrows[i] or NewArrow(i)
+    local rel = math.deg(D.AngleDiff(centerHeading, dir)) -- degrees to the right
+    local x = w / 2 + rel * ppd
+    if y > ARROW_SIZE / 2 and x > ARROW_SIZE / 2 and x < w - ARROW_SIZE / 2 then
+      b.heading = dir
+      b:ClearAllPoints()
+      b:SetPoint("CENTER", view, "TOPLEFT", x, -y)
+      b.tex:SetRotation(-math.rad(rel) * 0.6) -- (leaning the way it points, as on the ground)
+      b:Show()
+    else
+      b:Hide()
+    end
+  end
+  for i = #dirs + 1, #arrows do arrows[i]:Hide() end
+end
+
 -- The panorama: the tiles in view, laid flat and slid into place.
 local function PanoRefresh()
   local p = cur.p
@@ -323,6 +395,7 @@ local function PanoRefresh()
   local tilt = math.floor(cur.lat + 0.5)
   local looking = tilt == 0 and "level" or (tilt > 0 and ("looking up " .. tilt) or ("looking down " .. -tilt))
   info:SetText(D.Compass(heading) .. "  " .. looking)
+  PlaceArrows(heading, cur.lat, w / cur.fov)
   -- the map's marker: only when the heading moved noticeably (map redraws aren't free)
   if ns.Figure and (not lastMarkHeading or math.abs(D.AngleDiff(heading, lastMarkHeading)) > 0.03) then
     lastMarkHeading = heading
@@ -348,6 +421,11 @@ function V.Refresh()
   end
   local heading = D.Heading(p, cur.yaw)
   Title(p)
+  if pitch == 90 or pitch == -90 then
+    HideArrows()
+  else
+    PlaceArrows(heading, pitch, view:GetWidth() / STEP_HFOV)
+  end
   local facing = (pitch == 90 or pitch == -90) and "" or (D.Compass(heading) .. "  ")
   info:SetText(facing .. PITCH_NAMES[pitch])
   -- load the neighbors ahead of time
@@ -369,6 +447,8 @@ function V.Open(p, heading)
   else
     cur = { p = p, yaw = heading and D.YawFor(p, heading) or 0, pitch = D.LEVEL }
   end
+  local API = _G.AzerothGPS
+  cur.dirs = D.Directions(p, API and API.Roads and API.Roads(p.cont))
   lastMarkHeading = nil
   frame:Show()
   V.Refresh()
@@ -407,14 +487,19 @@ function V.Zoom(delta)
   V.Refresh()
 end
 
-function V.GoAhead()
-  if not cur then return end
-  local q = D.Ahead(cur.p, V.Heading())
+-- The next street view toward `heading` (within 35 degrees of it), looking that way.
+function V.GoToward(heading)
+  if not cur or not heading then return end
+  local q = D.Ahead(cur.p, heading, 150, math.rad(35))
   if not q then
-    UIErrorsFrame:AddMessage("No street view ahead", 1, 0.82, 0)
+    UIErrorsFrame:AddMessage("No street view that way yet", 1, 0.82, 0)
     return
   end
-  V.Open(q, V.Heading())
+  V.Open(q, heading)
+end
+
+function V.GoAhead()
+  if cur then V.GoToward(V.Heading()) end
 end
 
 -- The view shown (nil when the window is closed): { p, yaw, pitch }, and its heading.
@@ -432,6 +517,7 @@ function V.Probe()
   if not frame then V.Build() end
   cur = nil
   HideTiles()
+  HideArrows()
   img:Show()
   frame:Show()
   local ok = img:SetTexture(MEDIA .. "Probe.jpg")

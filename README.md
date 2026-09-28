@@ -55,7 +55,8 @@ Status: early development, private.
    (about 40 seconds a spot; `sv.cmd stitch --force` redoes them), and installs it (not the
    capture tool). Restart the game (new files).
 7. Drag the figure from the map onto the road. Drag the picture to look around, the mouse
-   wheel zooms, the arrows turn 45 degrees.
+   wheel zooms, the arrow buttons turn 45 degrees. White arrows on the ground point along
+   the roads and toward nearby street views (hidden while you drag); click one to go that way.
 
 `sv.cmd` in this folder runs `tools/sv.py` with the AzerothGPS venv's Python (it has Pillow
 and lupa). It works from any folder in PowerShell or Command Prompt when called by its full

@@ -72,6 +72,24 @@ def fit(src: Path, size: int, scale: float = 1.0) -> Image.Image:
     return out
 
 
+def arrow(size: int = 64) -> Image.Image:
+    """The viewer's white chevron pointing up (the way to go), with a soft dark shadow so it
+    reads on sky and on sand alike. Drawn 4x larger and scaled down."""
+    from PIL import ImageFilter
+
+    k = 4
+    s = size * k
+    chevron = [(128, 30), (242, 144), (194, 192), (128, 126), (62, 192), (14, 144)]
+    pts = [(x * s / 256, y * s / 256) for x, y in chevron]
+    shadow = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).polygon([(x, y + 3 * k) for x, y in pts], fill=(0, 0, 0, 170))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(4 * k))
+    im = Image.alpha_composite(Image.new("RGBA", (s, s), (0, 0, 0, 0)), shadow)
+    d = ImageDraw.Draw(im)
+    d.polygon(pts, fill=(255, 255, 255, 255), outline=(40, 40, 40, 255), width=2 * k)
+    return im.convert("RGBa").resize((size, size), Image.LANCZOS).convert("RGBA")
+
+
 def make(media: Path) -> None:
     """Media/: Figure.tga (64x64, the map's drag figure: assets/figure.png, else drawn here),
     Logo.tga and Portrait.tga (128x128, assets/logo.png; the portrait with a margin) and Probe.jpg. TGAs are uncompressed 32-bit, like
@@ -81,7 +99,8 @@ def make(media: Path) -> None:
     fig = assets / "figure.png"
     (fit(fig, 64) if fig.exists() else figure()).save(media / "Figure.tga")
     probe_card().save(media / "Probe.jpg", "JPEG", quality=90)
+    arrow().save(media / "Arrow.tga")  # the viewer's way-to-go chevrons
     if (assets / "logo.png").exists():
         fit(assets / "logo.png", 128).save(media / "Logo.tga")  # the addon list icon
         fit(assets / "logo.png", 128, 0.9).save(media / "Portrait.tga")  # the viewer's portrait: 10% smaller
-    print(f"wrote Figure.tga, Logo.tga, Portrait.tga and Probe.jpg in {media}")
+    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, Arrow.tga and Probe.jpg in {media}")
