@@ -36,6 +36,12 @@ BUDGET_BYTES = CONFIG["budget_bytes"]
 CUBE_QUALITY = CONFIG["master"]["quality"]
 
 
+def is_manual(point: dict) -> bool:
+    """A spot from the user's own screenshots (AGPS_Capture on their real account): kept in the
+    master for checking renders against, never shipped in a pack."""
+    return point.get("source") == "manual" or (point.get("source") != "harvester" and "shots" in point)
+
+
 def pack_for(cfg: dict, point: dict) -> dict | None:
     """The SD pack a point belongs in (by continent), or None."""
     for pk in cfg["sd"]["packs"]:
@@ -198,7 +204,7 @@ def import_captures(wow: Path, build: Path, log=print) -> dict:
             "id": pid, "cont": cap["cont"], "x": cap["x"], "y": cap["y"], "z": cap.get("z") or 0,
             "facing": cap.get("facing") or 0, "zone": cap.get("subzone") or cap.get("zone") or "",
             "mapID": cap.get("mapID"), "date": cap.get("date", ""), "build": cap.get("build", ""),
-            "poses": sorted(poses), "shots": raw,
+            "poses": sorted(poses), "shots": raw, "source": "manual",
         }
         if keep_cube:
             points[pid]["cube"] = old["cube"]  # (the same capture again: its cube still fits)
@@ -357,11 +363,12 @@ def _scaled(src: Path, dst: Path, px: int, quality: int) -> None:
         im.save(dst, "JPEG", quality=quality, optimize=True, subsampling=2)
 
 
-def build_packs(build: Path, version: str | None = None, cfg: dict | None = None) -> list[dict]:
+def build_packs(build: Path, version: str | None = None, cfg: dict | None = None,
+                manual: bool = False) -> list[dict]:
     """Write every SD pack addon (packs.json) into build/packs/<name>/: its toc, Index.lua and
     the tiles of its spots scaled down from the master (single views for spots not stitched
     yet). Stale folders go. Refuses a pack over the budget. Returns one report per pack:
-    { name, title, points, bytes, planned }."""
+    { name, title, points, bytes, planned }. Manual captures stay out unless `manual` (tests)."""
     cfg = cfg or CONFIG
     migrate(build)
     points_file = build / "points.json"
@@ -376,7 +383,7 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
                 shutil.rmtree(d)
     reports = []
     for pk in sd["packs"]:
-        mine = [p for p in points.values() if pack_for(cfg, p) is pk]
+        mine = [p for p in points.values() if pack_for(cfg, p) is pk and (manual or not is_manual(p))]
         out = root / pk["name"]
         images = out / "Images"
         images.mkdir(parents=True, exist_ok=True)
@@ -426,7 +433,7 @@ def budget(reports: list[dict], cfg: dict | None = None) -> str:
     return "\n".join(lines)
 
 
-def build_pack(build: Path, version: str | None = None) -> tuple[int, int]:
+def build_pack(build: Path, version: str | None = None, manual: bool = False) -> tuple[int, int]:
     """(Older callers) build every pack; returns (spots, bytes) over all of them."""
-    reports = build_packs(build, version)
+    reports = build_packs(build, version, manual=manual)
     return sum(r["points"] for r in reports), sum(r["bytes"] for r in reports)

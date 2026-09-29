@@ -74,7 +74,12 @@ def test_import_and_build_pack(tmp_path):
     build = tmp_path / "build"
     stats = pack.import_captures(wow, build, log=lambda *_: None)
     assert stats == {"captures": 1, "skipped": 1, "images": 3, "missing": 0}
-    n, size = pack.build_pack(build, "2026.09.28")
+    # the user's own screenshots never go into a pack
+    n, _ = pack.build_pack(build, "2026.09.28")
+    assert n == 0 and not (build / "packs" / KAL / "Images" / "1-1629--4373").exists()
+    assert "1-1629--4373" not in (build / "packs" / KAL / "Index.lua").read_text(encoding="utf-8")
+    # (with manual=True, for checking the viewer reads single views)
+    n, size = pack.build_pack(build, "2026.09.28", manual=True)
     assert n == 1 and size > 0
     assert (build / "master" / "1-1629--4373" / "views" / "y000_p+00.jpg").exists()
     img = build / "packs" / KAL / "Images" / "1-1629--4373" / "y000_p+00.jpg"

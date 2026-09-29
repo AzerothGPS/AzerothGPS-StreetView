@@ -16,6 +16,10 @@ AzerothGPS/AzerothGPS). This repo is **private**: https://github.com/AzerothGPS/
   it never moves the character or the camera (the user turns and presses the game's Set View
   keys; it only hides names and takes a screenshot per key press). Never published, and
   `sv.py install` leaves it out unless `--capture` is passed.
+- **The user's own screenshots are never shipped** (the user, 2026-09-28). Spots from
+  AGPS_Capture are `source: "manual"` (`pack.is_manual`): they stay in the master as ground
+  truth for checking renders, and `build_packs` leaves them out. The raw screenshots don't stay
+  in the game install: they live in `data/manual-captures/Screenshots` (git-ignored).
 - **No automation of any kind on this PC's game.** Automated teleporting and capture live in
   the separate private repo AzerothGPS/streetview-harvester, for a private server on the
   other PC only. Never install anything from it into this PC's WoW folder.
