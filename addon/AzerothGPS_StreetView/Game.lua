@@ -953,6 +953,19 @@ local function ScoreColor(n)
   return "|cffff9060"
 end
 
+-- Where the panel starts: right of the map window frame's round portrait when that shows (as
+-- AzerothGPS's own top panel does).
+local function PanelLeft()
+  if API.TopPanelInset then return API.TopPanelInset() end
+  local f = API.MapFrame and API.MapFrame()
+  if f then
+    for _, c in ipairs({ f:GetChildren() }) do
+      if c:IsShown() and (c.PortraitContainer or c.GetPortrait) then return 46 end
+    end
+  end
+  return 4
+end
+
 -- Redraw the panel from the game's state.
 function Gm.Refresh()
   if not panel then return end
@@ -960,6 +973,9 @@ function Gm.Refresh()
     panel:Hide()
     return
   end
+  panel:ClearAllPoints()
+  panel:SetPoint("TOPLEFT", PanelLeft(), -4)
+  panel:SetPoint("TOPRIGHT", -4, -4)
   panel:Show()
   local ph = game.phase
   local roundText = game.round > 0 and string.format("  |cffffffffRound %d of %d|r", game.round, game.rounds) or ""
