@@ -90,6 +90,33 @@ def arrow(size: int = 64) -> Image.Image:
     return im.convert("RGBa").resize((size, size), Image.LANCZOS).convert("RGBA")
 
 
+def sheet(src: Path, size: int = 64) -> Image.Image:
+    """An animated GIF as a strip of frames side by side (the game has no GIFs: the addon shows one
+    frame at a time with SetTexCoord): every frame squared around the part any frame shows, scaled
+    to size x size with premultiplied alpha. Width size * frames, rounded up to a power of two."""
+    from PIL import ImageSequence
+    frames = [f.convert("RGBA") for f in ImageSequence.Iterator(Image.open(src))]
+    boxes = [f.getchannel("A").getbbox() for f in frames]
+    l, t = min(b[0] for b in boxes), min(b[1] for b in boxes)
+    r, b = max(bx[2] for bx in boxes), max(bx[3] for bx in boxes)
+    side = max(r - l, b - t)
+    cx, cy = (l + r) // 2, (t + b) // 2
+    width = 1
+    while width < size * len(frames):
+        width *= 2
+    out = Image.new("RGBA", (width, size), (0, 0, 0, 0))
+    for i, f in enumerate(frames):
+        sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+        sq.paste(f.crop((cx - side // 2, cy - side // 2, cx - side // 2 + side, cy - side // 2 + side)), (0, 0))
+        out.paste(sq.convert("RGBa").resize((size, size), Image.LANCZOS).convert("RGBA"), (i * size, 0))
+    px = out.load()
+    for y in range(out.height):  # (fully clear pixels: black, not leftover color)
+        for x in range(out.width):
+            if px[x, y][3] == 0:
+                px[x, y] = (0, 0, 0, 0)
+    return out
+
+
 def make(media: Path) -> None:
     """Media/: Figure.tga (64x64, the map's drag figure: assets/figure.png, else drawn here),
     Logo.tga and Portrait.tga (128x128, assets/logo.png; the portrait with a margin) and Probe.jpg. TGAs are uncompressed 32-bit, like
@@ -103,4 +130,6 @@ def make(media: Path) -> None:
     if (assets / "logo.png").exists():
         fit(assets / "logo.png", 128).save(media / "Logo.tga")  # the addon list icon
         fit(assets / "logo.png", 128, 0.76).save(media / "Portrait.tga")  # the viewer's portrait: small enough that its round frame shows all of "StreetView"
-    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, Arrow.tga and Probe.jpg in {media}")
+    if (assets / "guess.gif").exists():  # Street Guess's guess on the map (the user's animation)
+        sheet(assets / "guess.gif").save(media / "Guess.tga")
+    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, Arrow.tga, Guess.tga and Probe.jpg in {media}")

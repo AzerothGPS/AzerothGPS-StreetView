@@ -705,7 +705,29 @@ function Gm.Animate()
   if k >= 1 then game.pan = nil end
 end
 
+-- A marker on the map at world (x, y): "guess" (the player's own: the animated orc) or "answer"
+-- (the routes' star marker); a square dot where the map's icons aren't available (tests).
+local function Mark(ctx, kind, x, y)
+  if Gm.marks then
+    local sx, sy = ctx.ToScreen(x, y)
+    return Gm.marks.Put(kind, sx, sy)
+  end
+  if kind == "guess" then
+    ctx.Dot(x, y, { 0, 0, 0 }, 15, 0.8)
+    ctx.Dot(x, y, GUESS_COLOR, 11, 1)
+  else
+    ctx.Dot(x, y, SPOT_COLOR, 14, 1)
+  end
+end
+
+local DrawOn
 function Gm.Draw(ctx)
+  if Gm.marks then Gm.marks.Begin() end
+  DrawOn(ctx)
+  if Gm.marks then Gm.marks.End() end
+end
+
+DrawOn = function(ctx)
   if not game then return end
   local ph = game.phase
   local API = _G.AzerothGPS
@@ -720,10 +742,7 @@ function Gm.Draw(ctx)
     local pg = game.pending
     local px, py -- (not `pg and At(...)`: `and` keeps only a call's first value)
     if pg then px, py = At(pg.cont, pg.x, pg.y) end
-    if px then
-      ctx.Dot(px, py, { 0, 0, 0 }, 15, 0.8)
-      ctx.Dot(px, py, GUESS_COLOR, 11, 1)
-    end
+    if px then Mark(ctx, "guess", px, py) end
     return
   end
   if not game.spot then return end
@@ -752,9 +771,9 @@ function Gm.Draw(ctx)
   if g and g.x then gx, gy = At(g.cont, g.x, g.y) end
   if gx then
     ctx.Line(gx, gy, gx + (sx - gx) * t, gy + (sy - gy) * t, LINE_COLOR, 3, 0.95, true)
-    ctx.Dot(gx, gy, GUESS_COLOR, 11, 1)
+    Mark(ctx, "guess", gx, gy)
   end
-  if t >= 1 or not gx then ctx.Dot(sx, sy, SPOT_COLOR, 14, 1) end
+  if t >= 1 or not gx then Mark(ctx, "answer", sx, sy) end
 end
 
 ---------------------------------------------------------------------------------------------
@@ -1243,6 +1262,60 @@ local function BuildButton(parent, figure)
   gameButton:SetScript("OnLeave", GameTooltip_Hide)
 end
 
+-- The map's markers for the game (Gm.marks): textures on AzerothGPS's map canvas, placed on every
+-- redraw at the points Gm.Draw gives. The guess is the animated orc (Media/Guess.tga: its frames
+-- side by side, one a second), the answer the star the routes use for their stops.
+local GUESS_TEX = "Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Guess"
+local GUESS_FRAMES, GUESS_SHEET_FRAMES, GUESS_FRAME_SECONDS = 2, 2, 1 -- (Guess.tga is 128 wide: 2 frames of 64)
+local STAR_TEX = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1"
+local function BuildMarks(canvas)
+  local layer = CreateFrame("Frame", nil, canvas)
+  layer:SetAllPoints()
+  layer:SetFrameLevel(canvas:GetFrameLevel() + 25)
+  local pool, used = { guess = {}, answer = {} }, { guess = 0, answer = 0 }
+  local function Get(kind)
+    local n = used[kind] + 1
+    used[kind] = n
+    local t = pool[kind][n]
+    if not t then
+      t = layer:CreateTexture(nil, "OVERLAY")
+      if kind == "guess" then
+        t:SetTexture(GUESS_TEX)
+        t:SetSize(30, 30)
+      else
+        t:SetTexture(STAR_TEX)
+        t:SetSize(22, 22)
+      end
+      pool[kind][n] = t
+    end
+    return t
+  end
+  local M = {}
+  function M.Begin() used.guess, used.answer = 0, 0 end
+  function M.Put(kind, sx, sy)
+    local t = Get(kind)
+    t:ClearAllPoints()
+    t:SetPoint("CENTER", layer, "CENTER", sx, sy + (kind == "guess" and 8 or 0)) -- (the orc sits on the spot)
+    t:Show()
+  end
+  function M.End()
+    for kind, list in pairs(pool) do
+      for i = used[kind] + 1, #list do list[i]:Hide() end
+    end
+  end
+  -- the orc's frames (the driver calls this every tenth of a second)
+  function M.Animate(now)
+    local f = math.floor(now / GUESS_FRAME_SECONDS) % GUESS_FRAMES
+    local w = 1 / GUESS_SHEET_FRAMES
+    for _, t in ipairs(pool.guess) do t:SetTexCoord(f * w, (f + 1) * w, 0, 1) end
+  end
+  function M.Clear()
+    M.Begin()
+    M.End()
+  end
+  return M
+end
+
 -- The invitation, asked before joining.
 local function Ask(sender, rounds, onYes, onNo)
   if not (StaticPopupDialogs and StaticPopup_Show) then
@@ -1300,12 +1373,15 @@ function Gm.Init(figureButton)
   io_.follow = function() if API.Follow then API.Follow() end end
   io_.showMap = function() if API.ShowMap then API.ShowMap() end end
   io_.changed = function()
+    if not game and Gm.marks then Gm.marks.Clear() end
     Gm.Refresh()
     if ns.Figure then ns.Figure.Refresh() end
     API.Redraw()
   end
   io_.ask = Ask
 
+  local canvas = API.MapCanvas and API.MapCanvas()
+  if canvas then Gm.marks = BuildMarks(canvas) end
   API.SetOverlay("StreetGuess", Gm.Draw)
   -- Whisper: shift-click a player's name in chat to fill the name box
   if hooksecurefunc and SetItemRef then
@@ -1350,6 +1426,7 @@ function Gm.Init(figureButton)
       local ok, err = pcall(Gm.Tick)
       if not ok then ns.Print("|cffff6060game clock failed:|r " .. tostring(err)) end
       Gm.RefreshTimer()
+      if Gm.marks then Gm.marks.Animate(GetTime()) end
     end
     if game and game.pan then Gm.Animate() end
     if game and game.reveal and Now() - game.reveal.t0 <= Gm.REVEAL_SECONDS + 0.1 then API.Redraw() end
