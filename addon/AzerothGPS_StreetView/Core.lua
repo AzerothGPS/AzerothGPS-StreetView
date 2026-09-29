@@ -57,6 +57,8 @@ local HELP = {
   "/sv hide - close the viewer.",
   "/sv flipyaw - turn the views the other way (if left and right are swapped).",
   "/sv probe - check that this game client shows JPEG images.",
+  "/sv dev - Street Guess's Report picture button on or off (for taking broken pictures again).",
+  "/sv reports - the street views reported as broken; /sv unreport <id> or /sv unreport all.",
 }
 
 SLASH_AZEROTHGPSSTREETVIEW1 = "/sv"
@@ -85,6 +87,26 @@ SlashCmdList.AZEROTHGPSSTREETVIEW = function(msg)
     ns.Viewer.Refresh()
   elseif cmd == "probe" then
     ns.Viewer.Probe()
+  elseif cmd == "dev" then
+    ns.db.dev = not ns.db.dev or nil
+    Print(ns.db.dev and "Report picture is on in Street Guess." or "Report picture is off.")
+  elseif cmd == "reports" then
+    local n = 0
+    for id in pairs(ns.db.reported or {}) do
+      n = n + 1
+      Print("  reported: " .. id)
+    end
+    Print(n == 0 and "No street views reported." or (n .. " reported. /sv unreport <id> or /sv unreport all"))
+  elseif cmd == "unreport" then
+    if rest == "all" then
+      ns.db.reported = nil
+      Print("No street views reported now.")
+    elseif ns.db.reported and ns.db.reported[rest] then
+      ns.db.reported[rest] = nil
+      Print("Street view " .. rest .. " is no longer reported.")
+    else
+      Print("Not reported: " .. tostring(rest) .. " (/sv reports lists them)")
+    end
   else
     for _, line in ipairs(HELP) do Print(line) end
   end

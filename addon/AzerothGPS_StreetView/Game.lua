@@ -624,8 +624,13 @@ function Gm.Report()
   local s = game and game.spot
   if not (s and ns.db) then return end
   ns.db.reported = ns.db.reported or {}
-  ns.db.reported[s.id] = time and time() or 1
-  io().print("Thanks: street view " .. s.id .. " is left out from now on and will be taken again.")
+  if ns.db.reported[s.id] then -- (clicked again: a mistake, undone)
+    ns.db.reported[s.id] = nil
+    io().print("Street view " .. s.id .. " is no longer reported.")
+  else
+    ns.db.reported[s.id] = time and time() or 1
+    io().print("Street view " .. s.id .. " reported: left out from now on and taken again. Click again to undo.")
+  end
   Changed()
 end
 
@@ -1197,7 +1202,7 @@ local function BuildPanel(parent)
   reopen:Hide()
   panel.reopen = reopen
   -- a broken picture (all one color, black...): held back from the packs and taken again
-  local report = Chip(panel, "Report picture", 96, function() Gm.Report() end)
+  local report = Chip(panel, "Report picture", 104, function() Gm.Report() end)
   report:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:SetText("Report this street view", 1, 1, 1)
@@ -1369,12 +1374,12 @@ function Gm.Refresh()
   panel.submit:SetShown(game.mode == "solo" and ph == "look" and game.pending ~= nil)
   local reopen = ph == "look" and not game.missing and not (ns.Viewer.Current() and ns.Viewer.Current().game)
   panel.reopen:SetShown(reopen)
-  local report = (ph == "result" or ph == "over" or ph == "wait") and game.spot ~= nil
+  -- (a developer's tool: /sv dev. A player's report would only hide the spot on their own machine)
+  local report = ns.db and ns.db.dev and (ph == "result" or ph == "over" or ph == "wait") and game.spot ~= nil
   panel.report:SetShown(report)
   if report then
     local done = Gm.Reported(game.spot.id)
-    panel.report.label:SetText(done and "Reported" or "Report picture")
-    panel.report:SetEnabled(not done)
+    panel.report.label:SetText(done and "Reported (undo)" or "Report picture")
   end
   if panel.submit:IsShown() or reopen or report then
     local x = 8
