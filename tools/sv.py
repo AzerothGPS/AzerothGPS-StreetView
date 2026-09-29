@@ -78,7 +78,8 @@ def install(wow: Path, capture: bool) -> None:
 
 
 def build_and_report(flush: bool = False) -> list[dict]:
-    reports = pack.build_packs(BUILD)
+    # (pictures players reported in Street Guess, from the game's saved settings: held back, taken again)
+    reports = pack.build_packs(BUILD, reported=pack.reported_in_game(DEFAULT_WOW))
     print(pack.budget(reports), flush=flush)
     return reports
 

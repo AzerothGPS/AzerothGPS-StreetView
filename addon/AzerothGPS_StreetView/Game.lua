@@ -163,7 +163,8 @@ function Gm.PickSpot(used, rnd, allowed)
   local ids = {}
   for id, p in pairs(D.byId) do
     if not used[id] and type(p.cont) == "number" and p.cont < 10000
-        and (not allowed or (p.pack and allowed[Gm.PackKey(p.pack.name)])) then
+        and (not allowed or (p.pack and allowed[Gm.PackKey(p.pack.name)]))
+        and (not Gm.Usable or Gm.Usable(p)) then
       ids[#ids + 1] = id
     end
   end
@@ -306,7 +307,8 @@ Gm.io = {
   random = function(a, b) if a then return math.random(a, b) end return math.random() end,
   -- the rest: the viewer, the map and the panel (Gm.Init sets them)
   open = function() end, close = function() end, hold = function() end, lookAt = function() end,
-  follow = function() end, showMap = function() end, world = function() end, view = function() end, changed = function() end, ask = function() end,
+  follow = function() end, showMap = function() end, world = function() end, view = function() end,
+  mapState = function() end, changed = function() end, ask = function() end,
   print = function(...) if ns.Print then ns.Print(...) end end,
 }
 local io = function() return Gm.io end
@@ -448,7 +450,8 @@ Look = function()
   game.guess, game.reveal, game.pending = nil, nil, nil
   game.missing = game.spot == nil
   io().world(game.spot) -- (every round starts from the whole world: no hint where to look)
-  if game.spot then io().open(game.spot, io().random() * 2 * math.pi) end
+  game.heading = io().random() * 2 * math.pi
+  if game.spot then io().open(game.spot, game.heading) end
   Changed()
 end
 
@@ -544,6 +547,7 @@ function Gm.Start(mode, rounds, target)
     return false
   end
   NewGame(mode, rounds)
+  game.before = io().mapState()
   game.channel = mode == "party" and io().group() or nil
   game.target = mode == "whisper" and target or nil
   io().hold(true)
@@ -572,10 +576,16 @@ function Gm.Leave()
   if game.phase ~= "over" and game.mode ~= "solo" then
     ToOthers(game.isHost and "X" or "Q", game.id)
   end
+  local before = game.before
   game = nil
   io().close()
   io().hold(false)
-  io().follow()
+  -- back to the map as it was: following the player, or the view they had
+  if before and not before.following and before.x then
+    io().lookAt(before.cont, before.x, before.y, before.zoom)
+  else
+    io().follow()
+  end
   Changed()
 end
 
@@ -598,6 +608,25 @@ Submit = function()
   end
   g.score = Gm.Score(g.yards)
   Scored(g)
+end
+
+-- The round's street view again (closed during the round).
+function Gm.ShowAgain()
+  if game and game.phase == "look" and game.spot then io().open(game.spot, game.heading) end
+end
+
+-- A broken picture: reported (kept in the saved settings: `sv.cmd pull` holds it back from the
+-- packs and puts it on the retake list), and never picked again.
+function Gm.Reported(id)
+  return ns.db and ns.db.reported and ns.db.reported[id] ~= nil
+end
+function Gm.Report()
+  local s = game and game.spot
+  if not (s and ns.db) then return end
+  ns.db.reported = ns.db.reported or {}
+  ns.db.reported[s.id] = time and time() or 1
+  io().print("Thanks: street view " .. s.id .. " is left out from now on and will be taken again.")
+  Changed()
 end
 
 -- Solo: the guess placed is final now (no waiting for the timer).
@@ -708,6 +737,7 @@ function Gm.OnMessage(msg, channel, sender)
       game.channel = channel ~= "WHISPER" and channel or nil
       game.packs[sender] = Gm.ParsePacks(f[3])
       game.phase = "joined"
+      game.before = io().mapState()
       game.deadline = Now() + Gm.JOIN_SECONDS + 10 -- (no word from the host by then: it started without us)
       io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me])), reply, to)
       io().hold(true)
@@ -1158,6 +1188,24 @@ local function BuildPanel(parent)
   submit:SetScript("OnClick", function() Gm.SubmitNow() end)
   submit:Hide()
   panel.submit = submit
+  -- this round's street view closed during the round: open it again
+  local ok3, reopen = pcall(CreateFrame, "Button", nil, panel, "UIPanelButtonTemplate")
+  if not ok3 or not reopen then reopen = Chip(panel, "Show street view", 120) end
+  reopen:SetSize(120, 20)
+  reopen:SetText("Show street view")
+  reopen:SetScript("OnClick", function() Gm.ShowAgain() end)
+  reopen:Hide()
+  panel.reopen = reopen
+  -- a broken picture (all one color, black...): held back from the packs and taken again
+  local report = Chip(panel, "Report picture", 96, function() Gm.Report() end)
+  report:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Report this street view", 1, 1, 1)
+    GameTooltip:AddLine("Its picture is broken (one color, black, inside a wall...): it's left out of the games and the next data update, and taken again.", nil, nil, nil, true)
+    GameTooltip:Show()
+  end)
+  report:Hide()
+  panel.report = report
 end
 
 -- One line about this player's guess.
@@ -1319,9 +1367,24 @@ function Gm.Refresh()
     h = h + 24
   end
   panel.submit:SetShown(game.mode == "solo" and ph == "look" and game.pending ~= nil)
-  if panel.submit:IsShown() then
-    panel.submit:ClearAllPoints()
-    panel.submit:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -h)
+  local reopen = ph == "look" and not game.missing and not (ns.Viewer.Current() and ns.Viewer.Current().game)
+  panel.reopen:SetShown(reopen)
+  local report = (ph == "result" or ph == "over" or ph == "wait") and game.spot ~= nil
+  panel.report:SetShown(report)
+  if report then
+    local done = Gm.Reported(game.spot.id)
+    panel.report.label:SetText(done and "Reported" or "Report picture")
+    panel.report:SetEnabled(not done)
+  end
+  if panel.submit:IsShown() or reopen or report then
+    local x = 8
+    for _, b in ipairs({ panel.submit, panel.reopen, panel.report }) do
+      if b:IsShown() then
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -h)
+        x = x + b:GetWidth() + 6
+      end
+    end
     h = h + 24
   end
   panel:SetHeight(math.max(40, h))
@@ -1341,6 +1404,10 @@ function Gm.RefreshTimer()
     panel.timer:SetText("|cff9d9d9dcloses in " .. Clock(game.closeAt - Now()) .. "|r")
     if V and V.SetTimer then V.SetTimer(nil) end
     return
+  end
+  if ph == "look" and panel.reopen then
+    local want = not game.missing and not (V and V.Current() and V.Current().game)
+    if want ~= panel.reopen:IsShown() then Gm.Refresh() end
   end
   if (ph == "look" or ph == "invite") and game.deadline then
     local left = game.deadline - Now()
@@ -1517,6 +1584,14 @@ function Gm.Init(figureButton)
     local x, y, c, _, sc, half = API.View()
     if x and sc and sc > 0 and half then return x, y, API.BaseContinent(c), half / sc end
   end
+  -- the map as it is: following the player (its center on them), or where it looks
+  io_.mapState = function()
+    local x, y, c, zoom = io_.view()
+    if not x then return nil end
+    local px, py, pc = API.PlayerWorld()
+    local following = px ~= nil and API.BaseContinent(pc) == c and (px - x) ^ 2 + (py - y) ^ 2 < 25
+    return { following = following, x = x, y = y, cont = c, zoom = zoom }
+  end
   io_.world = function(s) -- (the start of a round; a guess on another continent: the whole world)
     if API.ShowWorld then API.ShowWorld() elseif s and API.LookAt then API.LookAt(s.cont, s.x, s.y, 6000) end
   end
@@ -1532,6 +1607,10 @@ function Gm.Init(figureButton)
 
   local canvas = API.MapCanvas and API.MapCanvas()
   if canvas then Gm.marks = BuildMarks(canvas) end
+  Gm.Usable = function(p)
+    if ns.db and ns.db.reported and ns.db.reported[p.id] then return false end
+    return not (D.loadable and not D.loadable[p.id])
+  end
   API.SetOverlay("StreetGuess", Gm.Draw)
   -- Whisper: shift-click a player's name in chat to fill the name box
   if hooksecurefunc and SetItemRef then

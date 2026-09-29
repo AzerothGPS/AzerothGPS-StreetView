@@ -44,6 +44,7 @@ class Player:
         self.printed = []
         self.looked = []
         self.map_view = None  # (the map's center and zoom, when a test gives one: the result animates from it)
+        self.map_state = None  # (the map before the game: restored when it ends)
         self.group = group  # the party's channel, or None
         io = self.lua.table_from({
             "now": lambda: clock.t,
@@ -59,7 +60,8 @@ class Player:
             "lookAt": lambda c, x, y, z: self.looked.append((c, x, y, z)),
             "world": lambda spot: self.looked.append("world"),
             "view": lambda: self.map_view,
-            "follow": lambda: None,
+            "mapState": lambda: self.map_state,
+            "follow": lambda: self.looked.append("follow"),
             "showMap": lambda: None,
             "changed": lambda: None,
             "ask": self.ask,
@@ -546,3 +548,25 @@ def test_a_finished_game_closes_after_a_minute(solo):
     assert p.G.Current() is not None  # (still showing the result)
     run(net, clock, 11)
     assert p.G.Current() is None and p.held == [True, False]  # back to the map and the route
+
+
+def test_leaving_restores_the_map_as_it_was(solo):
+    p, clock, net = solo
+    # looking somewhere else before the game: back there
+    p.map_state = p.lua.eval("{ following = false, x = 1000, y = 2000, cont = 1, zoom = 700 }")
+    p.G.Start("solo", 1)
+    p.G.Leave()
+    assert p.looked[-1] == (1, 1000, 2000, 700)
+    # following the player before: following again
+    p.map_state = p.lua.eval("{ following = true, x = 5, y = 5, cont = 1, zoom = 300 }")
+    p.G.Start("solo", 1)
+    p.G.Leave()
+    assert p.looked[-1] == "follow"
+
+
+def test_reported_and_unloadable_spots_are_never_picked(solo):
+    p, clock, net = solo
+    p.lua.execute("function _usable(G) G.Usable = function(pt) return pt.id ~= '0-300-300' and pt.id ~= '0-900-900' end end")
+    p.lua.globals()._usable(p.G)
+    p.G.Start("solo", 1)
+    assert p.game.spot.id not in ("0-300-300", "0-900-900")

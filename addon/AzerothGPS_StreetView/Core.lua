@@ -93,7 +93,19 @@ end
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("ADDON_LOADED")
 ev:RegisterEvent("PLAYER_LOGIN")
-ev:SetScript("OnEvent", function(_, event, arg1)
+ev:RegisterEvent("PLAYER_ENTERING_WORLD")
+ev:SetScript("OnEvent", function(_, event, arg1, arg2)
+  if event == "PLAYER_ENTERING_WORLD" then
+    -- The game sees only the files that were there when it started: pictures installed later show
+    -- as plain green until a restart. On a fresh start every installed view can be shown; after a
+    -- /reload only those (D.loadable, kept in the saved settings).
+    if arg1 then -- (isInitialLogin: the game just started)
+      ns.db.loadable = {}
+      for id in pairs(D.byId) do ns.db.loadable[id] = true end
+    end
+    if arg1 or arg2 then D.loadable = ns.db.loadable end
+    return
+  end
   if event == "ADDON_LOADED" and arg1 == addonName then
     InitDB()
   elseif event == "PLAYER_LOGIN" then

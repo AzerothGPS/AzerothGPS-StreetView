@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import time
 import re
 import shutil
 from pathlib import Path
@@ -332,7 +333,7 @@ def import_harvest(folder: Path, build: Path, log=print) -> dict:
             "id": pid, "cont": meta["cont"], "x": meta["x"], "y": meta["y"], "z": meta.get("z") or 0,
             "facing": meta.get("facing") or 0, "zone": meta.get("zone") or "", "mapID": meta.get("mapID"),
             "date": meta.get("captured", ""), "build": meta.get("client_build", ""), "poses": [],
-            "cube": meta["cube"], "source": "harvester",
+            "cube": meta["cube"], "source": "harvester", "imported_at": int(time.time()),
         }
         stats["points"] += 1
     build.mkdir(parents=True, exist_ok=True)
@@ -372,6 +373,62 @@ def _scaled(src: Path, dst: Path, px: int, quality: int) -> None:
         im.save(dst, "JPEG", quality=quality, optimize=True, subsampling=2)
 
 
+FLAT_STD = 6.0  # a tile this even (grayscale standard deviation) is one flat color
+FLAT_SIDES_BAD = 8  # a spot with this many of its 16 side tiles flat is a broken render (black, one
+# color, inside a wall): measured over the first 1,800 spots, 1,700 have none, the broken purple
+# Darnassus ones 8-14
+
+
+def flat_sides(master: Path) -> int:
+    """How many of a spot's 16 side tiles (faces F, R, B, L) are nearly one flat color."""
+    from PIL import ImageStat
+    n = 0
+    for t in sorted((master / "cube").glob("*.jpg")):
+        if t.stem[0] in "FRBL":
+            with Image.open(t) as im:
+                if ImageStat.Stat(im.convert("L").resize((64, 64))).stddev[0] < FLAT_STD:
+                    n += 1
+    return n
+
+
+def reported_in_game(wow: Path) -> dict[str, int]:
+    """The street views players reported as broken in Street Guess (the game's saved settings,
+    AzerothGPSStreetViewDB.reported = { [id] = time }), over every account in the game folder."""
+    out: dict[str, int] = {}
+    for sv in (wow / "WTF" / "Account").glob("*/SavedVariables/AzerothGPS_StreetView.lua"):
+        text = sv.read_text(encoding="utf-8", errors="replace")
+        m = re.search(r'\["reported"\]\s*=\s*\{(.*?)\n\s*\}', text, re.S)
+        if m:
+            for pid, t in re.findall(r'\["([^"]+)"\]\s*=\s*(\d+)', m.group(1)):
+                out[pid] = max(out.get(pid, 0), int(t))
+    return out
+
+
+def retake(build: Path, points: dict, reported: dict[str, int] | None = None) -> dict[str, dict]:
+    """The spots to take again, held back from the packs: broken renders (flat_sides, measured once
+    a spot and kept in points.json) and those reported in game after their current picture was
+    imported. Written to build/retake.json ({ id: { reason, ... } }) for the capture PC."""
+    out: dict[str, dict] = {}
+    changed = False
+    for pid, p in points.items():
+        master = build / "master" / pid
+        if "flat_sides" not in p and (master / "cube").is_dir():
+            p["flat_sides"] = flat_sides(master)
+            changed = True
+        if p.get("flat_sides", 0) >= FLAT_SIDES_BAD:
+            out[pid] = {"reason": f"broken render: {p['flat_sides']} of 16 side tiles one flat color",
+                        "cont": p["cont"], "x": p["x"], "y": p["y"], "zone": p.get("zone", "")}
+    for pid, t in (reported or {}).items():
+        p = points.get(pid)
+        if p and t >= p.get("imported_at", 0):
+            out.setdefault(pid, {"cont": p["cont"], "x": p["x"], "y": p["y"], "zone": p.get("zone", "")})
+            out[pid]["reason"] = "reported in game" + (f"; {out[pid]['reason']}" if "reason" in out[pid] else "")
+    if changed:
+        (build / "points.json").write_text(json.dumps(points, indent=1), encoding="utf-8")
+    (build / "retake.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    return out
+
+
 def ship_points(points: list[dict], spacing: float | None) -> list[dict]:
     """The spots shipped at about `spacing` yards apart (packs.json ship_spacing_yd): the master keeps
     every rendered spot (100 yd), the packs take a thinned set. Greedy in a fixed order (continent,
@@ -397,7 +454,7 @@ def ship_points(points: list[dict], spacing: float | None) -> list[dict]:
 
 
 def build_packs(build: Path, version: str | None = None, cfg: dict | None = None,
-                manual: bool = False) -> list[dict]:
+                manual: bool = False, reported: dict[str, int] | None = None) -> list[dict]:
     """Write every SD pack addon (packs.json) into build/packs/<name>/: its toc, Index.lua and
     the tiles of its spots scaled down from the master (single views for spots not stitched
     yet). Stale folders go. Refuses a pack over the budget. Returns one report per pack:
@@ -407,6 +464,7 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
     points_file = build / "points.json"
     points = json.loads(points_file.read_text(encoding="utf-8")) if points_file.exists() else {}
     version = version or dt.date.today().strftime("%Y.%m.%d")
+    held = retake(build, points, reported)  # (broken or reported: taken again, not shipped meanwhile)
     sd = cfg["sd"]
     root = build / "packs"
     names = {pk["name"] for pk in sd["packs"]}
@@ -416,7 +474,8 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
                 shutil.rmtree(d)
     reports = []
     for pk in sd["packs"]:
-        mine = [p for p in points.values() if pack_for(cfg, p) is pk and (manual or not is_manual(p))]
+        mine = [p for p in points.values() if pack_for(cfg, p) is pk and (manual or not is_manual(p))
+                and p["id"] not in held]
         mine = ship_points(mine, cfg.get("ship_spacing_yd"))
         out = root / pk["name"]
         images = out / "Images"
@@ -446,7 +505,7 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
             raise SystemExit(f"{pk['name']} is {size / 1e9:.2f} GB: over the {cfg['budget_bytes'] / 1e9:.1f} GB "
                              "budget for one CurseForge file. Lower the SD tile size or split the pack first.")
         reports.append({"name": pk["name"], "title": pk["title"], "points": len(mine), "bytes": size,
-                        "planned": pk["planned"]})
+                        "planned": pk["planned"], "held": len(held)})
     return reports
 
 
@@ -465,6 +524,9 @@ def budget(reports: list[dict], cfg: dict | None = None) -> str:
             if full > lim:
                 line += "  WOULD BE OVER THE LIMIT"
         lines.append(line)
+    held = reports[0].get("held", 0) if reports else 0
+    if held:
+        lines.append(f"  held back to take again: {held} (build/retake.json: broken renders and pictures reported in game)")
     return "\n".join(lines)
 
 

@@ -65,6 +65,13 @@ sits in the directions' place; its X leaves and the route comes back. Players ta
 messages (prefix `AGPSSV`, the protocol is at the top of Game.lua), invitations are always asked.
 The logic runs through `Gm.io`; `tests/test_game.py` plays whole games between simulated players.
 
+**Broken pictures:** `pack.retake` holds spots back from the packs and lists them in
+`build/retake.json` for the capture PC to take again: broken renders (8+ of the 16 side tiles one flat
+color, measured once per import) and pictures players reported with Street Guess's "Report picture"
+(saved in `AzerothGPSStreetViewDB.reported`, read from the game's WTF folder by `sv.cmd pull`/`build`).
+Street Guess only picks spots whose files were there when the game last fully started
+(`D.loadable`, saved on a fresh start): pictures installed after it show as plain green until a restart.
+
 ## Coordinates and views
 
 - World yards, x north, y west (AzerothGPS's convention). Headings are radians

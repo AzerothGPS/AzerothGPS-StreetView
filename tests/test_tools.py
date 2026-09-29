@@ -103,7 +103,7 @@ def test_import_harvest(tmp_path):
     for f in "FRBLUD":
         for i in (0, 1):
             for j in (0, 1):
-                Image.new("RGB", (64, 64), (10, 20, 30)).save(exp / "cube" / f"{f}{i}{j}.jpg")
+                Image.effect_noise((64, 64), 60).convert("RGB").save(exp / "cube" / f"{f}{i}{j}.jpg")  # (textured: not a broken render)
     (exp / "meta.json").write_text(
         '{"id": "1-100--200", "cont": 1, "x": 100.2, "y": -199.8, "facing": 2.5, "zone": "Durotar",'
         ' "captured": "2026-10-01T00:00:00+00:00", "cube": {"size": 64, "pad": 0.08, "mismatch": 9.5}}',
@@ -396,3 +396,44 @@ def test_ship_points_thins_to_the_shipping_spacing():
     assert ship_points(road, None) == road and len(ship_points(road, 0)) == len(road)
     # the same input, the same pick (a later build ships what an earlier one did)
     assert [p["id"] for p in ship_points(list(reversed(road)), 200)] == [p["id"] for p in ship_points(road, 200)]
+
+
+def test_broken_and_reported_spots_are_held_back_for_a_retake(tmp_path):
+    import json
+    from PIL import Image
+    from svtools import pack
+    build = tmp_path / "build"
+    points = {}
+    for pid, flat in (("1-100-100", False), ("1-500-500", True), ("1-900-900", False)):
+        cube = build / "master" / pid / "cube"
+        cube.mkdir(parents=True)
+        for f in "FRBLUD":
+            for i in (0, 1):
+                for j in (0, 1):
+                    im = Image.new("RGB", (64, 64), (0, 90, 0)) if flat else Image.effect_noise((64, 64), 60).convert("RGB")
+                    im.save(cube / f"{f}{i}{j}.jpg")
+        x = int(pid.split("-")[1])
+        points[pid] = {"id": pid, "cont": 1, "x": x, "y": x, "z": 0, "facing": 0, "zone": "Z", "poses": [],
+                       "cube": {"pad": 0.08}, "source": "harvester", "imported_at": 1000}
+    (build / "points.json").write_text(json.dumps(points), encoding="utf-8")
+    held = pack.retake(build, points, {"1-900-900": 2000, "1-100-100": 500})  # (the second reported before its import)
+    assert set(held) == {"1-500-500", "1-900-900"}
+    assert "broken render" in held["1-500-500"]["reason"] and held["1-900-900"]["reason"] == "reported in game"
+    assert json.loads((build / "retake.json").read_text(encoding="utf-8")).keys() == held.keys()
+
+
+def test_reported_in_game_reads_the_saved_settings(tmp_path):
+    from svtools import pack
+    sv = tmp_path / "WTF" / "Account" / "ACC" / "SavedVariables"
+    sv.mkdir(parents=True)
+    (sv / "AzerothGPS_StreetView.lua").write_text(
+        """AzerothGPSStreetViewDB = {
+["reported"] = {
+["1--1019-383"] = 1790700000,
+["0-5-5"] = 1790700100,
+},
+["yawSign"] = 1,
+}
+""",
+        encoding="utf-8")
+    assert pack.reported_in_game(tmp_path) == {"1--1019-383": 1790700000, "0-5-5": 1790700100}
