@@ -35,6 +35,8 @@ Gm.GRACE_SECONDS = 3 -- a round ends this long after the guessing time, whoever 
 Gm.MAX_TRIES = 5 -- street views tried until everyone has one
 Gm.FULL_YD = 25 -- a guess this close gets all 100 points
 Gm.SCALE_YD = 3000 -- ... then 100 * e^(-(yards - 25) / 3000): 90 points ~340 yd off, 60 ~1,550, 40 ~2,800
+Gm.TERRAIN_MAX_YD = 2500 -- the result: guess and spot shown together up to this zoom (the terrain map's widest)
+Gm.SPOT_ZOOM_YD = 600 -- ... else the spot alone, this zoomed
 Gm.CELEBRATE_SOLO = 60 -- solo: the average round score that earns the celebration
 Gm.ROUNDS = { 1, 3, 5 }
 
@@ -215,7 +217,7 @@ Gm.io = {
   random = function(a, b) if a then return math.random(a, b) end return math.random() end,
   -- the rest: the viewer, the map and the panel (Gm.Init sets them)
   open = function() end, close = function() end, hold = function() end, lookAt = function() end,
-  follow = function() end, showMap = function() end, changed = function() end, ask = function() end,
+  follow = function() end, showMap = function() end, world = function() end, changed = function() end, ask = function() end,
   print = function(...) if ns.Print then ns.Print(...) end end,
 }
 local io = function() return Gm.io end
@@ -328,13 +330,18 @@ local function Scored(g)
     mine.scores[game.round] = score
     mine.guesses[game.round] = g
   end
-  if g and g.x then
-    game.reveal = { t0 = Now() }
-    local s = game.spot
-    if s and g.yards then
-      io().lookAt(s.cont, (s.x + g.x) / 2, (s.y + g.y) / 2, math.max(250, g.yards * 0.65 + 80))
-    elseif s then
-      io().lookAt(s.cont, s.x, s.y, 800)
+  -- the map: the guess and the spot together while that fits on the terrain map; else the spot
+  -- alone; a guess on another continent: the world
+  local s = game.spot
+  if g and g.x then game.reveal = { t0 = Now() } end
+  if s then
+    local fit = g and g.yards and math.max(250, g.yards * 0.65 + 80)
+    if fit and fit <= Gm.TERRAIN_MAX_YD then
+      io().lookAt(s.cont, (s.x + g.x) / 2, (s.y + g.y) / 2, fit)
+    elseif g and g.x and not g.yards then
+      io().world(s)
+    else
+      io().lookAt(s.cont, s.x, s.y, Gm.SPOT_ZOOM_YD)
     end
   end
   ToOthers("S", game.id, game.round, score, g and g.yards and math.floor(g.yards + 0.5) or "",
@@ -1229,6 +1236,9 @@ function Gm.Init(figureButton)
     API.HoldMap("StreetGuess", on, function(x, y, cont) Gm.Guess(x, y, API.BaseContinent(cont)) end)
   end
   io_.lookAt = function(cont, x, y, zoom) if API.LookAt then API.LookAt(cont, x, y, zoom) end end
+  io_.world = function(s) -- (a guess on another continent: zoomed out to the world)
+    if API.ShowWorld then API.ShowWorld() elseif API.LookAt then API.LookAt(s.cont, s.x, s.y, 6000) end
+  end
   io_.follow = function() if API.Follow then API.Follow() end end
   io_.showMap = function() if API.ShowMap then API.ShowMap() end end
   io_.changed = function()

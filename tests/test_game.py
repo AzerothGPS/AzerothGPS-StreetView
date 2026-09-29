@@ -56,6 +56,7 @@ class Player:
             "close": self.close,
             "hold": lambda on: self.held.append(bool(on)),
             "lookAt": lambda c, x, y, z: self.looked.append((c, x, y, z)),
+            "world": lambda spot: self.looked.append("world"),
             "follow": lambda: None,
             "showMap": lambda: None,
             "changed": lambda: None,
@@ -370,3 +371,23 @@ def test_no_pack_in_common_ends_before_it_starts():
     run(net, clock, 2)
     assert a.game.phase == "over" and "no map pack" in a.game.reason
     assert b.game.phase == "over"
+
+
+def test_the_result_shows_both_only_when_they_fit_on_the_terrain_map(solo):
+    p, clock, net = solo
+    p.G.Start("solo", 3)
+    s = p.game.spot  # (0-300-300)
+    p.G.Guess(s.x + 400, s.y, s.cont)  # 400 yd off: both on the map, around the middle
+    run(net, clock, 31)
+    c, x, y, z = p.looked[-1]
+    assert (c, x, y) == (0, 500, 300) and z <= p.G.TERRAIN_MAX_YD
+    run(net, clock, 8)
+    s = p.game.spot  # (0-900-900)
+    p.G.Guess(s.x + 6000, s.y, s.cont)  # 6,000 yd off: too far to fit, just the spot
+    run(net, clock, 31)
+    assert p.looked[-1] == (0, 900, 900, p.G.SPOT_ZOOM_YD)
+    run(net, clock, 8)
+    s = p.game.spot
+    p.G.Guess(0, 0, 1 - s.cont)  # the other continent: the world
+    run(net, clock, 31)
+    assert p.looked[-1] == "world"
