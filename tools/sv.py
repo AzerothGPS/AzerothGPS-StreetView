@@ -123,6 +123,9 @@ def main(argv=None) -> None:
     p_p.add_argument("--watch", type=float, metavar="MIN", help="pull again every MIN minutes (Ctrl+C stops)")
     p_p.add_argument("--no-install", action="store_true")
     sub.add_parser("build")
+    p_rd = sub.add_parser("roads", help="road sync: retire spots whose road is gone, list spots for new roads")
+    p_rd.add_argument("--agps", type=Path, default=ROOT.parent / "azerothgps", help="the AzerothGPS checkout")
+    p_rd.add_argument("--harvester", type=Path, default=ROOT.parent / "streetview-harvester")
     p_r = sub.add_parser("release-data")
     p_r.add_argument("--upload", action="store_true", help="upload to CurseForge (otherwise a dry run)")
     p_r.add_argument("--version", help="the packs' version (default: today, YYYY.MM.DD)")
@@ -156,6 +159,12 @@ def main(argv=None) -> None:
     elif a.cmd == "pull":
         pull_loop(a.wow, a.src, a.watch, not a.no_install)
     elif a.cmd == "build":
+        build_and_report()
+    elif a.cmd == "roads":
+        from svtools import roads
+        result = roads.run(BUILD, a.agps, a.harvester, pack.CONFIG)
+        print(roads.report(result))
+        print(f"written: {BUILD / 'road-diff.json'} (retired: out of the packs; add: the harvester's render list)")
         build_and_report()
     elif a.cmd == "release-data":
         from svtools import release

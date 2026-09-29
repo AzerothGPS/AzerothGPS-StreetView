@@ -465,6 +465,8 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
     points = json.loads(points_file.read_text(encoding="utf-8")) if points_file.exists() else {}
     version = version or dt.date.today().strftime("%Y.%m.%d")
     held = retake(build, points, reported)  # (broken or reported: taken again, not shipped meanwhile)
+    road_diff = build / "road-diff.json"  # (sv.cmd roads: spots whose road is gone)
+    retired = set(json.loads(road_diff.read_text(encoding="utf-8")).get("retired", {})) if road_diff.exists() else set()
     sd = cfg["sd"]
     root = build / "packs"
     names = {pk["name"] for pk in sd["packs"]}
@@ -476,7 +478,7 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
     for pk in sd["packs"]:
         # (a spot in no zone is outside the Classic game's world: Gilneas behind the Greymane Wall)
         mine = [p for p in points.values() if pack_for(cfg, p) is pk and (manual or not is_manual(p))
-                and p["id"] not in held and (p.get("zone") or is_manual(p))]
+                and p["id"] not in held and p["id"] not in retired and (p.get("zone") or is_manual(p))]
         mine = ship_points(mine, cfg.get("ship_spacing_yd"))
         out = root / pk["name"]
         images = out / "Images"

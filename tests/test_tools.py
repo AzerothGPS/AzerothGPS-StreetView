@@ -437,3 +437,20 @@ def test_reported_in_game_reads_the_saved_settings(tmp_path):
 """,
         encoding="utf-8")
     assert pack.reported_in_game(tmp_path) == {"1--1019-383": 1790700000, "0-5-5": 1790700100}
+
+
+def test_road_sync_retires_spots_off_the_roads_and_lists_new_roads():
+    from svtools import roads
+    # an old road north-south (x 0..1000 at y 0) and a new road east-west (y 0..1000 at x 2000)
+    current = {1: {"e": [[1, 2, 1000, 0, 0, 0, 1000, 0], [3, 4, 1000, 0, 2000, 0, 2000, 1000]]}}
+    rendered = [{"id": f"1-{x}-0", "cont": 1, "x": x, "y": 0, "zone": "Z"} for x in range(0, 1001, 100)]
+    rendered.append({"id": "1-500-800", "cont": 1, "x": 500, "y": 800, "zone": "Z"})  # its road was removed
+    planned = [{"id": f"1-{x}-0", "cont": 1, "x": x, "y": 0, "zone": "Z"} for x in range(0, 1001, 100)]
+    planned += [{"id": f"1-2000-{y}", "cont": 1, "x": 2000, "y": y, "zone": "Z"} for y in range(0, 1001, 100)]
+    planned.append({"id": "1-2000-5000", "cont": 1, "x": 2000, "y": 5000, "zone": ""})  # no zone: never
+    r = roads.diff(rendered, planned, current, 100, None)
+    assert [p["id"] for p in r["retired"]] == ["1-500-800"]
+    assert sorted(q["id"] for q in r["add"]) == sorted(f"1-2000-{y}" for y in range(0, 1001, 100))
+    # shipping every ~200 yd: only every other new spot needs rendering
+    r = roads.diff(rendered, planned, current, 100, 200)
+    assert len(r["add"]) == 6
