@@ -58,7 +58,8 @@ no walking on, not marked on the map); in that time the player double-clicks the
 guess (again to move it), and the one placed when the time runs out counts;
 street views come only from the map packs every player has (they're exchanged on joining; the
 panel lists who lacks which, or has an older one). `Gm.Score` gives 0-100 (full within 25 yd, then
-`floor(100 * e^(-((yd - 25) / 4500) ^ 1.3))`: 90 at 800 yd, 77 at 1,600, 23 at 6,000; the last points the hardest). While a game is on the map is held (`AzerothGPS.HoldMap`, API
+`floor(100 * e^(-((yd - 25) / 3800) ^ 1.3))`: 88 at 800 yd, 72 at 1,600, 16 at 6,000; the last points the hardest;
+the celebration needs an average round score of 75: the player's solo, the winner's otherwise). While a game is on the map is held (`AzerothGPS.HoldMap`, API
 version 3): the route and directions panel hide, double-clicks are guesses, and the game's panel
 sits in the directions' place; its X leaves and the route comes back. Players talk through addon
 messages (prefix `AGPSSV`, the protocol is at the top of Game.lua), invitations are always asked.

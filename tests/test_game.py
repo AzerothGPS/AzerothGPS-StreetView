@@ -136,7 +136,7 @@ def test_score_is_easy_at_first_and_hard_at_the_end(solo):
     assert S(None) == 0
     assert S(0) == 100 and S(25) == 100
     assert S(26) == 99  # (100 only within 25 yd)
-    assert S(800) == 90 and S(1608) == 77 and S(3000) == 55 and S(6000) == 23 and S(10000) == 5
+    assert S(800) == 88 and S(1608) == 72 and S(3000) == 48 and S(6000) == 16 and S(10000) == 3
     prev = 101
     for yd in range(0, 20000, 50):
         assert S(yd) <= prev
@@ -201,7 +201,7 @@ def test_solo_celebrates_a_good_average(solo):
     s = p.game.spot
     p.G.Guess(s.x + 300, s.y, s.cont)
     run(net, clock, 31 + 8)
-    assert p.game.phase == "over" and p.G.Average(p.game) == 97 and p.game.celebrate
+    assert p.game.phase == "over" and p.G.Average(p.game) == 96 and p.game.celebrate
 
 
 def party(n=2, **kw):
@@ -486,3 +486,22 @@ def test_fit_view_falls_back_to_the_answer_alone(solo):
     assert p.G.FitView(spot, near) == (200, 0, 400 * 0.65 + 80)
     far = p.lua.eval("{ { x = 400, y = 0 }, { x = 9000, y = 0 } }")
     assert p.G.FitView(spot, far) is None
+
+
+def test_no_celebration_below_75(solo):
+    p, clock, net = solo
+    p.G.Start("solo", 1)
+    s = p.game.spot
+    p.G.Guess(s.x + 1500, s.y, s.cont)  # ~73 points: good, but not a celebration
+    run(net, clock, 31 + 8)
+    assert p.game.phase == "over" and 70 <= p.G.Average(p.game) < 75 and not p.game.celebrate
+
+
+def test_a_party_winner_under_75_gets_no_celebration():
+    (a, b), clock, net = party(2)
+    a.G.Start("party", 1)
+    run(net, clock, 2)
+    a.G.Guess(300, 3300, 0)  # 3,000 yd off: wins, but only 48
+    b.G.Guess(300, 9300, 0)
+    run(net, clock, 32 + 8)
+    assert a.game.phase == "over" and list(a.game.winners.values()) == ["Ann-Realm"] and not a.game.celebrate

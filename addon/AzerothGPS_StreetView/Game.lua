@@ -34,12 +34,12 @@ Gm.PROPOSE_SECONDS = 3 -- ... and this long for the players to say they have the
 Gm.GRACE_SECONDS = 3 -- a round ends this long after the guessing time, whoever hasn't answered
 Gm.MAX_TRIES = 5 -- street views tried until everyone has one
 Gm.FULL_YD = 25 -- a guess this close gets all 100 points
-Gm.SCALE_YD = 4500 -- ... then 100 * e^(-((yards - 25) / 4500) ^ 1.3), rounded down: 99 just past 25 yd, 90 at
-Gm.SCORE_POWER = 1.3 -- 800 yd, 77 at 1,600, 55 at 3,000, 23 at 6,000, 5 at 10,000 (the last points the hardest)
+Gm.SCALE_YD = 3800 -- ... then 100 * e^(-((yards - 25) / 3800) ^ 1.3), rounded down: 99 just past 25 yd, 88 at
+Gm.SCORE_POWER = 1.3 -- 800 yd, 72 at 1,600, 48 at 3,000, 16 at 6,000, 3 at 10,000 (the last points the hardest)
 Gm.TERRAIN_MAX_YD = 2900 -- the result: guess and spot shown together up to this zoom (the terrain map's widest: 3000)
 Gm.PAN_SECONDS = 0.9 -- ... the map pans and zooms out to them this smoothly, then the line grows
 Gm.SPOT_ZOOM_YD = 600 -- ... else the spot alone, this zoomed
-Gm.CELEBRATE_SOLO = 60 -- solo: the average round score that earns the celebration
+Gm.CELEBRATE_MIN = 75 -- the average round score that earns the celebration (solo: the player's; else the winner's)
 Gm.ROUNDS = { 1, 3, 5 }
 -- Each player's color: their name on the scoreboard, their dotted line and dot on the map. The
 -- player's own is white (the orc marks their guess); the others get these in the order they joined.
@@ -355,9 +355,11 @@ Over = function(reason)
   local list = Gm.Standings(game)
   game.winners = Gm.Winners(list)
   if game.mode == "solo" then
-    game.celebrate = not reason and Gm.Average(game) >= Gm.CELEBRATE_SOLO
+    game.celebrate = not reason and Gm.Average(game) >= Gm.CELEBRATE_MIN
   else
-    game.celebrate = not reason and #game.winners > 0
+    local top = list[1]
+    game.celebrate = not reason and #game.winners > 0 and top ~= nil
+      and top.total / math.max(1, game.round) >= Gm.CELEBRATE_MIN
   end
   Changed()
 end
