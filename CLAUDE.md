@@ -49,8 +49,9 @@ additive, with a lupa test) rather than reaching into AzerothGPS's private names
 ## Street Guess (Game.lua)
 
 A GeoGuessr-style game from the button above the figure: solo, party or whisper, 1/3/5 rounds.
-A street view pops up for 15 s (no zone name or coordinates, no walking on, not marked on the map)
-and in that time the player double-clicks the map (one window, looking and guessing together);
+A street view pops up for 30 s with a countdown on it and the panel (no zone name or coordinates,
+no walking on, not marked on the map); in that time the player double-clicks the map to place a
+guess (again to move it), and the one placed when the time runs out counts;
 street views come only from the map packs every player has (they're exchanged on joining; the
 panel lists who lacks which, or has an older one). `Gm.Score` gives 0-100 (full within 25 yd, then
 `100 * e^(-(yd - 25) / 3000)`). While a game is on the map is held (`AzerothGPS.HoldMap`, API

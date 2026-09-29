@@ -170,15 +170,19 @@ def test_solo_game_runs_its_rounds_and_averages(solo):
     assert p.G.Start("solo", 3)
     assert p.held == [True] and p.game.phase == "look" and p.shown == ["0-300-300"]
     run(net, clock, 5)
-    p.G.Guess(310, 300, 0)  # while the street view is up: 10 yd off, all the points
+    p.G.Guess(900, 900, 0)  # placed while the street view is up...
+    p.G.Guess(310, 300, 0)  # ... and moved: the last one counts
+    assert p.game.phase == "look" and p.game.pending.x == 310 and p.closed == 0  # (it waits for the timer)
+    run(net, clock, 26)  # the 30 seconds are up: 10 yd off, all the points
     assert p.game.phase == "result" and scores(p, "Me-Realm") == [100] and p.closed >= 1
     assert p.looked  # the map shows the guess and the spot
     run(net, clock, 8)
     assert p.game.round == 2 and p.game.phase == "look" and p.shown[-1] == "0-900-900"
     p.G.Guess(900, 900, 1)  # the wrong continent: nothing
+    run(net, clock, 31)
     assert scores(p, "Me-Realm") == [100, 0]
     run(net, clock, 8)
-    run(net, clock, 16)  # no guess in the 15 seconds: nothing
+    run(net, clock, 31)  # no guess in the 30 seconds: nothing
     assert scores(p, "Me-Realm") == [100, 0, 0]
     run(net, clock, 8)
     g = p.game
@@ -192,7 +196,7 @@ def test_solo_celebrates_a_good_average(solo):
     p.G.Start("solo", 1)
     s = p.game.spot
     p.G.Guess(s.x + 300, s.y, s.cont)
-    run(net, clock, 8)
+    run(net, clock, 31 + 8)
     assert p.game.phase == "over" and p.G.Average(p.game) == 91 and p.game.celebrate
 
 
@@ -214,12 +218,12 @@ def test_party_game_between_two_players():
     assert a.shown == b.shown == ["0-300-300"]
     assert list(b.game.order.values()) == ["Ann-Realm", "Bob-Realm"]
     a.G.Guess(300, 400, 0)  # 100 yd off
-    net.deliver()
-    assert a.game.phase == "wait"
-    assert b.game.players["Ann-Realm"].scores[1] == a.G.Score(100)
     b.G.Guess(300, 3300, 0)  # 3,000 yd off
-    run(net, clock, 1)  # all in: the round's result
+    run(net, clock, 5)
+    assert a.game.phase == "look" and b.game.players["Ann-Realm"].scores[1] is None  # (nothing sent before the time's up)
+    run(net, clock, 27)  # the time is up: both guesses in, the round's result
     assert a.game.phase == "result" and b.game.phase == "result"
+    assert b.game.players["Ann-Realm"].scores[1] == a.G.Score(100)
     assert b.game.players["Ann-Realm"].guesses[1].x == 300  # (her guess shows on B's map)
     run(net, clock, 8)
     for p in (a, b):
@@ -232,9 +236,8 @@ def test_the_round_ends_when_time_is_up_for_someone_silent():
     run(net, clock, 2)
     assert a.game.phase == "look"
     a.G.Guess(300, 300, 0)
-    b.G.OnMessage = None  # (B's game went quiet)
-    net.players.pop("Bob-Realm")
-    run(net, clock, 20)
+    net.players.pop("Bob-Realm")  # (B's game went quiet)
+    run(net, clock, 36)
     assert a.game.phase in ("result", "over")
     assert scores(a, "Ann-Realm") == [100]
 
@@ -292,7 +295,7 @@ def test_whisper_game_plays_through():
     assert b.game.phase == "look" and b.game.mode == "whisper"
     b.G.Guess(300, 300, 0)
     a.G.Guess(900, 900, 0)
-    run(net, clock, 9)
+    run(net, clock, 31 + 9)
     assert a.game.phase == "over" and list(a.game.winners.values()) == ["Bob-Realm"]
     assert list(b.game.winners.values()) == ["Bob-Realm"]
     assert all(target == "Bob-Realm" or target == "Ann-Realm" for _, _, _, target in net.queue)
@@ -347,7 +350,7 @@ def test_street_views_come_only_from_packs_everyone_has():
         assert a.game.phase == "look" and a.game.spot.cont == 1  # (Kalimdor's only)
         a.G.Guess(a.game.spot.x, a.game.spot.y, 1)
         b.G.Guess(0, 0, 1)
-        run(net, clock, 8)
+        run(net, clock, 31 + 8)
     assert sorted(a.shown) == sorted(b.shown) == ["1-100-100", "1-2000-500"]
 
 

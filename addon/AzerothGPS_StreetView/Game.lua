@@ -1,6 +1,7 @@
 -- Street Guess: a GeoGuessr-style game on the AzerothGPS map. Everyone gets the same street view
--- (no zone name or coordinates) and has 15 seconds to look around and double-click the map where
--- they think it is: the closer, the more points (0-100 a round, the first ones easy, the last hard).
+-- (no zone name or coordinates) and has 30 seconds to look around and double-click the map where
+-- they think it is (again to move the guess: the one placed when the time runs out counts): the
+-- closer, the more points (0-100 a round, the first ones easy, the last hard).
 -- Street views come only from the map packs every player has; the panel says who lacks which.
 -- Solo, with the party, or with one player by whisper; 1, 3 or 5 rounds.
 --
@@ -26,7 +27,7 @@ ns.Game = Gm
 local D = ns.Data
 
 Gm.PREFIX = "AGPSSV"
-Gm.LOOK_SECONDS = 15 -- the street view shows this long: the time to guess
+Gm.LOOK_SECONDS = 30 -- the street view shows this long: the time to guess
 Gm.RESULT_SECONDS = 7 -- the round's result, before the next round
 Gm.JOIN_SECONDS = 20 -- the host waits this long for answers to an invitation
 Gm.PROPOSE_SECONDS = 3 -- ... and this long for the players to say they have the next street view
@@ -268,7 +269,7 @@ local function NewGame(mode, rounds, host, id)
   if not game.isHost then AddPlayer(me) end
 end
 
-local Look, Result, Over, NextRound
+local Look, Result, Over, NextRound, Submit
 
 -- The game ends (reason: why, when it didn't run its rounds). The panel stays until its X.
 Over = function(reason)
@@ -311,7 +312,7 @@ Look = function()
   game.phase = "look"
   game.deadline = Now() + Gm.LOOK_SECONDS
   game.roundEnd = game.deadline + Gm.GRACE_SECONDS
-  game.guess, game.reveal = nil, nil
+  game.guess, game.reveal, game.pending = nil, nil, nil
   game.missing = game.spot == nil
   io().follow()
   if game.spot then io().open(game.spot, io().random() * 2 * math.pi) end
@@ -351,7 +352,7 @@ Result = function()
   game.deadline = Now() + Gm.RESULT_SECONDS
   if not game.guess then -- (the host ended the round before this player's time was up)
     local g = game
-    Scored(nil)
+    Submit()
     if game ~= g then return end
     game.phase = "result"
   end
@@ -450,13 +451,21 @@ function Gm.Leave()
 end
 
 -- A double-click on the map: the guess (continent: the base one, AzerothGPS.BaseContinent).
+-- It's only placed: another double-click moves it, and the one placed when the time runs out counts.
 function Gm.Guess(x, y, cont)
   if not game or game.phase ~= "look" then return end
-  io().close() -- (the map shows how close it was)
+  game.pending = { x = x, y = y, cont = cont }
+  Changed()
+end
+
+-- The time is up: the guess placed (if any) is scored.
+Submit = function()
+  local pg = game.pending
+  if not pg then return Scored(nil) end
   local s = game.spot
-  local g = { x = x, y = y, cont = cont }
-  if s and cont == s.cont then
-    g.yards = math.sqrt((x - s.x) ^ 2 + (y - s.y) ^ 2)
+  local g = { x = pg.x, y = pg.y, cont = pg.cont }
+  if s and pg.cont == s.cont then
+    g.yards = math.sqrt((pg.x - s.x) ^ 2 + (pg.y - s.y) ^ 2)
   end
   g.score = Gm.Score(g.yards)
   Scored(g)
@@ -475,9 +484,9 @@ function Gm.Tick()
   if not game then return end
   local now = Now()
   local ph = game.phase
-  if ph == "look" and now >= game.deadline then -- (no guess in time)
+  if ph == "look" and now >= game.deadline then -- the time is up: the guess placed counts
     io().close()
-    Scored(nil)
+    Submit()
   end
   if ph == "joined" and now >= game.deadline then
     return Over("The game started without you")
@@ -504,7 +513,7 @@ function Gm.Tick()
       end
     end
   elseif (ph == "look" or ph == "wait") and game.mode ~= "solo" and (AllScored() or now >= game.roundEnd) then
-    if ph == "look" then Scored(nil) end
+    if ph == "look" then Submit() end
     ToOthers("N", game.id, game.round)
     Result()
   elseif ph == "result" and now >= game.deadline then
@@ -663,11 +672,20 @@ function Gm.RevealProgress()
 end
 
 function Gm.Draw(ctx)
-  if not game or not game.spot then return end
+  if not game then return end
   local ph = game.phase
-  if ph ~= "wait" and ph ~= "result" and ph ~= "over" then return end
   local API = _G.AzerothGPS
   local base = API and API.BaseContinent and API.BaseContinent(ctx.cont) or ctx.cont
+  if ph == "look" then -- the guess placed so far (not the answer yet)
+    local pg = game.pending
+    if pg and pg.cont == base then
+      ctx.Dot(pg.x, pg.y, { 0, 0, 0 }, 15, 0.8)
+      ctx.Dot(pg.x, pg.y, GUESS_COLOR, 11, 1)
+    end
+    return
+  end
+  if not game.spot then return end
+  if ph ~= "wait" and ph ~= "result" and ph ~= "over" then return end
   local s = game.spot
   if s.cont ~= base then return end
   local t = Gm.RevealProgress()
@@ -991,7 +1009,8 @@ function Gm.Refresh()
     status = "Getting the next street view ready..."
   elseif ph == "look" then
     status = game.missing and "|cffff8080You don't have this street view (update your StreetView packs): guess anyway!|r"
-      or "Where is this? |cffffd100Double-click the map|r before the time runs out."
+      or (game.pending and "Guess placed. |cffffd100Double-click|r again to move it; it counts when the time runs out."
+        or "Where is this? |cffffd100Double-click the map|r where you think it is.")
   elseif ph == "wait" then
     status = GuessLine(game.guess) .. "\n|cff9d9d9dWaiting for the others...|r"
   elseif ph == "result" then
@@ -1101,14 +1120,20 @@ function Gm.Refresh()
 end
 
 function Gm.RefreshTimer()
-  if not panel or not game then return end
+  local V = ns.Viewer
+  if not panel or not game then
+    if V and V.SetTimer then V.SetTimer(nil) end
+    return
+  end
   local ph = game.phase
   if (ph == "look" or ph == "invite") and game.deadline then
     local left = game.deadline - Now()
     local color = left <= 5 and "|cffff5050" or (ph == "look" and "|cffffd100" or "|cffffffff")
     panel.timer:SetText(color .. Clock(left) .. "|r")
+    if V and V.SetTimer then V.SetTimer(ph == "look" and (color .. Clock(left) .. "|r") or nil) end
   else
     panel.timer:SetText("")
+    if V and V.SetTimer then V.SetTimer(nil) end
   end
 end
 
@@ -1150,7 +1175,7 @@ local function BuildButton(parent, figure)
   gameButton:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("Street Guess")
-    GameTooltip:AddLine("Where is this street view? You have 15 seconds to look around and double-click the map where you think it is.", 1, 1, 1, true)
+    GameTooltip:AddLine("Where is this street view? You have 30 seconds to look around and double-click the map where you think it is (again to move it).", 1, 1, 1, true)
     GameTooltip:AddLine("Solo, with your party, or with one player by whisper.", 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
   end)

@@ -28,7 +28,7 @@ local GRID_COLS, GRID_ROWS = 24, 12 -- cube views: the window is drawn as this m
 local MAX_LAT = 85 -- cube views: how far up or down you can look
 local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "level", [45] = "looking up", [90] = "straight up" }
 
-local frame, chrome, view, img, missing, title, info, preload, ahead
+local frame, chrome, view, img, missing, title, info, preload, ahead, timerBox
 local tiles = {} -- panorama tile textures by col * 100 + row
 local cells = {} -- cube view cell textures
 local lastMarkHeading -- heading last drawn on the map
@@ -246,6 +246,17 @@ function V.Build()
       dragY = y
     end
   end)
+  -- Street Guess's countdown, over the top of the picture
+  timerBox = CreateFrame("Frame", nil, view)
+  timerBox:SetSize(84, 30)
+  timerBox:SetPoint("TOP", 0, -6)
+  timerBox:SetFrameLevel(view:GetFrameLevel() + 8)
+  local tbg = timerBox:CreateTexture(nil, "BACKGROUND")
+  tbg:SetAllPoints()
+  tbg:SetColorTexture(0, 0, 0, 0.6)
+  timerBox.text = timerBox:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  timerBox.text:SetPoint("CENTER")
+  timerBox:Hide()
   -- hidden, tiny textures: the views next to this one load ahead of time
   preload = {}
   for i = 1, 4 do
@@ -521,6 +532,7 @@ function V.Open(p, heading, game)
   end
   local API = _G.AzerothGPS
   cur.game = game or nil
+  if not game then timerBox:Hide() end
   cur.dirs = not game and D.Directions(p, API and API.Roads and API.Roads(p.cont)) or nil
   if ahead.SetEnabled then ahead:SetEnabled(not game) end
   lastMarkHeading = nil
@@ -532,8 +544,20 @@ function V.Hide()
   if frame then frame:Hide() end
 end
 
+-- Street Guess's countdown on the picture (text, nil: none).
+function V.SetTimer(text)
+  if not timerBox then return end
+  if text and cur and cur.game then
+    timerBox.text:SetText(text)
+    timerBox:Show()
+  else
+    timerBox:Hide()
+  end
+end
+
 -- Close the viewer if it shows Street Guess's view.
 function V.CloseGame()
+  V.SetTimer(nil)
   if cur and cur.game then
     cur = nil
     if frame then frame:Hide() end
