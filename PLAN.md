@@ -419,3 +419,64 @@ Do not start a milestone until the previous one passed its in-game check on the 
 3. Whether the capture PC is on the LAN (HTTP receiver) or remote (Tailscale or Syncthing).
 4. Which race the capture character uses (fixes the camera height for the whole dataset, Tracks 1 and 3).
 5. After R2: whether the Track 2 render look is acceptable for the public data packs, or whether only real screenshots (Track 1 or Track 3) may ship. That choice sets how many points the user is willing to capture by hand.
+
+## 10. Instances: street views in dungeons and raids (planned 2026-09-28)
+
+Rendered with Track 2, like the open world: no game and no server. Instance spots are a separate pack family, so the open-world packs and their budget stay as they are.
+
+### 10.1 What exists already (AzerothGPS, `Data/Instances.lua`)
+
+- **25 instances**: 19 dungeons and 6 raids. Each is a level of its own, `20000 + MapID`, in the instance's own world coordinates. Each has roads per floor (`ns.Roads[level]`, packed points, node heights in `.z`), floors that lie over each other (layers), entrances (outside and inside end), and bosses with positions and kill order.
+- **Road length** (measured 2026-09-28, sum of road edges; overlapping pieces inflate it): about 302,000 yards. Biggest: Naxxramas 52k, Dire Maul 39k, Ahn'Qiraj Temple 30k, Maraudon 23k, Blackrock Depths 19k. Smallest: Stockade 1.3k, Onyxia 1.6k, Shadowfang Keep 3.0k, Deadmines 3.1k.
+- **Missing from the data:** Blackwing Lair (map 469), and WoW Forever's new dungeons and raids (nine new dungeons, Hyjal Summit, Barrow Deeps). AzerothGPS has to add them first (`agps instances --write`), in the AzerothGPS session, before they can get spots.
+
+### 10.2 Capture points
+
+- From the instance roads, with each node's height: `harvester points --instances [--only "Ragefire Chasm"]`.
+- **Spacing 30 yards** (corridors are short and turn often; 100 yards would skip whole rooms). Also add a spot facing each boss (from its position, 15 to 20 yards back along the road), one just inside each entrance, and one at each floor change.
+- **Dedupe only on the same floor** (within 20 yards and 4 yards of height). Stacked floors keep their own spots.
+- **Point id:** `<level>-<x>-<y>-<z>` (for example `20389-5-12-(-24)`, written as `20389-5-12-m24`) because floors stack. `pack.point_id`, the viewer's `Data.lua` and the harvester must agree. This is the one format change; open-world ids stay `<cont>-<x>-<y>`.
+- **Estimate:** 7,500 to 10,000 spots at 30 to 40 yards before dedupe, probably about 4,000 to 6,000 after. The pilot measures the real number.
+
+### 10.3 Export and scene
+
+- **wow.export by MapID.** Some instance maps are terrain tiles with buildings on them (e.g. Wailing Caverns, Maraudon, Zul'Gurub). Others are one global building model in the map's WDT (most indoor dungeons). Check which is which, and that the automation hook can export a WDT's global building model. A WDT placement has no map offset: world X = -z, Y = -x (AzerothGPS `CLAUDE.md`).
+- **Building doodad sets:** use the placement's set plus set 0, as the game does.
+- **Liquids:** lava (Molten Core, Blackrock Depths, Blackrock Spire), slime (Naxxramas) and water. Lava and slime render as emission.
+
+### 10.4 Lighting indoors (the main risk)
+
+- Inside a dungeon, most of the light is **baked into the building models' vertex colors**, plus the building's ambient color. wow.export's OBJ export carries **no** vertex colors (0 of 10,278 meshes, 2026-09-28). Without them, interiors render flat and wrong.
+- **First spike, before any instance run:** get vertex colors. Either wow.export's glTF export (check whether it carries them), or AzerothGPS's own Python building reader (already parses geometry and collision for walknet), extended to read the vertex colors and apply them per group.
+- **Interior vs exterior groups:** interior groups use the building's ambient color plus vertex colors. Exterior groups (courtyards, open caverns: Zul'Farrak, Zul'Gurub, Maraudon's outside, Dire Maul's courtyards, Ahn'Qiraj) use the instance map's own Light rows, like the open world, with grading.
+- Point lights in the building files can wait; vertex colors already contain most of their effect.
+- **Camera:** eye height 2.2 yards above the node's floor (the height is known). Cast the ground check down from just above the node, never from the sky, or the ceiling gets hit.
+
+### 10.5 Viewer (LOCAL, AzerothGPS-StreetView)
+
+- The game **hides the player's position in dungeons** (probed in Ragefire Chasm: `UnitPosition` and friends are nil). "Nearest spot to me" can't work inside. Browsing does: AzerothGPS already shows each instance's map with floors (`G.ShowInstance`, floor wheel). The figure's drag and drop and the spot dots go on that view, for the floor shown.
+- **AzerothGPS API additions** (small, additive, with lupa tests): the instance level and floor currently shown on the map, and instance world to map point. Title: the instance name and the floor, from `ns.Instances`.
+- **Mini game:** instance spots stay out of the normal rounds. Maybe a "dungeon round" later.
+
+### 10.6 Packs and size (the user: CurseForge limit is very important)
+
+- **Separate CurseForge projects, optional** (the viewer works without them): `AzerothGPS_StreetView_Dungeons` and `AzerothGPS_StreetView_Raids`, each under the 1.8 GB budget. If dungeons alone exceed it, split them by continent (Eastern Kingdoms / Kalimdor).
+- At the measured ~0.5 MB a spot, 5,000 spots is about 2.5 GB: two packs are needed. Dark interiors may compress smaller. `sv.py build` prints the projection per pack, as it does now.
+- The same rules as everywhere: renders only, never the user's own screenshots (manual captures stay out, `pack.is_manual`).
+
+### 10.7 References (standing rule)
+
+Before each instance: collect online screenshots, Forever-era first, into `work\refs\<instance>\` with notes, and a contact sheet next to a test render on the share (`refs-<instance>.jpg`). The user may add their own references per instance later. The re-gradable color layer applies per instance, as per zone.
+
+### 10.8 Order, time and milestones
+
+| Step | What | Done when |
+|---|---|---|
+| I0 | Vertex-color spike on Ragefire Chasm (Horde, under Orgrimmar, small, 4 bosses) | A corridor render with baked lighting that looks like the game (compare with online references) |
+| I1 | Instance points, the id format and viewer support | Ragefire's spots open in the viewer from the instance map, per floor |
+| I2 | Pilot: all of Ragefire Chasm | The user signs off on the look in game |
+| I3 | Dungeons: Wailing Caverns, Deadmines, Shadowfang Keep, Razorfen Kraul, then the rest | Each dungeon's contact sheet approved; pack under budget |
+| I4 | Raids: Onyxia, Molten Core, Zul'Gurub, Ruins of Ahn'Qiraj, Ahn'Qiraj Temple, Naxxramas (and Blackwing Lair once AzerothGPS has it) | Same |
+| I5 | Forever's new dungeons and raids, after AzerothGPS adds them | Same |
+
+**Render time:** about 1.5 minutes a spot with cached scenes, so 5,000 spots is about 125 hours (five days of GPU). Instances run after the open-world pass, or in between as the user prefers.
