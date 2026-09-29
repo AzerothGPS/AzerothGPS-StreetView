@@ -117,6 +117,25 @@ def sheet(src: Path, size: int = 64) -> Image.Image:
     return out
 
 
+def badge(src: Path, size: int = 64, fill: float = 0.8) -> Image.Image:
+    """A round button icon: the first frame of an animation (still), on a black circle, the art
+    filling `fill` of it. Drawn 4x larger and scaled down (smooth circle edge)."""
+    k = 4
+    s = size * k
+    im = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    ImageDraw.Draw(im).ellipse((k, k, s - k - 1, s - k - 1), fill=(0, 0, 0, 255))
+    art = Image.open(src).convert("RGBA")  # (the first frame)
+    l, t, r, b = art.getchannel("A").getbbox()
+    side = max(r - l, b - t)
+    cx, cy = (l + r) // 2, (t + b) // 2
+    sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    sq.paste(art.crop((cx - side // 2, cy - side // 2, cx - side // 2 + side, cy - side // 2 + side)), (0, 0))
+    inner = round(s * fill)
+    sq = sq.convert("RGBa").resize((inner, inner), Image.LANCZOS).convert("RGBA")
+    im.alpha_composite(sq, ((s - inner) // 2, (s - inner) // 2))
+    return im.convert("RGBa").resize((size, size), Image.LANCZOS).convert("RGBA")
+
+
 # Street Guess's orcs, in the order of Game.lua's Gm.ORCS (Guess1.tga ... Guess5.tga)
 GUESS_ORCS = ["guess.gif", "guess_maghar_brown.gif", "guess_olive_drab.gif", "guess_golden_yellow.gif",
               "guess_forest_green.gif"]
@@ -139,7 +158,9 @@ def make(media: Path) -> None:
     for i, name in enumerate(GUESS_ORCS, 1):
         if (assets / name).exists():
             sheet(assets / name).save(media / f"Guess{i}.tga")
+    if (assets / "guess.gif").exists():  # Street Guess's button on the map: the orc, still, on a black circle
+        badge(assets / "guess.gif").save(media / "GameIcon.tga")
     old = media / "Guess.tga"
     if old.exists():
         old.unlink()
-    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, Arrow.tga, Guess1-{len(GUESS_ORCS)}.tga and Probe.jpg in {media}")
+    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, Arrow.tga, Guess1-{len(GUESS_ORCS)}.tga, GameIcon.tga and Probe.jpg in {media}")
