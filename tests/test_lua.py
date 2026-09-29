@@ -178,3 +178,26 @@ def test_directions_along_roads_and_to_nearby_views(env):
     # a road already going that way: the view doesn't add a second arrow
     east_road = lua.eval("{ e = { { 1, 2, 100, 0, 0, 0, 0, -100 } } }")
     assert headings(lua, D, here, east_road) == [270]
+
+
+def test_arrows_reach_only_the_next_spot_on_a_diagonal(env):
+    lua, D = env
+    # a road running north-east (x north, y west: NE is x up, y down) with spots every 60 yd,
+    # the next one a little off the line; a straighter one two steps on; one far beyond reach
+    lua.execute("""function _set(D)
+      D.byCont[9] = {
+        { id = 'here', cont = 9, x = 0, y = 0 },
+        { id = 'next', cont = 9, x = 36, y = -48 },
+        { id = 'second', cont = 9, x = 85, y = -85 },
+        { id = 'far', cont = 9, x = 200, y = -200 },
+      }
+    end""")
+    lua.globals()._set(D)
+    here = D.byCont[9][1]
+    ne = -math.pi / 4  # north-east (headings counter-clockwise from north)
+    assert D.Ahead(here, ne).id == "next"  # not the straighter one further on
+    assert D.Ahead(D.byCont[9][3], ne) is None  # 'far' is past the reach
+    # one arrow that way, pointing at the next spot, not at the ones behind it
+    t = D.Directions(here, None)
+    got = [round(math.degrees(t[i]) % 360) for i in range(1, len(t) + 1)]
+    assert got == [round(math.degrees(D.Bearing(0, 0, 36, -48)) % 360)]

@@ -92,10 +92,15 @@ function D.Compass(heading)
   return COMPASS[math.floor(heading / D.STEP + 0.5) % 8 + 1]
 end
 
+-- How far the arrows and "Go ahead" reach: a little past one step (spots are about 100 yd
+-- apart along the roads), so a click lands on the next spot, never one further on.
+D.NEXT_RANGE = 130
+
 -- The nearest other view ahead of point p, looking along `heading`: within maxDist yards and
--- maxAngle of straight ahead (defaults 300 yd, 50 degrees), preferring near and straight.
+-- maxAngle of straight ahead (defaults D.NEXT_RANGE, 50 degrees), the nearest first: a spot
+-- a little off to the side beats a straighter one further on (a road bending on a diagonal).
 function D.Ahead(p, heading, maxDist, maxAngle)
-  maxDist, maxAngle = maxDist or 300, maxAngle or math.rad(50)
+  maxDist, maxAngle = maxDist or D.NEXT_RANGE, maxAngle or math.rad(50)
   local best, bestScore
   for _, q in ipairs(D.byCont[p.cont] or {}) do
     if q ~= p then
@@ -103,7 +108,7 @@ function D.Ahead(p, heading, maxDist, maxAngle)
       if d > 0.5 and d <= maxDist then
         local off = math.abs(D.AngleDiff(D.Bearing(p.x, p.y, q.x, q.y), heading))
         if off <= maxAngle then
-          local score = d * (1 + off)
+          local score = d * (1 + 0.5 * off)
           if not bestScore or score < bestScore then best, bestScore = q, score end
         end
       end
@@ -173,11 +178,12 @@ end
 
 -- The ways you can go from a spot, as headings (radians, counter-clockwise from north): along
 -- every road within `radius` yards of it (both ways, except past a road's end) and toward
--- other street views within `near` yards. Directions within `merge` of one already found count
--- once. `roads` is AzerothGPS's road network of the spot's continent ({ e = { { a, b, len,
+-- the nearest other street view each way within `near` yards (D.NEXT_RANGE). Directions within
+-- `merge` of one already found count once, so a spot further on behind a nearer one adds no
+-- arrow. `roads` is AzerothGPS's road network of the spot's continent ({ e = { { a, b, len,
 -- source, x, y, x, y, ... } } }), nil for none.
 function D.Directions(p, roads, radius, near, merge)
-  radius, near, merge = radius or 12, near or 300, merge or math.rad(25)
+  radius, near, merge = radius or 12, near or D.NEXT_RANGE, merge or math.rad(25)
   local dirs = {}
   local function add(h)
     h = h % (2 * math.pi)
@@ -209,9 +215,13 @@ function D.Directions(p, roads, radius, near, merge)
       end
     end
   end
+  local close = {}
   for _, q in ipairs(D.byCont[p.cont] or {}) do
-    if q ~= p and (q.x - x) ^ 2 + (q.y - y) ^ 2 <= near * near then add(D.Bearing(x, y, q.x, q.y)) end
+    local d2 = (q.x - x) ^ 2 + (q.y - y) ^ 2
+    if q ~= p and d2 <= near * near then close[#close + 1] = { q = q, d2 = d2 } end
   end
+  table.sort(close, function(a, b) return a.d2 < b.d2 end) -- (nearest first: it owns its direction)
+  for _, c in ipairs(close) do add(D.Bearing(x, y, c.q.x, c.q.y)) end
   return dirs
 end
 
