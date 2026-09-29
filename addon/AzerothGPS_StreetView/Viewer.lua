@@ -311,7 +311,7 @@ end
 
 -- The title: the spot's zone and map coordinates (a game's street view: neither).
 local function Title(p)
-  if cur and cur.game then return SetTitle("Street Guess: where is this?") end
+  if cur and cur.game then return SetTitle("Where in the Azeroth?") end
   local API = _G.AzerothGPS
   local where = p.zone or "?"
   local mapID, zone, u, v

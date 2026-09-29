@@ -1,4 +1,4 @@
--- Street Guess: a GeoGuessr-style game on the AzerothGPS map. Everyone gets the same street view
+-- Where in the Azeroth? (Street Guess): a GeoGuessr-style game on the AzerothGPS map. Everyone gets the same street view
 -- (no zone name or coordinates) and has 30 seconds to look around and double-click the map where
 -- they think it is (again to move the guess: the one placed when the time runs out counts): the
 -- closer, the more points (0-100 a round, the first ones easy, the last hard).
@@ -1258,7 +1258,7 @@ function Gm.Refresh()
   panel:Show()
   local ph = game.phase
   local roundText = game.round > 0 and string.format("  |cffffffffRound %d of %d|r", game.round, game.rounds) or ""
-  panel.title:SetText("|cffffd100Street Guess|r" .. (game.mode == "solo" and "  |cff9d9d9dsolo|r" or "") .. roundText)
+  panel.title:SetText("|cffffd100Where in the Azeroth?|r" .. (game.mode == "solo" and "  |cff9d9d9dsolo|r" or "") .. roundText)
   local status
   if ph == "invite" then
     local n = #game.order - 1
@@ -1462,7 +1462,7 @@ local function BuildButton(parent, figure)
   end)
   gameButton:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("Street Guess")
+    GameTooltip:AddLine("Where in the Azeroth?")
     GameTooltip:AddLine("Where is this street view? You have 30 seconds to look around and double-click the map where you think it is (again to move it).", 1, 1, 1, true)
     GameTooltip:AddLine("Solo, with your party, or with one player by whisper.", 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
@@ -1546,11 +1546,11 @@ end
 -- The invitation, asked before joining.
 local function Ask(sender, rounds, onYes, onNo)
   if not (StaticPopupDialogs and StaticPopup_Show) then
-    io().print(Short(sender) .. " invited you to Street Guess, but this client can't ask: declined.")
+    io().print(Short(sender) .. " invited you to play Where in the Azeroth?, but this client can't ask: declined.")
     return onNo()
   end
   StaticPopupDialogs.AGPS_STREETGUESS_INVITE = StaticPopupDialogs.AGPS_STREETGUESS_INVITE or {
-    text = "%s invites you to Street Guess (%s). Join?",
+    text = "%s invites you to play Where in the Azeroth? (%s). Join?",
     button1 = "Join",
     button2 = "No thanks",
     OnAccept = function(self, data) local d = data or self.data if d then d.yes() end end,
@@ -1576,7 +1576,7 @@ function Gm.Init(figureButton)
   local parent = API.MapButtonParent()
   if not parent or not figureButton then return end
   if not API.HoldMap then -- (an AzerothGPS without the game's API: no game)
-    ns.Print("Street Guess needs a newer AzerothGPS (API version 3).")
+    ns.Print("Where in the Azeroth? needs a newer AzerothGPS (API version 3).")
     return
   end
   BuildButton(parent, figureButton)

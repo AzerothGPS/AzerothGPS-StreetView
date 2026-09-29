@@ -50,7 +50,7 @@ Only through its public API, the `AzerothGPS` global (`../azerothgps/addon/Azero
 `docs/api.md` there). If StreetView needs more from the map, add it to that API (small,
 additive, with a lupa test) rather than reaching into AzerothGPS's private namespace.
 
-## Street Guess (Game.lua)
+## Where in the Azeroth? (Street Guess, Game.lua)
 
 A GeoGuessr-style game from the button above the figure: solo, party or whisper, 1/3/5 rounds.
 A street view pops up for 30 s with a countdown on it and the panel (no zone name or coordinates,

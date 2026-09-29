@@ -74,7 +74,7 @@ local function Playing() return ns.Game and ns.Game.Playing() end
 
 function F.Pick()
   if Playing() then
-    UIErrorsFrame:AddMessage("Not during a Street Guess game", 1, 0.82, 0)
+    UIErrorsFrame:AddMessage("Not during a game of Where in the Azeroth?", 1, 0.82, 0)
     return
   end
   carrying = true
@@ -154,7 +154,7 @@ function F.Init()
   button:SetScript("OnDragStart", F.Pick)
   button:SetScript("OnDragStop", F.Drop)
   button:SetScript("OnClick", function()
-    if Playing() then return UIErrorsFrame:AddMessage("Not during a Street Guess game", 1, 0.82, 0) end
+    if Playing() then return UIErrorsFrame:AddMessage("Not during a game of Where in the Azeroth?", 1, 0.82, 0) end
     if GetTime() - lastDrop > 0.3 then ns.Here() end
   end)
   button:SetScript("OnEnter", function(self)
@@ -193,7 +193,7 @@ function F.Init()
   -- Street Guess's button: in this one's place, with this one above it
   local ok, game = pcall(ns.Game.Init, button)
   if not ok then
-    ns.Print("|cffff6060Street Guess failed to start:|r " .. tostring(game))
+    ns.Print("|cffff6060Where in the Azeroth? failed to start:|r " .. tostring(game))
   elseif game then
     lowest = game
     button:ClearAllPoints()

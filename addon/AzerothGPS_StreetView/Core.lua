@@ -57,7 +57,7 @@ local HELP = {
   "/sv hide - close the viewer.",
   "/sv flipyaw - turn the views the other way (if left and right are swapped).",
   "/sv probe - check that this game client shows JPEG images.",
-  "/sv dev - Street Guess's Report picture button on or off (for taking broken pictures again).",
+  "/sv dev - the Report picture button in Where in the Azeroth? on or off (for taking broken pictures again).",
   "/sv reports - the street views reported as broken; /sv unreport <id> or /sv unreport all.",
 }
 
@@ -89,7 +89,7 @@ SlashCmdList.AZEROTHGPSSTREETVIEW = function(msg)
     ns.Viewer.Probe()
   elseif cmd == "dev" then
     ns.db.dev = not ns.db.dev or nil
-    Print(ns.db.dev and "Report picture is on in Street Guess." or "Report picture is off.")
+    Print(ns.db.dev and "Report picture is on (Where in the Azeroth?)." or "Report picture is off.")
   elseif cmd == "reports" then
     local n = 0
     for id in pairs(ns.db.reported or {}) do
