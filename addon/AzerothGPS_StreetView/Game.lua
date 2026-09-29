@@ -34,7 +34,8 @@ Gm.PROPOSE_SECONDS = 3 -- ... and this long for the players to say they have the
 Gm.GRACE_SECONDS = 3 -- a round ends this long after the guessing time, whoever hasn't answered
 Gm.MAX_TRIES = 5 -- street views tried until everyone has one
 Gm.FULL_YD = 25 -- a guess this close gets all 100 points
-Gm.SCALE_YD = 3000 -- ... then 100 * e^(-(yards - 25) / 3000): 90 points ~340 yd off, 60 ~1,550, 40 ~2,800
+Gm.SCALE_YD = 6500 -- ... then 100 * e^(-((yards - 25) / 6500) ^ 1.3), rounded down: 99 just past 25 yd, 93 at
+Gm.SCORE_POWER = 1.3 -- 800 yd, 85 at 1,600, 69 at 3,000, 40 at 6,000, 17 at 10,000 (the last points the hardest)
 Gm.TERRAIN_MAX_YD = 2900 -- the result: guess and spot shown together up to this zoom (the terrain map's widest: 3000)
 Gm.PAN_SECONDS = 0.9 -- ... the map pans and zooms out to them this smoothly, then the line grows
 Gm.SPOT_ZOOM_YD = 600 -- ... else the spot alone, this zoomed
@@ -48,7 +49,7 @@ Gm.ROUNDS = { 1, 3, 5 }
 function Gm.Score(yards)
   if not yards then return 0 end
   if yards <= Gm.FULL_YD then return 100 end
-  return math.floor(100 * math.exp(-(yards - Gm.FULL_YD) / Gm.SCALE_YD) + 0.5)
+  return math.floor(100 * math.exp(-((yards - Gm.FULL_YD) / Gm.SCALE_YD) ^ Gm.SCORE_POWER))
 end
 
 function Gm.Encode(...)

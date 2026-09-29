@@ -135,7 +135,8 @@ def test_score_is_easy_at_first_and_hard_at_the_end(solo):
     S = p.G.Score
     assert S(None) == 0
     assert S(0) == 100 and S(25) == 100
-    assert S(340) == 90 and S(1550) == 60 and S(2800) == 40
+    assert S(26) == 99  # (100 only within 25 yd)
+    assert S(800) == 93 and S(1608) == 85 and S(3000) == 69 and S(6000) == 40 and S(10000) == 17
     prev = 101
     for yd in range(0, 20000, 50):
         assert S(yd) <= prev
@@ -144,7 +145,7 @@ def test_score_is_easy_at_first_and_hard_at_the_end(solo):
     def band(lo, hi):
         yds = [yd for yd in range(0, 30000, 5) if lo <= S(yd) <= hi]
         return max(yds) - min(yds)
-    assert band(1, 40) > 20 * band(90, 100)
+    assert band(1, 40) > 10 * band(90, 100)
 
 
 def test_messages_round_trip(solo):
@@ -200,7 +201,7 @@ def test_solo_celebrates_a_good_average(solo):
     s = p.game.spot
     p.G.Guess(s.x + 300, s.y, s.cont)
     run(net, clock, 31 + 8)
-    assert p.game.phase == "over" and p.G.Average(p.game) == 91 and p.game.celebrate
+    assert p.game.phase == "over" and p.G.Average(p.game) == 98 and p.game.celebrate
 
 
 def party(n=2, **kw):
