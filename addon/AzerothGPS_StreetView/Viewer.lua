@@ -28,7 +28,7 @@ local GRID_COLS, GRID_ROWS = 24, 12 -- cube views: the window is drawn as this m
 local MAX_LAT = 85 -- cube views: how far up or down you can look
 local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "level", [45] = "looking up", [90] = "straight up" }
 
-local frame, chrome, view, img, missing, title, info, preload
+local frame, chrome, view, img, missing, title, info, preload, ahead
 local tiles = {} -- panorama tile textures by col * 100 + row
 local cells = {} -- cube view cell textures
 local lastMarkHeading -- heading last drawn on the map
@@ -182,7 +182,7 @@ function V.Build()
   up:SetPoint("LEFT", right, "RIGHT", 8, 0)
   local down = Button(frame, "Down", 48, function() V.Tilt(-1) end)
   down:SetPoint("LEFT", up, "RIGHT", 2, 0)
-  local ahead = Button(frame, "Go ahead", 72, function() V.GoAhead() end)
+  ahead = Button(frame, "Go ahead", 72, function() V.GoAhead() end)
   ahead:SetPoint("LEFT", down, "RIGHT", 8, 0)
   info = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   info:SetPoint("LEFT", ahead, "RIGHT", 8, 0)
@@ -292,8 +292,9 @@ function V.Build()
   end)
 end
 
--- The title: the spot's zone and map coordinates.
+-- The title: the spot's zone and map coordinates (a game's street view: neither).
 local function Title(p)
+  if cur and cur.game then return SetTitle("Street Guess: where is this?") end
   local API = _G.AzerothGPS
   local where = p.zone or "?"
   local mapID, zone, u, v
@@ -507,8 +508,8 @@ function V.Refresh()
 end
 
 -- Open point p looking toward `heading` (radians, counter-clockwise from north; default its
--- first view), level.
-function V.Open(p, heading)
+-- first view), level. game: Street Guess's view (no place name, no walking on, not on the map).
+function V.Open(p, heading, game)
   if not frame then V.Build() end
   if D.HasCube(p) then
     cur = { p = p, pano = true, cube = true, lon = heading and D.PanoLon(p, heading) or 0, lat = 0,
@@ -519,7 +520,9 @@ function V.Open(p, heading)
     cur = { p = p, yaw = heading and D.YawFor(p, heading) or 0, pitch = D.LEVEL }
   end
   local API = _G.AzerothGPS
-  cur.dirs = D.Directions(p, API and API.Roads and API.Roads(p.cont))
+  cur.game = game or nil
+  cur.dirs = not game and D.Directions(p, API and API.Roads and API.Roads(p.cont)) or nil
+  if ahead.SetEnabled then ahead:SetEnabled(not game) end
   lastMarkHeading = nil
   frame:Show()
   V.Refresh()
@@ -527,6 +530,14 @@ end
 
 function V.Hide()
   if frame then frame:Hide() end
+end
+
+-- Close the viewer if it shows Street Guess's view.
+function V.CloseGame()
+  if cur and cur.game then
+    cur = nil
+    if frame then frame:Hide() end
+  end
 end
 
 function V.TurnBy(dir)
@@ -561,7 +572,7 @@ end
 -- The next street view toward `heading` (the nearest within 50 degrees of it and
 -- D.NEXT_RANGE yards), looking that way.
 function V.GoToward(heading)
-  if not cur or not heading then return end
+  if not cur or not heading or cur.game then return end
   local q = D.Ahead(cur.p, heading)
   if not q then
     UIErrorsFrame:AddMessage("No street view that way yet", 1, 0.82, 0)

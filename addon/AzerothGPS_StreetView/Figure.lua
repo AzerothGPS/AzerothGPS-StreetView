@@ -60,7 +60,7 @@ function F.Draw(ctx)
   end
   -- the view open in the viewer: its spot and the way it looks
   local cur = ns.Viewer.Current()
-  if cur and cur.p.cont == base then
+  if cur and cur.p.cont == base and not cur.game then -- (not Street Guess's: that would give it away)
     local p, h = cur.p, ns.Viewer.Heading()
     local len = 36 / ctx.scale -- (36 UI units whatever the zoom)
     for _, a in ipairs({ h - 0.45, h + 0.45 }) do
@@ -70,7 +70,13 @@ function F.Draw(ctx)
   end
 end
 
+local function Playing() return ns.Game and ns.Game.Playing() end
+
 function F.Pick()
+  if Playing() then
+    UIErrorsFrame:AddMessage("Not during a Street Guess game", 1, 0.82, 0)
+    return
+  end
   carrying = true
   hover = nil
   button.icon:SetAlpha(0.25)
@@ -146,6 +152,7 @@ function F.Init()
   button:SetScript("OnDragStart", F.Pick)
   button:SetScript("OnDragStop", F.Drop)
   button:SetScript("OnClick", function()
+    if Playing() then return UIErrorsFrame:AddMessage("Not during a Street Guess game", 1, 0.82, 0) end
     if GetTime() - lastDrop > 0.3 then ns.Here() end
   end)
   button:SetScript("OnEnter", function(self)
@@ -180,4 +187,13 @@ function F.Init()
   end)
 
   API.SetOverlay("StreetView", F.Draw)
+
+  -- Street Guess's button, above this one
+  local ok, err = pcall(ns.Game.Init, button)
+  if not ok then ns.Print("|cffff6060Street Guess failed to start:|r " .. tostring(err)) end
+end
+
+-- The figure is dimmed while a Street Guess game is on (it can't be used then).
+function F.Refresh()
+  if button then button:SetAlpha(Playing() and 0.35 or 1) end
 end

@@ -46,6 +46,15 @@ def test_every_lua_file_compiles(path):
     assert ok, err
 
 
+@pytest.mark.parametrize("path", LUA_FILES, ids=lambda p: p.name)
+def test_every_lua_file_compiles_under_the_games_lua_5_1(path):
+    lua51 = pytest.importorskip("lupa.lua51")
+    lua = lua51.LuaRuntime()
+    ok, err = lua.eval("function(src, n) local f, e = loadstring(src, '@' .. n); return f ~= nil, e end")(
+        path.read_text(encoding="utf-8"), path.name)
+    assert ok, err
+
+
 def test_toc_lists_every_file():
     toc = (ADDON / "AzerothGPS_StreetView.toc").read_text(encoding="utf-8").splitlines()
     listed = {l.strip() for l in toc if l.strip() and not l.startswith("#")}

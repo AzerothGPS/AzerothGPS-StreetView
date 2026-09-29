@@ -46,6 +46,17 @@ Only through its public API, the `AzerothGPS` global (`../azerothgps/addon/Azero
 `docs/api.md` there). If StreetView needs more from the map, add it to that API (small,
 additive, with a lupa test) rather than reaching into AzerothGPS's private namespace.
 
+## Street Guess (Game.lua)
+
+A GeoGuessr-style game from the button above the figure: solo, party or whisper, 1/3/5 rounds.
+A street view shows for 15 s (no zone name or coordinates, no walking on, not marked on the map),
+then the player double-clicks the map; `Gm.Score` gives 0-100 (full within 25 yd, then
+`100 * e^(-(yd - 25) / 3000)`). While a game is on the map is held (`AzerothGPS.HoldMap`, API
+version 3): the route and directions panel hide, double-clicks are guesses, and the game's panel
+sits in the directions' place; its X leaves and the route comes back. Players talk through addon
+messages (prefix `AGPSSV`, the protocol is at the top of Game.lua), invitations are always asked.
+The logic runs through `Gm.io`; `tests/test_game.py` plays whole games between simulated players.
+
 ## Coordinates and views
 
 - World yards, x north, y west (AzerothGPS's convention). Headings are radians
