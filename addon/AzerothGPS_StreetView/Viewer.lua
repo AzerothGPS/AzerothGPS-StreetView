@@ -31,6 +31,11 @@ local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "le
 local frame, chrome, view, img, missing, title, info, preload, ahead, timerBox
 local tiles = {} -- panorama tile textures by col * 100 + row
 local cells = {} -- cube view cell textures
+local ghosts = {} -- ... a second copy, zoomed a little further, faint: the blur of a move up the road
+local move -- the move to the next spot being animated (V.GoToward)
+local MOVE_OUT, MOVE_IN = 0.3, 0.3 -- seconds: zooming toward the next spot, then settling at it
+local MOVE_ZOOM = 0.45 -- the view narrows this much on the way (a fraction of its field of view)
+local GHOST_ZOOM, GHOST_ALPHA = 0.16, 0.45 -- the blur copy: that much further in, this faint at full blur
 local lastMarkHeading -- heading last drawn on the map
 local arrows = {} -- way-to-go arrow buttons
 local dragging = false -- the picture is being dragged (arrows hidden)
@@ -298,6 +303,7 @@ function V.Build()
     SetWidth(x - l)
   end)
 
+  frame:SetScript("OnUpdate", V.MoveStep) -- (idle unless a move is being animated)
   frame:SetScript("OnHide", function()
     if ns.Figure then ns.Figure.Redraw() end
   end)
@@ -355,7 +361,7 @@ end
 -- are always in sight.
 local function PlaceArrowsAt(centerHeading, project)
   local dirs = cur and cur.dirs
-  if dragging or not dirs or not centerHeading then return HideArrows() end
+  if dragging or move or not dirs or not centerHeading then return HideArrows() end
   local w, h = view:GetWidth(), view:GetHeight()
   for i, dir in ipairs(dirs) do
     local b = arrows[i] or NewArrow(i)
@@ -384,8 +390,35 @@ local function PlaceArrows(centerHeading, centerLat, ppd)
   end)
 end
 
-local function HideCells(from)
-  for i = from or 1, #cells do cells[i]:Hide() end
+local function HideCells(from, pool)
+  pool = pool or cells
+  for i = from or 1, #pool do pool[i]:Hide() end
+end
+
+-- Lay a list of cube cells (D.CubeCells) out as the textures in `pool`.
+local function DrawCells(p, list, pool, layer, alpha)
+  for i, c in ipairs(list) do
+    local tex = pool[i]
+    if not tex then
+      tex = view:CreateTexture(nil, layer)
+      if tex.SetSnapToPixelGrid then tex:SetSnapToPixelGrid(false) end
+      if tex.SetTexelSnappingBias then tex:SetTexelSnappingBias(0) end
+      pool[i] = tex
+    end
+    local path = D.CubePath(p, c.face, c.col, c.row)
+    if tex.path ~= path then
+      if tex:SetTexture(path, "CLAMP", "CLAMP") == false then tex:SetColorTexture(0.06, 0.06, 0.08, 1) end
+      tex.path = path
+    end
+    tex:ClearAllPoints()
+    tex:SetPoint("TOPLEFT", view, "TOPLEFT", c.x, -c.y)
+    tex:SetSize(c.cw + 0.5, c.ch + 0.5) -- (a hair of overlap: no seams between cells)
+    local uv = c.uv
+    tex:SetTexCoord(uv[1], uv[2], uv[3], uv[4], uv[5], uv[6], uv[7], uv[8])
+    tex:SetAlpha(alpha)
+    tex:Show()
+  end
+  HideCells(#list + 1, pool)
 end
 
 -- The cube view: the window as a grid of small cells, each cut from the cube in perspective.
@@ -398,28 +431,16 @@ local function CubeRefresh()
   if not w or w <= 0 or not h or h <= 0 then return end
   cur.lon = (cur.lon + 180) % 360 - 180
   cur.lat = math.max(-MAX_LAT, math.min(MAX_LAT, cur.lat))
-  local list = D.CubeCells(p, cur.lon, cur.lat, cur.fov, w, h, GRID_COLS, GRID_ROWS)
-  for i, c in ipairs(list) do
-    local tex = cells[i]
-    if not tex then
-      tex = view:CreateTexture(nil, "ARTWORK")
-      if tex.SetSnapToPixelGrid then tex:SetSnapToPixelGrid(false) end
-      if tex.SetTexelSnappingBias then tex:SetTexelSnappingBias(0) end
-      cells[i] = tex
-    end
-    local path = D.CubePath(p, c.face, c.col, c.row)
-    if tex.path ~= path then
-      if tex:SetTexture(path, "CLAMP", "CLAMP") == false then tex:SetColorTexture(0.06, 0.06, 0.08, 1) end
-      tex.path = path
-    end
-    tex:ClearAllPoints()
-    tex:SetPoint("TOPLEFT", view, "TOPLEFT", c.x, -c.y)
-    tex:SetSize(c.cw + 0.5, c.ch + 0.5) -- (a hair of overlap: no seams between cells)
-    local uv = c.uv
-    tex:SetTexCoord(uv[1], uv[2], uv[3], uv[4], uv[5], uv[6], uv[7], uv[8])
-    tex:Show()
+  local blur = cur.blur or 0
+  DrawCells(p, D.CubeCells(p, cur.lon, cur.lat, cur.fov, w, h, GRID_COLS, GRID_ROWS), cells, "ARTWORK", 1)
+  -- moving up the road: a faint copy zoomed a little further in over it reads as motion blur
+  -- (there's no real blur for addons; only for the half second of the move)
+  if blur > 0 then
+    DrawCells(p, D.CubeCells(p, cur.lon, cur.lat, cur.fov * (1 - GHOST_ZOOM * blur), w, h, GRID_COLS, GRID_ROWS),
+      ghosts, "OVERLAY", GHOST_ALPHA * blur)
+  else
+    HideCells(1, ghosts)
   end
-  HideCells(#list + 1)
   Title(p)
   local heading = D.PanoHeading(p, cur.lon)
   local tilt = math.floor(cur.lat + 0.5)
@@ -486,6 +507,7 @@ function V.Refresh()
   if not frame or not cur then return end
   if cur.cube then return CubeRefresh() end
   HideCells()
+  HideCells(1, ghosts)
   if cur.pano then return PanoRefresh() end
   HideTiles()
   img:Show()
@@ -596,13 +618,69 @@ end
 -- The next street view toward `heading` (the nearest within 50 degrees of it and
 -- D.NEXT_RANGE yards), looking that way.
 function V.GoToward(heading)
-  if not cur or not heading or cur.game then return end
+  if not cur or not heading or cur.game or move then return end
   local q = D.Ahead(cur.p, heading)
   if not q then
     UIErrorsFrame:AddMessage("No street view that way yet", 1, 0.82, 0)
     return
   end
-  V.Open(q, heading)
+  if not (cur.cube and D.HasCube(q) and GetTime) then return V.Open(q, heading) end
+  -- like Google's: turn to face the way, zoom in toward it with a blur, then settle at the next
+  -- spot (its pictures start loading now, hidden)
+  local i = 0
+  for _, face in ipairs(D.FACE_NAMES) do
+    for col = 0, 1 do
+      for row = 0, 1 do
+        i = i + 1
+        local t = preload[i]
+        if not t then
+          t = view:CreateTexture(nil, "BACKGROUND")
+          t:SetSize(1, 1)
+          t:SetPoint("TOPLEFT")
+          t:SetAlpha(0)
+          preload[i] = t
+        end
+        t:SetTexture(D.CubePath(q, face, col, row))
+      end
+    end
+  end
+  local lon1 = D.PanoLon(cur.p, heading)
+  move = { stage = 1, t0 = GetTime(), q = q, heading = heading, lon0 = cur.lon,
+    dlon = (lon1 - cur.lon + 180) % 360 - 180, lat0 = cur.lat, fov0 = cur.fov }
+  HideArrows()
+end
+
+local function Ease(t) return t < 0.5 and 2 * t * t or 1 - (-2 * t + 2) ^ 2 / 2 end
+
+-- The move's frames (V.Build's driver).
+function V.MoveStep()
+  if not move then return end
+  if not cur or not frame:IsShown() then move = nil return end
+  local t = (GetTime() - move.t0) / (move.stage == 1 and MOVE_OUT or MOVE_IN)
+  local k = Ease(math.min(1, t))
+  if move.stage == 1 then
+    cur.lon = move.lon0 + move.dlon * k
+    cur.lat = move.lat0 * (1 - k)
+    cur.fov = move.fov0 * (1 - MOVE_ZOOM * k)
+    cur.blur = k
+    V.Refresh()
+    if t >= 1 then
+      local q, heading = move.q, move.heading
+      move = { stage = 2, t0 = GetTime() } -- (set first: the arrows stay hidden while it settles)
+      V.Open(q, heading)
+      move.fov1 = cur.fov
+      cur.fov, cur.blur = cur.fov * (1 - MOVE_ZOOM * 0.6), 1
+      V.Refresh()
+    end
+  else
+    cur.fov = move.fov1 * (1 - MOVE_ZOOM * 0.6 * (1 - k))
+    cur.blur = 1 - k
+    if t >= 1 then
+      cur.fov, cur.blur = move.fov1, nil
+      move = nil
+    end
+    V.Refresh()
+  end
 end
 
 function V.GoAhead()

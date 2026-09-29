@@ -829,7 +829,7 @@ local function BuildMenu(parent)
     return io().group() and "Invite your party: everyone with StreetView is asked to join." or "|cffff6060Join a party first.|r"
   end)
   local whisper = Chip(fly, "Whisper", 60, function() fly.mode = "whisper" ShowMenu("whisper") end)
-  Tip(whisper, "Whisper", "Play against one player: your target, or type a name.")
+  Tip(whisper, "Whisper", "Play against one player: your target, a name you type, or shift-click their name in chat.")
   local s1 = Step("mode", { solo, party, whisper })
   for _, c in ipairs({ solo, party, whisper }) do c:SetParent(s1) end
 
@@ -1239,6 +1239,20 @@ function Gm.Init(figureButton)
   io_.ask = Ask
 
   API.SetOverlay("StreetGuess", Gm.Draw)
+  -- Whisper: shift-click a player's name in chat to fill the name box
+  if hooksecurefunc and SetItemRef then
+    hooksecurefunc("SetItemRef", function(link)
+      local box = fly and fly.steps.whisper and fly.steps.whisper.box
+      if not (box and fly:IsShown() and fly.step == "whisper") then return end
+      local shift = (IsModifiedClick and IsModifiedClick("CHATLINK")) or (IsShiftKeyDown and IsShiftKeyDown())
+      local name = shift and type(link) == "string" and link:match("^player:([^:]+)")
+      if name then
+        box:SetText(name)
+        box:SetFocus()
+        box:SetCursorPosition(#name)
+      end
+    end)
+  end
   if API.OnLayout then API.OnLayout("StreetGuess", function() Gm.Refresh() end) end -- (the frame's portrait on or off)
 
   if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then C_ChatInfo.RegisterAddonMessagePrefix(Gm.PREFIX) end
