@@ -457,3 +457,32 @@ def test_party_players_cant_submit_early():
     a.G.Guess(300, 300, 0)
     a.G.SubmitNow()
     assert a.game.phase == "look"
+
+
+def test_the_round_result_fits_everyones_guesses_and_colors_them():
+    (a, b, c), clock, net = party(3)
+    a.G.Start("party", 1)
+    run(net, clock, 2)
+    assert a.game.phase == "look"
+    a.G.Guess(300, 400, 0)  # 100 yd off
+    b.G.Guess(300, 3300, 0)  # 3,000 yd off
+    c.G.Guess(300, 20000, 0)  # far off: doesn't fit with the others, left out of the view
+    run(net, clock, 32)
+    assert a.game.phase == "result"
+    # the answer (300, 300) with A's and B's guesses: centered between, zoomed to fit
+    c0, x, y, z = a.looked[-1]
+    assert (c0, x, y) == (0, 300, 1800) and z == pytest.approx(3000 * 0.65 + 80)
+    # colors: each other player their own, the same on everyone's screen order; the player's own white
+    ca, cb = a.G.PlayerColor(a.game, "Bob-Realm"), a.G.PlayerColor(a.game, "Cid-Realm")
+    assert list(ca.values()) != list(cb.values())
+    assert list(a.G.PlayerColor(a.game, "Ann-Realm").values()) == [1, 1, 1]
+    assert a.G.ColorCode(ca).startswith("|cff") and len(a.G.ColorCode(ca)) == 10
+
+
+def test_fit_view_falls_back_to_the_answer_alone(solo):
+    p, _, _ = solo
+    spot = p.lua.eval("{ x = 0, y = 0 }")
+    near = p.lua.eval("{ { x = 400, y = 0 } }")
+    assert p.G.FitView(spot, near) == (200, 0, 400 * 0.65 + 80)
+    far = p.lua.eval("{ { x = 400, y = 0 }, { x = 9000, y = 0 } }")
+    assert p.G.FitView(spot, far) is None

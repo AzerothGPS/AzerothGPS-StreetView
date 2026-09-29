@@ -41,6 +41,11 @@ Gm.PAN_SECONDS = 0.9 -- ... the map pans and zooms out to them this smoothly, th
 Gm.SPOT_ZOOM_YD = 600 -- ... else the spot alone, this zoomed
 Gm.CELEBRATE_SOLO = 60 -- solo: the average round score that earns the celebration
 Gm.ROUNDS = { 1, 3, 5 }
+-- Each player's color: their name on the scoreboard, their dotted line and dot on the map. The
+-- player's own is white (the orc marks their guess); the others get these in the order they joined.
+Gm.MY_COLOR = { 1, 1, 1 }
+Gm.COLORS = { { 0.4, 0.8, 1 }, { 0.55, 1, 0.45 }, { 1, 0.55, 1 }, { 1, 0.6, 0.3 }, { 0.75, 0.65, 1 },
+  { 1, 0.4, 0.4 }, { 0.35, 1, 0.9 }, { 1, 1, 0.45 } }
 
 ---------------------------------------------------------------------------------------------
 -- Pure helpers
@@ -176,6 +181,29 @@ function Gm.Winners(list)
   return out
 end
 
+-- A player's color (Gm.COLORS, given as they join; the player's own: white), and as a chat color code.
+function Gm.PlayerColor(g, name)
+  if name == g.me then return Gm.MY_COLOR end
+  return (g.colors and g.colors[name]) or Gm.COLORS[1]
+end
+function Gm.ColorCode(c)
+  return string.format("|cff%02x%02x%02x", math.floor(c[1] * 255 + 0.5), math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5))
+end
+
+-- Where the map should look to show the answer and the guesses (points { x, y } on the answer's
+-- continent): x, y and zoom (yards to the edge) when they fit on the terrain map together, else
+-- nil (then the answer alone).
+function Gm.FitView(spot, points)
+  local x0, x1, y0, y1 = spot.x, spot.x, spot.y, spot.y
+  for _, q in ipairs(points) do
+    x0, x1 = math.min(x0, q.x), math.max(x1, q.x)
+    y0, y1 = math.min(y0, q.y), math.max(y1, q.y)
+  end
+  local zoom = math.max(250, math.max(x1 - x0, y1 - y0) * 0.65 + 80)
+  if zoom > Gm.TERRAIN_MAX_YD then return nil end
+  return (x0 + x1) / 2, (y0 + y1) / 2, zoom
+end
+
 -- Solo: the average round score over the rounds played.
 function Gm.Average(g)
   local pl = g.players[g.me]
@@ -238,6 +266,10 @@ local function AddPlayer(name)
   if not game.players[name] then
     game.players[name] = { name = name, scores = {}, guesses = {} }
     game.order[#game.order + 1] = name
+    if name ~= game.me and not game.colors[name] then
+      game.ncolors = game.ncolors + 1
+      game.colors[name] = Gm.COLORS[(game.ncolors - 1) % #Gm.COLORS + 1]
+    end
   end
 end
 
@@ -266,7 +298,7 @@ end
 local function NewGame(mode, rounds, host, id)
   local me = io().me()
   game = { id = id or tostring(io().random(100000, 999999)), mode = mode, rounds = rounds, host = host or me, me = me,
-    players = {}, order = {}, round = 0, used = {}, phase = "wait", packs = {}, report = {} }
+    players = {}, order = {}, round = 0, used = {}, phase = "wait", packs = {}, report = {}, colors = {}, ncolors = 0 }
   game.isHost = game.host == me
   game.packs[me] = Gm.MyPacks()
   AddPlayer(game.host)
@@ -274,6 +306,45 @@ local function NewGame(mode, rounds, host, id)
 end
 
 local Look, Result, Over, NextRound, Submit
+
+-- The map for the result: the answer with this player's guess (and, `all`, everyone's) while they
+-- fit on the terrain map together, panned there smoothly; else the answer alone; this player's guess
+-- on another continent: the world.
+local function ShowResult(all)
+  local s, g = game.spot, game.guess
+  if not s then return end
+  if g and g.x and not g.yards then return io().world(s) end
+  local pts = {}
+  if g and g.x then pts[1] = g end
+  local x, y, zoom = Gm.FitView(s, pts)
+  if not x then return io().lookAt(s.cont, s.x, s.y, Gm.SPOT_ZOOM_YD) end
+  if all then -- the others' guesses too, nearest first, as many as still fit
+    local others = {}
+    for _, name in ipairs(game.order) do
+      local q = name ~= game.me and game.players[name].guesses[game.round]
+      if q and q.x and q.cont == s.cont then others[#others + 1] = q end
+    end
+    table.sort(others, function(p, q)
+      return (p.x - s.x) ^ 2 + (p.y - s.y) ^ 2 < (q.x - s.x) ^ 2 + (q.y - s.y) ^ 2
+    end)
+    for _, q in ipairs(others) do
+      pts[#pts + 1] = q
+      local x2, y2, z2 = Gm.FitView(s, pts)
+      if not x2 then
+        pts[#pts] = nil
+        break
+      end
+      x, y, zoom = x2, y2, z2
+    end
+  end
+  local vx, vy, vc, vz = io().view()
+  if vx and vc == s.cont and vz and vz > 0 then -- (animated from where the map is: Gm.Animate)
+    game.pan = { t0 = Now(), cont = s.cont, x0 = vx, y0 = vy, z0 = vz, x1 = x, y1 = y, z1 = zoom }
+    if game.reveal and Now() - game.reveal.t0 < 0.05 then game.reveal.t0 = Now() + Gm.PAN_SECONDS end
+  else
+    io().lookAt(s.cont, x, y, zoom)
+  end
+end
 
 -- The game ends (reason: why, when it didn't run its rounds). The panel stays until its X.
 Over = function(reason)
@@ -332,27 +403,8 @@ local function Scored(g)
     mine.scores[game.round] = score
     mine.guesses[game.round] = g
   end
-  -- the map: the guess and the spot together while that fits on the terrain map; else the spot
-  -- alone; a guess on another continent: the world
-  local s = game.spot
   if g and g.x then game.reveal = { t0 = Now() } end
-  if s then
-    local fit = g and g.yards and math.max(250, g.yards * 0.65 + 80)
-    if fit and fit <= Gm.TERRAIN_MAX_YD then
-      local mx, my = (s.x + g.x) / 2, (s.y + g.y) / 2
-      local vx, vy, vc, vz = io().view()
-      if vx and vc == s.cont and vz and vz > 0 then -- (animated from where the map is: Gm.Animate)
-        game.pan = { t0 = Now(), cont = s.cont, x0 = vx, y0 = vy, z0 = vz, x1 = mx, y1 = my, z1 = fit }
-        if game.reveal then game.reveal.t0 = Now() + Gm.PAN_SECONDS end
-      else
-        io().lookAt(s.cont, mx, my, fit)
-      end
-    elseif g and g.x and not g.yards then
-      io().world(s)
-    else
-      io().lookAt(s.cont, s.x, s.y, Gm.SPOT_ZOOM_YD)
-    end
-  end
+  ShowResult()
   ToOthers("S", game.id, game.round, score, g and g.yards and math.floor(g.yards + 0.5) or "",
     g and g.cont or "", g and g.x and math.floor(g.x + 0.5) or "", g and g.y and math.floor(g.y + 0.5) or "")
   if game.mode == "solo" then
@@ -372,6 +424,7 @@ Result = function()
     if game ~= g then return end
     game.phase = "result"
   end
+  if game.mode ~= "solo" then ShowResult(true) end -- (everyone's guesses in view)
   Changed()
 end
 
@@ -683,8 +736,6 @@ end
 
 local GUESS_COLOR = { 1, 0.35, 0.3 }
 local SPOT_COLOR = { 1, 0.82, 0.1 }
-local LINE_COLOR = { 1, 1, 1 }
-local OTHER_COLORS = { { 0.4, 0.8, 1 }, { 0.6, 1, 0.5 }, { 1, 0.6, 1 }, { 1, 0.75, 0.4 }, { 0.75, 0.7, 1 } }
 Gm.REVEAL_SECONDS = 1.5
 
 -- How far the line has grown (0-1).
@@ -750,18 +801,21 @@ DrawOn = function(ctx)
   local sx, sy = At(game.spot.cont, game.spot.x, game.spot.y)
   if not sx then return end
   local t = Gm.RevealProgress()
-  if ph ~= "wait" and t >= 1 then -- the others' guesses
-    local k = 0
+  if ph ~= "wait" and t >= 1 then -- the others' guesses, in their colors, with their names
     for _, name in ipairs(game.order) do
       if name ~= game.me then
-        k = k + 1
         local g = game.players[name].guesses[game.round]
         local gx, gy
         if g and g.x and g.cont then gx, gy = At(g.cont, g.x, g.y) end
         if gx then
-          local c = OTHER_COLORS[(k - 1) % #OTHER_COLORS + 1]
-          ctx.Line(gx, gy, sx, sy, c, 2, 0.7, true)
-          ctx.Dot(gx, gy, c, 9, 1)
+          local c = Gm.PlayerColor(game, name)
+          ctx.Line(gx, gy, sx, sy, c, 2, 0.8, true)
+          ctx.Dot(gx, gy, { 0, 0, 0 }, 11, 0.8)
+          ctx.Dot(gx, gy, c, 8, 1)
+          if Gm.marks then
+            local lx, ly = ctx.ToScreen(gx, gy)
+            Gm.marks.Label(lx, ly, Short(name), c)
+          end
         end
       end
     end
@@ -770,7 +824,7 @@ DrawOn = function(ctx)
   local gx, gy
   if g and g.x then gx, gy = At(g.cont, g.x, g.y) end
   if gx then
-    ctx.Line(gx, gy, gx + (sx - gx) * t, gy + (sy - gy) * t, LINE_COLOR, 3, 0.95, true)
+    ctx.Line(gx, gy, gx + (sx - gx) * t, gy + (sy - gy) * t, Gm.MY_COLOR, 3, 0.95, true)
     Mark(ctx, "guess", gx, gy)
   end
   if t >= 1 or not gx then Mark(ctx, "answer", sx, sy) end
@@ -1161,7 +1215,8 @@ function Gm.Refresh()
           lastText = done and "|cff40ff40guessed|r" or "|cff808080...|r"
         end
       end
-      row.name:SetText(string.format("%d. %s%s|r", i, me and "|cffffd100" or "|cffffffff", Short(s.name)))
+      row.name:SetText(string.format("%d. %s%s|r%s", i, Gm.ColorCode(Gm.PlayerColor(game, s.name)), Short(s.name),
+        me and " |cff9d9d9d(you)|r" or ""))
       row.last:SetText(lastText)
       row.total:SetText(showScores and tostring(s.total) or "")
       row.name:ClearAllPoints()
@@ -1272,7 +1327,7 @@ local function BuildMarks(canvas)
   local layer = CreateFrame("Frame", nil, canvas)
   layer:SetAllPoints()
   layer:SetFrameLevel(canvas:GetFrameLevel() + 25)
-  local pool, used = { guess = {}, answer = {} }, { guess = 0, answer = 0 }
+  local pool, used = { guess = {}, answer = {}, label = {} }, { guess = 0, answer = 0, label = 0 }
   local function Get(kind)
     local n = used[kind] + 1
     used[kind] = n
@@ -1291,7 +1346,23 @@ local function BuildMarks(canvas)
     return t
   end
   local M = {}
-  function M.Begin() used.guess, used.answer = 0, 0 end
+  function M.Begin() used.guess, used.answer, used.label = 0, 0, 0 end
+  -- a player's name by their guess
+  function M.Label(sx, sy, text, c)
+    local n = used.label + 1
+    used.label = n
+    local f = pool.label[n]
+    if not f then
+      f = layer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+      f:SetShadowOffset(1, -1)
+      pool.label[n] = f
+    end
+    f:SetText(text)
+    f:SetTextColor(c[1], c[2], c[3])
+    f:ClearAllPoints()
+    f:SetPoint("BOTTOM", layer, "CENTER", sx, sy + 7)
+    f:Show()
+  end
   function M.Put(kind, sx, sy)
     local t = Get(kind)
     t:ClearAllPoints()
