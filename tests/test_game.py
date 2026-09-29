@@ -383,10 +383,10 @@ def test_the_result_shows_both_only_when_they_fit_on_the_terrain_map(solo):
     p.G.Guess(s.x + 400, s.y, s.cont)  # 400 yd off: both on the map, around the middle
     run(net, clock, 31)
     c, x, y, z = p.looked[-1]
-    assert (c, x, y) == (0, 500, 300) and z <= p.G.TERRAIN_MAX_YD
+    assert (c, x, y) == (0, 500, 300) and z <= p.G.FIT_MAX_YD
     run(net, clock, 8)
     s = p.game.spot  # (0-900-900)
-    p.G.Guess(s.x + 6000, s.y, s.cont)  # 6,000 yd off: too far to fit, just the spot
+    p.G.Guess(s.x + 20000, s.y, s.cont)  # 20,000 yd off: too far to fit, just the spot
     run(net, clock, 31)
     assert p.looked[-1] == (0, 900, 900, p.G.SPOT_ZOOM_YD)
     run(net, clock, 8)
@@ -484,7 +484,7 @@ def test_fit_view_falls_back_to_the_answer_alone(solo):
     spot = p.lua.eval("{ x = 0, y = 0 }")
     near = p.lua.eval("{ { x = 400, y = 0 } }")
     assert p.G.FitView(spot, near) == (200, 0, 400 * 0.65 + 80)
-    far = p.lua.eval("{ { x = 400, y = 0 }, { x = 9000, y = 0 } }")
+    far = p.lua.eval("{ { x = 400, y = 0 }, { x = 20000, y = 0 } }")
     assert p.G.FitView(spot, far) is None
 
 
@@ -505,3 +505,13 @@ def test_a_party_winner_under_75_gets_no_celebration():
     b.G.Guess(300, 9300, 0)
     run(net, clock, 32 + 8)
     assert a.game.phase == "over" and list(a.game.winners.values()) == ["Ann-Realm"] and not a.game.celebrate
+
+
+def test_a_guess_5000_yd_off_still_shows_both(solo):
+    p, clock, net = solo
+    p.G.Start("solo", 1)
+    s = p.game.spot
+    p.G.Guess(s.x + 5000, s.y, s.cont)  # past the terrain view (3000), on the map art
+    run(net, clock, 31)
+    c, x, y, z = p.looked[-1]
+    assert (c, x, y) == (s.cont, s.x + 2500, s.y) and z == pytest.approx(5000 * 0.65 + 80)
