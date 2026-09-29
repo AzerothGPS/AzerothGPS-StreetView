@@ -1214,6 +1214,7 @@ function Gm.Init(figureButton)
   io_.ask = Ask
 
   API.SetOverlay("StreetGuess", Gm.Draw)
+  if API.OnLayout then API.OnLayout("StreetGuess", function() Gm.Refresh() end) end -- (the frame's portrait on or off)
 
   if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then C_ChatInfo.RegisterAddonMessagePrefix(Gm.PREFIX) end
   local ev = CreateFrame("Frame")
