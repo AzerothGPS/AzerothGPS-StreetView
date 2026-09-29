@@ -55,7 +55,7 @@ function F.Draw(ctx)
         for i = 5, #e - 3, 2 do ctx.Line(e[i], e[i + 1], e[i + 2], e[i + 3], ROAD_HOT, 6, 1) end
       end
     end
-    for _, p in ipairs(D.PointsOn(base)) do ctx.Dot(p.x, p.y, VIEWS, 8, 1) end
+    for _, p in ipairs(D.PointsOn(base)) do ctx.Dot(p.x, p.y, VIEWS, 3, 1) end -- (small: inside the road's line)
     if hover and hover.point then ctx.Dot(hover.point.x, hover.point.y, PICK, 13, 1) end
   end
   -- the view open in the viewer: its spot and the way it looks

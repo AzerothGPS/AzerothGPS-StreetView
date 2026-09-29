@@ -382,3 +382,17 @@ def test_spot_id_tolerates_rounded_meta():
     assert not pack.id_matches("1-561--2579", 1, 560.9, -2576.5)
     assert not pack.id_matches("0-561--2577", 1, 560.9, -2576.5)
     assert not pack.id_matches("junk", 1, 560.9, -2576.5)
+
+
+def test_ship_points_thins_to_the_shipping_spacing():
+    from svtools.pack import ship_points
+    # a straight road with a spot every 100 yd, and a parallel road 60 yd away
+    road = [{"id": f"1-{x}-0", "cont": 1, "x": x, "y": 0} for x in range(0, 2001, 100)]
+    side = [{"id": f"1-{x}-60", "cont": 1, "x": x, "y": 60} for x in range(0, 2001, 100)]
+    kept = ship_points(road + side, 200)
+    xs = sorted(p["x"] for p in kept if p["y"] == 0)
+    assert xs == list(range(0, 2001, 200))  # every other spot along the road
+    assert not [p for p in kept if p["y"] == 60]  # (the parallel road's are too close to them)
+    assert ship_points(road, None) == road and len(ship_points(road, 0)) == len(road)
+    # the same input, the same pick (a later build ships what an earlier one did)
+    assert [p["id"] for p in ship_points(list(reversed(road)), 200)] == [p["id"] for p in ship_points(road, 200)]

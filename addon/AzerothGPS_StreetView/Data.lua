@@ -93,9 +93,10 @@ function D.Compass(heading)
   return COMPASS[math.floor(heading / D.STEP + 0.5) % 8 + 1]
 end
 
--- How far the arrows and "Go ahead" reach: a little past one step (spots are about 100 yd
--- apart along the roads), so a click lands on the next spot, never one further on.
-D.NEXT_RANGE = 130
+-- How far the arrows and "Go ahead" reach: a little past the widest step (the packs ship spots
+-- about 200 yd apart: neighbors 150-300 yd, packs.json ship_spacing_yd); the nearest one that
+-- way is taken, so a click lands on the next spot, never one further on.
+D.NEXT_RANGE = 310
 
 -- The nearest other view ahead of point p, looking along `heading`: within maxDist yards and
 -- maxAngle of straight ahead (defaults D.NEXT_RANGE, 50 degrees), the nearest first: a spot

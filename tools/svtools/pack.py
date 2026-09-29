@@ -372,6 +372,30 @@ def _scaled(src: Path, dst: Path, px: int, quality: int) -> None:
         im.save(dst, "JPEG", quality=quality, optimize=True, subsampling=2)
 
 
+def ship_points(points: list[dict], spacing: float | None) -> list[dict]:
+    """The spots shipped at about `spacing` yards apart (packs.json ship_spacing_yd): the master keeps
+    every rendered spot (100 yd), the packs take a thinned set. Greedy in a fixed order (continent,
+    x, y): a spot is kept unless a kept one is within 0.75 * spacing (so neighbors along a road end up
+    ~0.75-1.5 spacing apart, ~0.9 on average). None or 0: every spot."""
+    if not spacing:
+        return list(points)
+    mind = 0.75 * spacing
+    keep, grid = [], {}
+    for p in sorted(points, key=lambda p: (int(p["cont"]), float(p["x"]), float(p["y"]), p["id"])):
+        c, x, y = int(p["cont"]), float(p["x"]), float(p["y"])
+        k = (c, int(x // mind), int(y // mind))
+        near = False
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for q in grid.get((c, k[1] + dx, k[2] + dy), ()):
+                    if (x - q[0]) ** 2 + (y - q[1]) ** 2 < mind * mind:
+                        near = True
+        if not near:
+            keep.append(p)
+            grid.setdefault(k, []).append((x, y))
+    return keep
+
+
 def build_packs(build: Path, version: str | None = None, cfg: dict | None = None,
                 manual: bool = False) -> list[dict]:
     """Write every SD pack addon (packs.json) into build/packs/<name>/: its toc, Index.lua and
@@ -393,6 +417,7 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
     reports = []
     for pk in sd["packs"]:
         mine = [p for p in points.values() if pack_for(cfg, p) is pk and (manual or not is_manual(p))]
+        mine = ship_points(mine, cfg.get("ship_spacing_yd"))
         out = root / pk["name"]
         images = out / "Images"
         images.mkdir(parents=True, exist_ok=True)
@@ -429,7 +454,8 @@ def budget(reports: list[dict], cfg: dict | None = None) -> str:
     """Each pack now and projected to all its planned spots, against the CurseForge budget."""
     cfg = cfg or CONFIG
     lim = cfg["budget_bytes"]
-    lines = [f"packs (limit {lim / 1e9:.1f} GB each, {cfg['spacing_yd']} yd spacing planned):"]
+    ship = cfg.get("ship_spacing_yd") or cfg["spacing_yd"]
+    lines = [f"packs (limit {lim / 1e9:.1f} GB each, rendered every {cfg['spacing_yd']} yd, shipped every ~{ship} yd):"]
     for r in reports:
         per = r["bytes"] / r["points"] if r["points"] else 0
         full = per * r["planned"]

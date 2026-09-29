@@ -198,7 +198,7 @@ def test_arrows_reach_only_the_next_spot_on_a_diagonal(env):
         { id = 'here', cont = 9, x = 0, y = 0 },
         { id = 'next', cont = 9, x = 36, y = -48 },
         { id = 'second', cont = 9, x = 85, y = -85 },
-        { id = 'far', cont = 9, x = 200, y = -200 },
+        { id = 'far', cont = 9, x = 400, y = -400 },
       }
     end""")
     lua.globals()._set(D)

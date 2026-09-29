@@ -31,6 +31,10 @@ AzerothGPS/AzerothGPS). This repo is **private**: https://github.com/AzerothGPS/
   (Kalimdor with Zephras Isle; Eastern Kingdoms), each a separate CurseForge project that the
   viewer requires. Budget 1.8 GB per zip; `build_packs` refuses more, and every build prints the
   projection to all planned spots (100-yard spacing, about 4,120 spots).
+- **Shipped every ~200 yd** (the user, 2026-09-29): the capture renders every 100 yd into the master,
+  `pack.ship_points` thins the packs to `ship_spacing_yd` (a spot is kept unless a kept one is within
+  150 yd; neighbors end up ~180-200 yd apart), and the arrows reach `D.NEXT_RANGE` = 310 yd. That puts
+  everything at about 1.05 GB (Kalimdor + Zephras 0.41, Eastern Kingdoms ~0.63).
 - Measured: SD (512 side tiles, 256 up/down, q75) about 470 KB a spot, about 1.1 GB per
   continent; master/HD (1024/512) about 1.45 MB a spot. Check any change to tiles, quality or
   spacing against these before it goes in.
