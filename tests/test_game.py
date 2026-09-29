@@ -535,3 +535,14 @@ def test_a_raid_gets_colored_squares_and_solo_a_random_orc(solo):
     g = p.lua.eval("{ mode = 'solo', me = 'P1' }")
     p.G.AssignLooks(g, p.lua.table_from(["P1"]), lambda n: 4)
     assert g.looks["P1"].orc == 4
+
+
+def test_a_finished_game_closes_after_a_minute(solo):
+    p, clock, net = solo
+    p.G.Start("solo", 1)
+    run(net, clock, 31 + 8)
+    assert p.game.phase == "over"
+    run(net, clock, 50)
+    assert p.G.Current() is not None  # (still showing the result)
+    run(net, clock, 11)
+    assert p.G.Current() is None and p.held == [True, False]  # back to the map and the route

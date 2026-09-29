@@ -29,6 +29,7 @@ local D = ns.Data
 Gm.PREFIX = "AGPSSV"
 Gm.LOOK_SECONDS = 30 -- the street view shows this long: the time to guess
 Gm.RESULT_SECONDS = 7 -- the round's result, before the next round
+Gm.OVER_SECONDS = 60 -- the final result stays this long, then the game closes and the map is the map again
 Gm.JOIN_SECONDS = 20 -- the host waits this long for answers to an invitation
 Gm.PROPOSE_SECONDS = 3 -- ... and this long for the players to say they have the next street view
 Gm.GRACE_SECONDS = 3 -- a round ends this long after the guessing time, whoever hasn't answered
@@ -405,6 +406,7 @@ Over = function(reason)
   if not game then return end
   game.phase = "over"
   game.reason = reason
+  game.closeAt = Now() + Gm.OVER_SECONDS
   io().close()
   local list = Gm.Standings(game)
   game.winners = Gm.Winners(list)
@@ -617,6 +619,10 @@ end
 function Gm.Tick()
   if not game then return end
   local now = Now()
+  if game.phase == "over" then -- (the final result's time is up: back to the map, and the route)
+    if game.closeAt and now >= game.closeAt then Gm.Leave() end
+    return
+  end
   local ph = game.phase
   if ph == "look" and now >= game.deadline then -- the time is up: the guess placed counts
     io().close()
@@ -1331,6 +1337,11 @@ function Gm.RefreshTimer()
     return
   end
   local ph = game.phase
+  if ph == "over" and game.closeAt then -- (closing by itself)
+    panel.timer:SetText("|cff9d9d9dcloses in " .. Clock(game.closeAt - Now()) .. "|r")
+    if V and V.SetTimer then V.SetTimer(nil) end
+    return
+  end
   if (ph == "look" or ph == "invite") and game.deadline then
     local left = game.deadline - Now()
     local color = left <= 5 and "|cffff5050" or (ph == "look" and "|cffffd100" or "|cffffffff")
