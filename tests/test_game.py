@@ -391,3 +391,26 @@ def test_the_result_shows_both_only_when_they_fit_on_the_terrain_map(solo):
     p.G.Guess(0, 0, 1 - s.cont)  # the other continent: the world
     run(net, clock, 31)
     assert p.looked[-1] == "world"
+
+
+def test_a_guess_on_the_other_continent_is_drawn_through_the_world_map(solo):
+    p, clock, net = solo
+    lua = p.lua
+    # AzerothGPS's API: the continents side by side on the world map (continent 1 = 0 + 10,000 yd)
+    lua.execute("""AzerothGPS = { BaseContinent = function(c) return c end,
+      ToContinent = function(from, x, y, to) if from == to then return x, y end
+        return x + (from - to) * 10000, y end }""")
+    p.G.Start("solo", 1)
+    s = p.game.spot  # (on continent 0)
+    p.G.Guess(50, 60, 1)
+    run(net, clock, 31)
+    assert p.looked[-1] == "world"
+    clock.t += 5  # (the line has grown all the way)
+    drawn = []
+    ctx = lua.table_from({"cont": 0})
+    ctx.Line = lambda *a: drawn.append(("line",) + tuple(a[:4]))
+    ctx.Dot = lambda *a: drawn.append(("dot",) + tuple(a[:2]))
+    p.G.Draw(ctx)
+    assert ("dot", 10050, 60) in drawn  # the guess, placed on continent 0's coordinates
+    assert ("line", 10050, 60, s.x, s.y) in drawn  # the dotted line to the answer
+    assert ("dot", s.x, s.y) in drawn  # the answer

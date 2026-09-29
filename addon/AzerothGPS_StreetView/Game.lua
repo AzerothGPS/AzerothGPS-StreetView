@@ -683,18 +683,26 @@ function Gm.Draw(ctx)
   local ph = game.phase
   local API = _G.AzerothGPS
   local base = API and API.BaseContinent and API.BaseContinent(ctx.cont) or ctx.cont
+  -- a point in the view's coordinates: on the other continent too, through the world map
+  -- (AzerothGPS.ToContinent; nil where it can't be placed)
+  local function At(cont, x, y)
+    if cont == base then return x, y end
+    if API and API.ToContinent then return API.ToContinent(cont, x, y, ctx.cont) end
+  end
   if ph == "look" then -- the guess placed so far (not the answer yet)
     local pg = game.pending
-    if pg and pg.cont == base then
-      ctx.Dot(pg.x, pg.y, { 0, 0, 0 }, 15, 0.8)
-      ctx.Dot(pg.x, pg.y, GUESS_COLOR, 11, 1)
+    local px, py -- (not `pg and At(...)`: `and` keeps only a call's first value)
+    if pg then px, py = At(pg.cont, pg.x, pg.y) end
+    if px then
+      ctx.Dot(px, py, { 0, 0, 0 }, 15, 0.8)
+      ctx.Dot(px, py, GUESS_COLOR, 11, 1)
     end
     return
   end
   if not game.spot then return end
   if ph ~= "wait" and ph ~= "result" and ph ~= "over" then return end
-  local s = game.spot
-  if s.cont ~= base then return end
+  local sx, sy = At(game.spot.cont, game.spot.x, game.spot.y)
+  if not sx then return end
   local t = Gm.RevealProgress()
   if ph ~= "wait" and t >= 1 then -- the others' guesses
     local k = 0
@@ -702,20 +710,24 @@ function Gm.Draw(ctx)
       if name ~= game.me then
         k = k + 1
         local g = game.players[name].guesses[game.round]
-        if g and g.x and g.cont == base then
+        local gx, gy
+        if g and g.x and g.cont then gx, gy = At(g.cont, g.x, g.y) end
+        if gx then
           local c = OTHER_COLORS[(k - 1) % #OTHER_COLORS + 1]
-          ctx.Line(g.x, g.y, s.x, s.y, c, 2, 0.7, true)
-          ctx.Dot(g.x, g.y, c, 9, 1)
+          ctx.Line(gx, gy, sx, sy, c, 2, 0.7, true)
+          ctx.Dot(gx, gy, c, 9, 1)
         end
       end
     end
   end
   local g = game.guess
-  if g and g.x and g.cont == base then
-    ctx.Line(g.x, g.y, g.x + (s.x - g.x) * t, g.y + (s.y - g.y) * t, LINE_COLOR, 3, 0.95, true)
-    ctx.Dot(g.x, g.y, GUESS_COLOR, 11, 1)
+  local gx, gy
+  if g and g.x then gx, gy = At(g.cont, g.x, g.y) end
+  if gx then
+    ctx.Line(gx, gy, gx + (sx - gx) * t, gy + (sy - gy) * t, LINE_COLOR, 3, 0.95, true)
+    ctx.Dot(gx, gy, GUESS_COLOR, 11, 1)
   end
-  if t >= 1 or not (g and g.x) then ctx.Dot(s.x, s.y, SPOT_COLOR, 14, 1) end
+  if t >= 1 or not gx then ctx.Dot(sx, sy, SPOT_COLOR, 14, 1) end
 end
 
 ---------------------------------------------------------------------------------------------
