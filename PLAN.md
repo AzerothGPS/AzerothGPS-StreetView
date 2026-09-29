@@ -480,3 +480,53 @@ Before each instance: collect online screenshots, Forever-era first, into `work\
 | I5 | Forever's new dungeons and raids, after AzerothGPS adds them | Same |
 
 **Render time:** about 1.5 minutes a spot with cached scenes, so 5,000 spots is about 125 hours (five days of GPU). Instances run after the open-world pass, or in between as the user prefers.
+
+## 11. Keeping the street views current (after the first capture; the user, 2026-09-29)
+
+### 11.1 Road sync: a standing step of every StreetView data update
+
+The street views follow AzerothGPS's roads, and the roads change (drawn fixes, `overrides/`,
+new client data). **Every data update starts by comparing the rendered spots with the current
+roads**, before building or releasing packs:
+- **The plan from the current roads:** the harvester's `points` command, which lays spots every
+  `spacing_yd` along AzerothGPS's `Data/Roads.lua`, with the same zone rules as the render run:
+  no zone means left out, so Gilneas and the other closed areas stay out.
+- **Retire:** a rendered spot farther than about 60 yd from every current road (its road was
+  removed or moved) leaves the packs. The master keeps it, and `build/road-diff.json` lists it
+  as `retired` with its old road.
+- **Add:** a planned spot with no rendered spot within half the spacing (a new or moved road)
+  goes on the render list (`build/road-diff.json` `add`, the harvester's spot-list format).
+- **Then** the usual build: `pack.ship_points` thins again, which may swap a few picks next to
+  the changes (expected), then the size check and the retake list (`build/retake.json`).
+- **Tooling to build:** `sv.cmd roads` (the diff and the render list; its report says how many
+  were retired and added, per zone). `build_packs` leaves retired spots out, like held-back
+  ones. Tests with a road removed, moved and added.
+
+### 11.2 Rendering on any designated PC
+
+After the first full capture, the capture PC is no longer required. Rendering reads the client's
+map files with wow.export and draws them with Blender. There is no game process, no account and
+no server, so any PC with the game installed and a capable GPU can render, the main PC included.
+The main PC's rule stands: nothing is ever installed into its game except by `sv.cmd install`,
+and nothing runs or automates the game. wow.export only reads the install's files.
+- **The harvester repo holds everything a new render PC needs** (its `SETUP.md` and `RENDER.md`),
+  written so Claude can set it up from the repo alone:
+  - the tools, versions and where to get them; paths from a config file, not hard-coded;
+  - the lighting pipeline and every finding: Light/LightData at midday, the Modern preset's LUTs,
+    the ambient/canopy fix, the global-light fallback for maps like Zephras Isle, the lighting
+    version stamp, and color corrections by regrade;
+  - camera placement, the quality gate, and the sample count;
+  - the spot list format and a smoke test on known spots with their expected pictures.
+- **Flow on a render PC:** `sv.cmd roads` (list) -> `python -m harvester render --spots <list>` ->
+  its `out\` -> `sv.cmd pull --from <that out>` -> packs, install, release.
+- **Before switching:** render the smoke-test spots on the new PC and compare them with the
+  capture PC's masters, which should match within a small tolerance. Same lighting version,
+  same numbers.
+
+### 11.3 Order
+
+1. Finish the first capture, including its retry pass, and review the retake list.
+2. The harvester: paths from config, a `--spots` render mode, `SETUP.md` (the capture PC's
+   Claude writes it; it built the pipeline).
+3. StreetView: `sv.cmd roads` and retired spots left out of the packs.
+4. The smoke test on the main PC, then updates run where the user likes.

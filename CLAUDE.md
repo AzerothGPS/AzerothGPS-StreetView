@@ -72,6 +72,14 @@ color, measured once per import) and pictures players reported with Street Guess
 Street Guess only picks spots whose files were there when the game last fully started
 (`D.loadable`, saved on a fresh start): pictures installed after it show as plain green until a restart.
 
+## Updating the street views (standing rule, 2026-09-29)
+
+Every data update starts from the roads: compare the rendered spots with AzerothGPS's current
+`Data/Roads.lua`. Spots whose road is gone are retired (left out of the packs, kept in the
+master); new roads get spots on the render list. Then build, check sizes and the retake list, and
+release. Rendering can run on any designated PC with the harvester repo's setup guide (wow.export
+and Blender only read the client's files; nothing runs the game). Details: `PLAN.md` part 11.
+
 ## Coordinates and views
 
 - World yards, x north, y west (AzerothGPS's convention). Headings are radians
