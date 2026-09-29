@@ -125,13 +125,15 @@ function F.Init()
   -- In AzerothGPS's bottom-right column: right above its import button, or above its "Back to
   -- your position" button while that one shows (only when the map is panned away from you).
   local recenter, import = API.MapButton and API.MapButton("recenter"), API.MapButton and API.MapButton("import")
+  -- (the lowest of our buttons: Street Guess's, when it's there, with the figure above it)
+  local lowest = button
   local function Place()
-    button:ClearAllPoints()
+    lowest:ClearAllPoints()
     local below = (recenter and recenter:IsShown() and recenter) or import
     if below then
-      button:SetPoint("BOTTOM", below, "TOP", 0, 4)
+      lowest:SetPoint("BOTTOM", below, "TOP", 0, 4)
     else
-      button:SetPoint("BOTTOMRIGHT", -6, 70) -- (an AzerothGPS without MapButton)
+      lowest:SetPoint("BOTTOMRIGHT", -6, 70) -- (an AzerothGPS without MapButton)
     end
   end
   Place()
@@ -188,9 +190,16 @@ function F.Init()
 
   API.SetOverlay("StreetView", F.Draw)
 
-  -- Street Guess's button, above this one
-  local ok, err = pcall(ns.Game.Init, button)
-  if not ok then ns.Print("|cffff6060Street Guess failed to start:|r " .. tostring(err)) end
+  -- Street Guess's button: in this one's place, with this one above it
+  local ok, game = pcall(ns.Game.Init, button)
+  if not ok then
+    ns.Print("|cffff6060Street Guess failed to start:|r " .. tostring(game))
+  elseif game then
+    lowest = game
+    button:ClearAllPoints()
+    Place()
+    button:SetPoint("BOTTOM", game, "TOP", 0, 4)
+  end
 end
 
 -- The figure is dimmed while a Street Guess game is on (it can't be used then).

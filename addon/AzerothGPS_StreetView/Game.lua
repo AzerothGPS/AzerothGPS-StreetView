@@ -445,7 +445,7 @@ Look = function()
   game.roundEnd = game.deadline + Gm.GRACE_SECONDS
   game.guess, game.reveal, game.pending = nil, nil, nil
   game.missing = game.spot == nil
-  io().follow()
+  io().world(game.spot) -- (every round starts from the whole world: no hint where to look)
   if game.spot then io().open(game.spot, io().random() * 2 * math.pi) end
   Changed()
 end
@@ -1359,7 +1359,7 @@ end
 local function BuildButton(parent, figure)
   gameButton = CreateFrame("Button", nil, parent)
   gameButton:SetSize(28, 28)
-  gameButton:SetPoint("BOTTOM", figure, "TOP", 0, 4)
+  -- (placed by Figure.lua: under the figure, in AzerothGPS's bottom-right column)
   local icon = gameButton:CreateTexture(nil, "ARTWORK") -- (the orc on a black circle: Media/GameIcon.tga)
   icon:SetAllPoints()
   icon:SetTexture("Interface\\AddOns\\AzerothGPS_StreetView\\Media\\GameIcon")
@@ -1506,8 +1506,8 @@ function Gm.Init(figureButton)
     local x, y, c, _, sc, half = API.View()
     if x and sc and sc > 0 and half then return x, y, API.BaseContinent(c), half / sc end
   end
-  io_.world = function(s) -- (a guess on another continent: zoomed out to the world)
-    if API.ShowWorld then API.ShowWorld() elseif API.LookAt then API.LookAt(s.cont, s.x, s.y, 6000) end
+  io_.world = function(s) -- (the start of a round; a guess on another continent: the whole world)
+    if API.ShowWorld then API.ShowWorld() elseif s and API.LookAt then API.LookAt(s.cont, s.x, s.y, 6000) end
   end
   io_.follow = function() if API.Follow then API.Follow() end end
   io_.showMap = function() if API.ShowMap then API.ShowMap() end end
@@ -1571,4 +1571,5 @@ function Gm.Init(figureButton)
     if game and game.reveal and Now() - game.reveal.t0 <= Gm.REVEAL_SECONDS + 0.1 then API.Redraw() end
     if game and game.celebrate and panel:IsShown() then Celebrate(t) end
   end)
+  return gameButton
 end

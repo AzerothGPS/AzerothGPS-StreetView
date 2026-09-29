@@ -173,6 +173,7 @@ def test_solo_game_runs_its_rounds_and_averages(solo):
     p, clock, net = solo
     assert p.G.Start("solo", 3)
     assert p.held == [True] and p.game.phase == "look" and p.shown == ["0-300-300"]
+    assert p.looked == ["world"]  # (the round starts on the world map)
     run(net, clock, 5)
     p.G.Guess(900, 900, 0)  # placed while the street view is up...
     p.G.Guess(310, 300, 0)  # ... and moved: the last one counts
