@@ -15,7 +15,7 @@
     "quality": 75,
     "packs": [
       {"name": "AzerothGPS_StreetView_Kalimdor", "title": "Kalimdor and Zephras Isle", "continents": [1, 2991], "planned": 680, "curseforge_project": null, "curseforge_slug": null},
-      {"name": "AzerothGPS_StreetView_EasternKingdoms", "title": "Eastern Kingdoms", "continents": [0], "planned": 880, "curseforge_project": null, "curseforge_slug": null}
+      {"name": "AzerothGPS_StreetView_EasternKingdoms", "title": "Eastern Kingdoms", "continents": [0], "planned": 769, "curseforge_project": null, "curseforge_slug": null}
     ]
   }
 }
