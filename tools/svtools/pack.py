@@ -474,8 +474,9 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
                 shutil.rmtree(d)
     reports = []
     for pk in sd["packs"]:
+        # (a spot in no zone is outside the Classic game's world: Gilneas behind the Greymane Wall)
         mine = [p for p in points.values() if pack_for(cfg, p) is pk and (manual or not is_manual(p))
-                and p["id"] not in held]
+                and p["id"] not in held and (p.get("zone") or is_manual(p))]
         mine = ship_points(mine, cfg.get("ship_spacing_yd"))
         out = root / pk["name"]
         images = out / "Images"
