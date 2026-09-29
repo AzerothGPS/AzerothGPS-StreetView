@@ -42,11 +42,29 @@ Gm.PAN_SECONDS = 0.9 -- ... the map pans and zooms out to them this smoothly, th
 Gm.SPOT_ZOOM_YD = 600 -- ... else the spot alone, this zoomed
 Gm.CELEBRATE_MIN = 75 -- the average round score that earns the celebration (solo: the player's; else the winner's)
 Gm.ROUNDS = { 1, 3, 5 }
--- Each player's color: their name on the scoreboard, their dotted line and dot on the map. The
--- player's own is white (the orc marks their guess); the others get these in the order they joined.
-Gm.MY_COLOR = { 1, 1, 1 }
-Gm.COLORS = { { 0.4, 0.8, 1 }, { 0.55, 1, 0.45 }, { 1, 0.55, 1 }, { 1, 0.6, 0.3 }, { 0.75, 0.65, 1 },
-  { 1, 0.4, 0.4 }, { 0.35, 1, 0.9 }, { 1, 1, 0.45 } }
+-- Each player's look: their icon on the map and their color (their name on the scoreboard, their
+-- dotted line). Up to 5 players (solo, whisper, a party): one of the user's orc animations each
+-- (Media/Guess<n>.tga, the color its skin's); solo, a random one. A raid: the player's own guess
+-- is an orc, everyone else's a colored square, from 40 colors. Given in the host's roster order (L),
+-- so every player sees the same looks.
+Gm.MY_COLOR = { 1, 1, 1 } -- (before looks are given out)
+Gm.ORCS = {
+  { name = "green", color = { 0.58, 0.8, 0.35 } },
+  { name = "Mag'har brown", color = { 0.85, 0.6, 0.4 } },
+  { name = "olive", color = { 0.66, 0.7, 0.38 } },
+  { name = "golden", color = { 0.95, 0.84, 0.3 } },
+  { name = "forest green", color = { 0.3, 0.72, 0.34 } },
+}
+-- 40 colors for a raid's squares: hues spread by the golden angle, two strengths, three brightnesses
+Gm.RAID_COLORS = {}
+for i = 0, 39 do
+  local h, sat, v = (i * 0.618034) % 1, (i % 2 == 0) and 0.75 or 0.5, ({ 1, 0.85, 0.7 })[i % 3 + 1]
+  local k = math.floor(h * 6)
+  local f = h * 6 - k
+  local pp, q, t = v * (1 - sat), v * (1 - f * sat), v * (1 - (1 - f) * sat)
+  local rgb = ({ { v, t, pp }, { q, v, pp }, { pp, v, t }, { pp, q, v }, { t, pp, v }, { v, pp, q } })[k % 6 + 1]
+  Gm.RAID_COLORS[i + 1] = rgb
+end
 
 ---------------------------------------------------------------------------------------------
 -- Pure helpers
@@ -182,10 +200,49 @@ function Gm.Winners(list)
   return out
 end
 
--- A player's color (Gm.COLORS, given as they join; the player's own: white), and as a chat color code.
+-- A player's look ({ orc = n } or { color = { r, g, b } }; nil until given out) and color.
+function Gm.PlayerLook(g, name)
+  return g.looks and g.looks[name]
+end
 function Gm.PlayerColor(g, name)
-  if name == g.me then return Gm.MY_COLOR end
-  return (g.colors and g.colors[name]) or Gm.COLORS[1]
+  local look = Gm.PlayerLook(g, name)
+  if not look then return Gm.MY_COLOR end
+  return look.orc and Gm.ORCS[look.orc].color or look.color
+end
+
+-- Give out the looks, in `roster` order (the host's): who has one keeps it. rnd(n): 1..n.
+function Gm.AssignLooks(g, roster, rnd)
+  g.looks = g.looks or {}
+  local raid = g.channel == "RAID" or #roster > #Gm.ORCS
+  if g.mode == "solo" then
+    g.looks[g.me] = g.looks[g.me] or { orc = (rnd or math.random)(#Gm.ORCS) }
+    return
+  end
+  local usedOrc, usedColor = {}, {}
+  for _, look in pairs(g.looks) do
+    if look.orc then usedOrc[look.orc] = true end
+    if look.color then usedColor[look.color] = true end
+  end
+  for _, name in ipairs(roster) do
+    if not g.looks[name] then
+      if raid and name ~= g.me then
+        for _, c in ipairs(Gm.RAID_COLORS) do
+          if not usedColor[c] then
+            g.looks[name], usedColor[c] = { color = c }, true
+            break
+          end
+        end
+      else
+        for k = 1, #Gm.ORCS do
+          if not usedOrc[k] then
+            g.looks[name], usedOrc[k] = { orc = k }, true
+            break
+          end
+        end
+      end
+      g.looks[name] = g.looks[name] or { color = Gm.RAID_COLORS[1] } -- (more players than looks)
+    end
+  end
 end
 function Gm.ColorCode(c)
   return string.format("|cff%02x%02x%02x", math.floor(c[1] * 255 + 0.5), math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5))
@@ -267,10 +324,6 @@ local function AddPlayer(name)
   if not game.players[name] then
     game.players[name] = { name = name, scores = {}, guesses = {} }
     game.order[#game.order + 1] = name
-    if name ~= game.me and not game.colors[name] then
-      game.ncolors = game.ncolors + 1
-      game.colors[name] = Gm.COLORS[(game.ncolors - 1) % #Gm.COLORS + 1]
-    end
   end
 end
 
@@ -299,7 +352,7 @@ end
 local function NewGame(mode, rounds, host, id)
   local me = io().me()
   game = { id = id or tostring(io().random(100000, 999999)), mode = mode, rounds = rounds, host = host or me, me = me,
-    players = {}, order = {}, round = 0, used = {}, phase = "wait", packs = {}, report = {}, colors = {}, ncolors = 0 }
+    players = {}, order = {}, round = 0, used = {}, phase = "wait", packs = {}, report = {}, looks = {} }
   game.isHost = game.host == me
   game.packs[me] = Gm.MyPacks()
   AddPlayer(game.host)
@@ -446,6 +499,7 @@ local function Begin()
     return Over("There's no map pack every player has")
   end
   for _, name in ipairs(game.order) do ToOthers("K", game.id, name, Gm.PackField(game.packs[name] or {})) end
+  Gm.AssignLooks(game, game.order, function(n) return io().random(1, n) end)
   ToOthers("L", game.id, table.concat(game.order, ","))
   NextRound()
 end
@@ -493,6 +547,7 @@ function Gm.Start(mode, rounds, target)
   io().hold(true)
   io().showMap()
   if mode == "solo" then
+    Gm.AssignLooks(game, game.order, function(n) return io().random(1, n) end)
     NextRound()
     return true
   end
@@ -685,11 +740,13 @@ function Gm.OnMessage(msg, channel, sender)
       if not (","  .. (f[2] or "") .. ","):find("," .. game.me .. ",", 1, true) then
         return Over("The game started without you")
       end
-      local keep = {}
+      local keep, roster = {}, {}
       for name in (f[2] or ""):gmatch("[^,]+") do
         keep[name] = true
+        roster[#roster + 1] = name
         AddPlayer(name)
       end
+      Gm.AssignLooks(game, roster)
       for i = #game.order, 1, -1 do
         local name = game.order[i]
         if not keep[name] then RemovePlayer(name) end
@@ -759,18 +816,34 @@ function Gm.Animate()
   if k >= 1 then game.pan = nil end
 end
 
--- A marker on the map at world (x, y): "guess" (the player's own: the animated orc) or "answer"
+-- A marker on the map at world (x, y): "guess" (a player's: their orc, variant `orc`) or "answer"
 -- (the routes' star marker); a square dot where the map's icons aren't available (tests).
-local function Mark(ctx, kind, x, y)
+local function Mark(ctx, kind, x, y, orc)
   if Gm.marks then
     local sx, sy = ctx.ToScreen(x, y)
-    return Gm.marks.Put(kind, sx, sy)
+    return Gm.marks.Put(kind, sx, sy, orc)
   end
   if kind == "guess" then
     ctx.Dot(x, y, { 0, 0, 0 }, 15, 0.8)
     ctx.Dot(x, y, GUESS_COLOR, 11, 1)
   else
     ctx.Dot(x, y, SPOT_COLOR, 14, 1)
+  end
+end
+
+-- A player's guess on the map: their orc, or (a raid's others) a colored square; `name` labels it.
+local function PlayerMark(ctx, name, x, y, label)
+  local look = Gm.PlayerLook(game, name)
+  local orc = look and look.orc or (name == game.me and 1)
+  if orc then
+    Mark(ctx, "guess", x, y, orc)
+  else
+    ctx.Dot(x, y, { 0, 0, 0 }, 11, 0.8)
+    ctx.Dot(x, y, Gm.PlayerColor(game, name), 8, 1)
+  end
+  if label and Gm.marks then
+    local lx, ly = ctx.ToScreen(x, y)
+    Gm.marks.Label(lx, ly + (orc and 20 or 0), Short(name), Gm.PlayerColor(game, name))
   end
 end
 
@@ -796,7 +869,7 @@ DrawOn = function(ctx)
     local pg = game.pending
     local px, py -- (not `pg and At(...)`: `and` keeps only a call's first value)
     if pg then px, py = At(pg.cont, pg.x, pg.y) end
-    if px then Mark(ctx, "guess", px, py) end
+    if px then PlayerMark(ctx, game.me, px, py) end
     return
   end
   if not game.spot then return end
@@ -811,14 +884,8 @@ DrawOn = function(ctx)
         local gx, gy
         if g and g.x and g.cont then gx, gy = At(g.cont, g.x, g.y) end
         if gx then
-          local c = Gm.PlayerColor(game, name)
-          ctx.Line(gx, gy, sx, sy, c, 2, 0.8, true)
-          ctx.Dot(gx, gy, { 0, 0, 0 }, 11, 0.8)
-          ctx.Dot(gx, gy, c, 8, 1)
-          if Gm.marks then
-            local lx, ly = ctx.ToScreen(gx, gy)
-            Gm.marks.Label(lx, ly, Short(name), c)
-          end
+          ctx.Line(gx, gy, sx, sy, Gm.PlayerColor(game, name), 2, 0.85, true)
+          PlayerMark(ctx, name, gx, gy, true)
         end
       end
     end
@@ -827,8 +894,8 @@ DrawOn = function(ctx)
   local gx, gy
   if g and g.x then gx, gy = At(g.cont, g.x, g.y) end
   if gx then
-    ctx.Line(gx, gy, gx + (sx - gx) * t, gy + (sy - gy) * t, Gm.MY_COLOR, 3, 0.95, true)
-    Mark(ctx, "guess", gx, gy)
+    ctx.Line(gx, gy, gx + (sx - gx) * t, gy + (sy - gy) * t, Gm.PlayerColor(game, game.me), 3, 0.95, true)
+    PlayerMark(ctx, game.me, gx, gy)
   end
   if t >= 1 or not gx then Mark(ctx, "answer", sx, sy) end
 end
@@ -1321,10 +1388,10 @@ local function BuildButton(parent, figure)
 end
 
 -- The map's markers for the game (Gm.marks): textures on AzerothGPS's map canvas, placed on every
--- redraw at the points Gm.Draw gives. The guess is the animated orc (Media/Guess.tga: its frames
+-- redraw at the points Gm.Draw gives. A guess is an animated orc (Media/Guess<n>.tga: its frames
 -- side by side, one a second), the answer the star the routes use for their stops.
 local GUESS_TEX = "Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Guess"
-local GUESS_FRAMES, GUESS_SHEET_FRAMES, GUESS_FRAME_SECONDS = 2, 2, 1 -- (Guess.tga is 128 wide: 2 frames of 64)
+local GUESS_FRAMES, GUESS_SHEET_FRAMES, GUESS_FRAME_SECONDS = 2, 2, 1 -- (each 128 wide: 2 frames of 64)
 local STAR_TEX = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1"
 local function BuildMarks(canvas)
   local layer = CreateFrame("Frame", nil, canvas)
@@ -1338,7 +1405,6 @@ local function BuildMarks(canvas)
     if not t then
       t = layer:CreateTexture(nil, "OVERLAY")
       if kind == "guess" then
-        t:SetTexture(GUESS_TEX)
         t:SetSize(30, 30)
       else
         t:SetTexture(STAR_TEX)
@@ -1366,8 +1432,12 @@ local function BuildMarks(canvas)
     f:SetPoint("BOTTOM", layer, "CENTER", sx, sy + 7)
     f:Show()
   end
-  function M.Put(kind, sx, sy)
+  function M.Put(kind, sx, sy, orc)
     local t = Get(kind)
+    if kind == "guess" and t.orc ~= (orc or 1) then
+      t.orc = orc or 1
+      t:SetTexture(GUESS_TEX .. t.orc)
+    end
     t:ClearAllPoints()
     t:SetPoint("CENTER", layer, "CENTER", sx, sy + (kind == "guess" and 8 or 0)) -- (the orc sits on the spot)
     t:Show()

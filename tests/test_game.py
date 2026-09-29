@@ -472,10 +472,11 @@ def test_the_round_result_fits_everyones_guesses_and_colors_them():
     # the answer (300, 300) with A's and B's guesses: centered between, zoomed to fit
     c0, x, y, z = a.looked[-1]
     assert (c0, x, y) == (0, 300, 1800) and z == pytest.approx(3000 * 0.65 + 80)
-    # colors: each other player their own, the same on everyone's screen order; the player's own white
-    ca, cb = a.G.PlayerColor(a.game, "Bob-Realm"), a.G.PlayerColor(a.game, "Cid-Realm")
-    assert list(ca.values()) != list(cb.values())
-    assert list(a.G.PlayerColor(a.game, "Ann-Realm").values()) == [1, 1, 1]
+    # looks: an orc each (a party), in the host's roster order, the same on every player's screen
+    for p in (a, b, c):
+        assert [p.game.looks[n].orc for n in ("Ann-Realm", "Bob-Realm", "Cid-Realm")] == [1, 2, 3]
+    ca = a.G.PlayerColor(a.game, "Bob-Realm")
+    assert list(ca.values()) == list(a.G.ORCS[2].color.values())
     assert a.G.ColorCode(ca).startswith("|cff") and len(a.G.ColorCode(ca)) == 10
 
 
@@ -515,3 +516,21 @@ def test_a_guess_5000_yd_off_still_shows_both(solo):
     run(net, clock, 31)
     c, x, y, z = p.looked[-1]
     assert (c, x, y) == (s.cont, s.x + 2500, s.y) and z == pytest.approx(5000 * 0.65 + 80)
+
+
+def test_a_raid_gets_colored_squares_and_solo_a_random_orc(solo):
+    p, clock, net = solo
+    g = p.lua.eval("{ mode = 'party', channel = 'RAID', me = 'P1' }")
+    roster = p.lua.table_from([f"P{i}" for i in range(1, 41)])
+    p.G.AssignLooks(g, roster)
+    assert g.looks["P1"].orc == 1  # (the player's own guess: an orc)
+    colors = {tuple(g.looks[f"P{i}"].color.values()) for i in range(2, 41)}
+    assert len(colors) == 39  # everyone else a different color
+    # a party of 5: five different orcs, no squares
+    g = p.lua.eval("{ mode = 'party', channel = 'PARTY', me = 'P1' }")
+    p.G.AssignLooks(g, p.lua.table_from([f"P{i}" for i in range(1, 6)]))
+    assert sorted(g.looks[f"P{i}"].orc for i in range(1, 6)) == [1, 2, 3, 4, 5]
+    # solo: a random one of the five
+    g = p.lua.eval("{ mode = 'solo', me = 'P1' }")
+    p.G.AssignLooks(g, p.lua.table_from(["P1"]), lambda n: 4)
+    assert g.looks["P1"].orc == 4

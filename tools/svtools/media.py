@@ -117,6 +117,11 @@ def sheet(src: Path, size: int = 64) -> Image.Image:
     return out
 
 
+# Street Guess's orcs, in the order of Game.lua's Gm.ORCS (Guess1.tga ... Guess5.tga)
+GUESS_ORCS = ["guess.gif", "guess_maghar_brown.gif", "guess_olive_drab.gif", "guess_golden_yellow.gif",
+              "guess_forest_green.gif"]
+
+
 def make(media: Path) -> None:
     """Media/: Figure.tga (64x64, the map's drag figure: assets/figure.png, else drawn here),
     Logo.tga and Portrait.tga (128x128, assets/logo.png; the portrait with a margin) and Probe.jpg. TGAs are uncompressed 32-bit, like
@@ -130,6 +135,11 @@ def make(media: Path) -> None:
     if (assets / "logo.png").exists():
         fit(assets / "logo.png", 128).save(media / "Logo.tga")  # the addon list icon
         fit(assets / "logo.png", 128, 0.76).save(media / "Portrait.tga")  # the viewer's portrait: small enough that its round frame shows all of "StreetView"
-    if (assets / "guess.gif").exists():  # Street Guess's guess on the map (the user's animation)
-        sheet(assets / "guess.gif").save(media / "Guess.tga")
-    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, Arrow.tga, Guess.tga and Probe.jpg in {media}")
+    # Street Guess's guesses on the map: the user's orc animations, one per player (Game.lua Gm.ORCS)
+    for i, name in enumerate(GUESS_ORCS, 1):
+        if (assets / name).exists():
+            sheet(assets / name).save(media / f"Guess{i}.tga")
+    old = media / "Guess.tga"
+    if old.exists():
+        old.unlink()
+    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, Arrow.tga, Guess1-{len(GUESS_ORCS)}.tga and Probe.jpg in {media}")
