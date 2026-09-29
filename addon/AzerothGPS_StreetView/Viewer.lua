@@ -33,7 +33,7 @@ local tiles = {} -- panorama tile textures by col * 100 + row
 local cells = {} -- cube view cell textures
 local ghosts = {} -- ... a second copy, zoomed a little further, faint: the blur of a move up the road
 local move -- the move to the next spot being animated (V.GoToward)
-local MOVE_OUT, MOVE_IN = 0.3, 0.3 -- seconds: zooming toward the next spot, then settling at it
+local MOVE_OUT, MOVE_IN = 0.3, 0.3 -- seconds: zooming toward the next spot, then fading into it
 local MOVE_ZOOM = 0.45 -- the view narrows this much on the way (a fraction of its field of view)
 local GHOST_ZOOM, GHOST_ALPHA = 0.16, 0.45 -- the blur copy: that much further in, this faint at full blur
 local lastMarkHeading -- heading last drawn on the map
@@ -435,7 +435,10 @@ local function CubeRefresh()
   DrawCells(p, D.CubeCells(p, cur.lon, cur.lat, cur.fov, w, h, GRID_COLS, GRID_ROWS), cells, "ARTWORK", 1)
   -- moving up the road: a faint copy zoomed a little further in over it reads as motion blur
   -- (there's no real blur for addons; only for the half second of the move)
-  if blur > 0 then
+  local g = cur.ghost -- (arriving: the last spot's view, zoomed in toward here, fading into this one)
+  if g then
+    DrawCells(g.p, D.CubeCells(g.p, g.lon, g.lat, g.fov, w, h, GRID_COLS, GRID_ROWS), ghosts, "OVERLAY", g.alpha)
+  elseif blur > 0 then
     DrawCells(p, D.CubeCells(p, cur.lon, cur.lat, cur.fov * (1 - GHOST_ZOOM * blur), w, h, GRID_COLS, GRID_ROWS),
       ghosts, "OVERLAY", GHOST_ALPHA * blur)
   else
@@ -665,18 +668,21 @@ function V.MoveStep()
     cur.blur = k
     V.Refresh()
     if t >= 1 then
+      -- arrive: the next spot at its normal zoom, under the last view still zooming in and fading
+      -- out (one continuous move forward, never back out)
       local q, heading = move.q, move.heading
-      move = { stage = 2, t0 = GetTime() } -- (set first: the arrows stay hidden while it settles)
+      local ghost = { p = cur.p, lon = cur.lon, lat = cur.lat, fov0 = cur.fov, fov = cur.fov, alpha = 1 }
+      move = { stage = 2, t0 = GetTime(), ghost = ghost } -- (set first: the arrows stay hidden while it arrives)
       V.Open(q, heading)
-      move.fov1 = cur.fov
-      cur.fov, cur.blur = cur.fov * (1 - MOVE_ZOOM * 0.6), 1
+      cur.ghost = ghost
       V.Refresh()
     end
   else
-    cur.fov = move.fov1 * (1 - MOVE_ZOOM * 0.6 * (1 - k))
-    cur.blur = 1 - k
+    local g = move.ghost
+    g.fov = g.fov0 * (1 - MOVE_ZOOM * 0.5 * k) -- (still moving forward as it fades)
+    g.alpha = 1 - k
     if t >= 1 then
-      cur.fov, cur.blur = move.fov1, nil
+      cur.ghost = nil
       move = nil
     end
     V.Refresh()
