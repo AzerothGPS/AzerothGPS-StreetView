@@ -1,10 +1,9 @@
 name: Release
 
-# A version tag (v0.1.0) builds the viewer's zip, makes the GitHub release, and uploads it to
-# CurseForge with that version's CHANGELOG.md section as the notes. On CurseForge the viewer
-# requires AzerothGPS and the continent packs (packs.json), so installing it brings them.
-# The continent packs themselves (the pictures) are released from a PC with `sv.cmd
-# release-data --upload`: they are never in git.
+# A version tag (v0.1.0) builds the viewer's code zip and makes the GitHub release, with that
+# version's CHANGELOG.md section as the notes. CurseForge gets the addon with its pictures, which
+# are never in git: that release is made from a PC with `sv.cmd release --upload` (code and
+# pictures in one zip; the user, 2026-09-29: no separate data packs).
 # "Run workflow" by hand does a dry run: it only checks the CurseForge game version.
 on:
   push:
@@ -44,12 +43,7 @@ jobs:
             on { print }
           ' CHANGELOG.md | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > notes.md
           if [ ! -s notes.md ]; then echo "no '## $VERSION' section in CHANGELOG.md"; exit 1; fi
-          PROJECT=$(jq -r '.viewer.curseforge_project // empty' packs.json)
-          if [ -z "$PROJECT" ]; then echo "packs.json viewer.curseforge_project is not set yet"; exit 1; fi
-          REQUIRES=$(jq -r '[.viewer.curseforge_requires[]?, (.sd.packs[].curseforge_slug // empty)] | join(",")' packs.json)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
-          echo "requires=$REQUIRES" >> "$GITHUB_OUTPUT"
 
       - name: Build the zip
         if: github.event_name == 'push'
@@ -57,7 +51,7 @@ jobs:
           VERSION="${{ steps.v.outputs.version }}"
           mkdir -p dist
           (cd addon && zip -r -q "../dist/AzerothGPS_StreetView-$VERSION.zip" AzerothGPS_StreetView -x '*/.*')
-          # every file the toc lists is in it, and no pictures (they ship in the continent packs)
+          # every file the toc lists is in it (Index.lua: the empty one; the pictures ship on CurseForge)
           grep -v '^#' addon/AzerothGPS_StreetView/AzerothGPS_StreetView.toc | tr -d '\r' | sed '/^\s*$/d' | tr '\\' '/' | while read -r f; do
             unzip -l "dist/AzerothGPS_StreetView-$VERSION.zip" | grep -q "AzerothGPS_StreetView/$f" || { echo "missing from the zip: $f"; exit 1; }
           done
@@ -70,15 +64,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ steps.v.outputs.version }}"
-          gh release create "v$VERSION" "dist/AzerothGPS_StreetView-$VERSION.zip" --title "AzerothGPS StreetView $VERSION" --notes-file notes.md
-
-      - name: CurseForge
-        if: github.event_name == 'push'
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_GAME_VERSION_ID: ${{ vars.CF_GAME_VERSION_ID }}
-        run: |
-          VERSION="${{ steps.v.outputs.version }}"
-          python3 tools/svtools/curseforge.py --project "${{ steps.v.outputs.project }}" \
-            --zip "dist/AzerothGPS_StreetView-$VERSION.zip" --display "AzerothGPS StreetView v$VERSION" \
-            --changelog notes.md --requires "${{ steps.v.outputs.requires }}"
+          gh release create "v$VERSION" "dist/AzerothGPS_StreetView-$VERSION.zip" --title "AzerothGPS StreetView $VERSION (code only)" --notes-file notes.md

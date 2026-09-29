@@ -24,6 +24,8 @@ from .savedvars import load_savedvariables
 
 ROOT = Path(__file__).resolve().parents[2]
 LEGACY_PACK = "AzerothGPS_StreetView_Data"  # (the single pack of the first builds)
+# addons of earlier layouts, removed from the game by `sv.cmd install` (the pictures are in the viewer now)
+LEGACY_PACKS = [LEGACY_PACK, "AzerothGPS_StreetView_Kalimdor", "AzerothGPS_StreetView_EasternKingdoms"]
 IMAGE_SIZE = (1024, 512)  # 2:1, powers of two (the game needs power-of-two textures)
 JPEG_QUALITY = 85  # (single views)
 
@@ -501,7 +503,10 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
                 for f in (master / "views").glob("*.jpg"):
                     if not (images / p["id"] / f.name).exists():
                         shutil.copy2(f, images / p["id"] / f.name)
-        (out / f"{pk['name']}.toc").write_text(toc(version, f"AzerothGPS StreetView: {pk['title']}"), encoding="utf-8")
+        if pk.get("in_viewer"):  # (the viewer's own toc lists Index.lua)
+            (out / f"{pk['name']}.toc").unlink(missing_ok=True)
+        else:
+            (out / f"{pk['name']}.toc").write_text(toc(version, f"AzerothGPS StreetView: {pk['title']}"), encoding="utf-8")
         (out / "Index.lua").write_text(index_lua(mine, version, pk["name"]), encoding="utf-8")
         size = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
         if size > cfg["budget_bytes"]:

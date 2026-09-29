@@ -1,13 +1,14 @@
-"""Releasing the continent packs to CurseForge (sv.py release-data).
+"""Releasing AzerothGPS StreetView to CurseForge (`sv.py release`): the viewer's code and its
+pictures in one addon zip (the user, 2026-09-29: no separate data packs).
 
-The pictures never go into git, so the packs can't be released by the tag workflow (that one
-releases the viewer's code). This builds each pack with a date version, zips it, checks it,
-and with --upload sends each zip to its own CurseForge project (packs.json: curseforge_project).
-The viewer's CurseForge project lists the packs as required dependencies (curseforge_slug), so
-installing the viewer brings them. Every upload is recorded in data-releases.jsonl (committed).
+The pictures never go into git, so the tag workflow can't release them: it makes a code-only
+GitHub release. This builds the pictures (the packs.json pack `in_viewer`), lays them and the
+real Index.lua over the viewer's code in one zip, checks it, and with --upload sends it to the
+viewer's CurseForge project (packs.json viewer.curseforge_project), requiring AzerothGPS. Every
+upload is recorded in data-releases.jsonl (committed).
 
-Checks before anything leaves: every zip under the budget; only the pack's own folder, its toc,
-Index.lua and JPEG tiles inside; nothing personal in the text files; no empty pack.
+Checks before anything leaves: under the budget; only the viewer's folder, with its toc files,
+Lua, Media and JPEG tiles; nothing personal in the text files; no empty build.
 """
 
 from __future__ import annotations
@@ -26,36 +27,46 @@ PERSONAL = [re.compile(r"[A-Za-z]:[\\/]+Users[\\/]", re.I), re.compile(r"[\w.+-]
             re.compile(r"\d{6,}#\d")]
 
 
-def zip_pack(folder: Path, dist: Path, version: str) -> Path:
-    """dist/<name>-<version>.zip with the pack's folder at its top (JPEGs stored, not deflated:
-    they don't shrink and it's faster)."""
+def zip_addon(sources: list[Path], name: str, dist: Path, version: str) -> Path:
+    """dist/<name>-<version>.zip with the addon's folder at its top, the sources laid over each
+    other in order (the viewer's code, then its pictures and Index.lua). JPEGs stored, not
+    deflated: they don't shrink and it's faster."""
     dist.mkdir(parents=True, exist_ok=True)
-    out = dist / f"{folder.name}-{version}.zip"
+    out = dist / f"{name}-{version}.zip"
     if out.exists():
         out.unlink()
+    files: dict = {}
+    for src in sources:
+        for f in src.rglob("*"):
+            if f.is_file() and not any(part.startswith(".") for part in f.relative_to(src).parts):
+                files[f.relative_to(src).as_posix()] = f
     with zipfile.ZipFile(out, "w") as z:
-        for f in sorted(folder.rglob("*")):
-            if f.is_file():
-                arc = f"{folder.name}/{f.relative_to(folder).as_posix()}"
-                z.write(f, arc, zipfile.ZIP_STORED if f.suffix.lower() == ".jpg" else zipfile.ZIP_DEFLATED)
+        for rel in sorted(files):
+            f = files[rel]
+            z.write(f, f"{name}/{rel}", zipfile.ZIP_STORED if f.suffix.lower() == ".jpg" else zipfile.ZIP_DEFLATED)
     return out
 
 
+SHIPS = re.compile(r"^[^/]+/(?:[^/]+\.(?:toc|lua)|Media/[^/]+\.(?:tga|jpg|blp)|Images/.+\.jpg)$", re.I)
+
+
 def check_zip(path: Path, name: str, budget: int) -> list[str]:
-    """What's wrong with a pack zip (empty list: fine)."""
+    """What's wrong with the addon zip (empty list: fine)."""
     problems = []
     size = path.stat().st_size
     if size > budget:
         problems.append(f"{path.name} is {size / 1e9:.2f} GB, over the {budget / 1e9:.1f} GB budget")
     with zipfile.ZipFile(path) as z:
+        names = z.namelist()
+        if f"{name}/{name}.toc" not in names:
+            problems.append(f"{name}/{name}.toc missing")
         for info in z.infolist():
             n = info.filename
             if not n.startswith(name + "/"):
-                problems.append(f"{n}: outside the pack's folder")
-            elif not (n == f"{name}/{name}.toc" or n == f"{name}/Index.lua"
-                      or (n.startswith(f"{name}/Images/") and n.lower().endswith(".jpg"))):
-                problems.append(f"{n}: not a file a pack ships")
-            if n.endswith((".toc", ".lua")):
+                problems.append(f"{n}: outside the addon's folder")
+            elif not SHIPS.match(n):
+                problems.append(f"{n}: not a file the addon ships")
+            if n.endswith((".toc", ".lua", ".txt")):
                 text = z.read(info).decode("utf-8", "replace")
                 for rx in PERSONAL:
                     if rx.search(text):
@@ -63,51 +74,54 @@ def check_zip(path: Path, name: str, budget: int) -> list[str]:
     return problems
 
 
+def toc_version(viewer: Path) -> str:
+    m = re.search(r"^## Version:\s*(\S+)", (viewer / f"{viewer.name}.toc").read_text(encoding="utf-8"), re.M)
+    return m.group(1) if m else "0"
+
+
 def release_data(build: Path, dist: Path, version: str | None = None, upload: bool = False,
-                 cfg: dict | None = None, log=print) -> list[dict]:
+                 cfg: dict | None = None, log=print, viewer: Path | None = None) -> list[dict]:
+    """Build, zip and check the addon (code and pictures); --upload sends it to CurseForge."""
     cfg = cfg or pack.CONFIG
-    version = version or dt.date.today().strftime("%Y.%m.%d")
-    reports = pack.build_packs(build, version, cfg)
+    viewer = viewer or pack.ROOT / "addon" / cfg["viewer"]["name"]
+    name = cfg["viewer"]["name"]
+    version = version or toc_version(viewer)
+    data_version = dt.date.today().strftime("%Y.%m.%d")
+    reports = pack.build_packs(build, data_version, cfg)
     log(pack.budget(reports, cfg))
-    ready = []
-    bad = False
-    for r in reports:
-        pk = next(p for p in cfg["sd"]["packs"] if p["name"] == r["name"])
-        if not r["points"]:
-            log(f"  {r['name']}: no spots yet, not released")
-            continue
-        z = zip_pack(build / "packs" / r["name"], dist, version)
-        problems = check_zip(z, r["name"], cfg["budget_bytes"])
-        for p in problems:
-            log(f"  PROBLEM {p}")
-        bad = bad or bool(problems)
-        log(f"  {z.name}: {z.stat().st_size / 1e6:.1f} MB, {r['points']} spots"
-            + ("" if pk.get("curseforge_project") else "  (no curseforge_project in packs.json yet)"))
-        ready.append({"pack": pk, "zip": z, "report": r})
-    if bad:
+    spots = sum(r["points"] for r in reports)
+    if not spots:
+        raise SystemExit("No street views built yet: nothing to release.")
+    sources = [viewer] + [build / "packs" / pk["name"] for pk in cfg["sd"]["packs"] if pk.get("in_viewer")]
+    z = zip_addon(sources, name, dist, version)
+    problems = check_zip(z, name, cfg["budget_bytes"])
+    for p in problems:
+        log(f"  PROBLEM {p}")
+    if problems:
         raise SystemExit("Not released: fix the problems above first.")
+    log(f"  {z.name}: {z.stat().st_size / 1e6:.1f} MB, {spots} street views"
+        + ("" if cfg["viewer"].get("curseforge_project") else "  (no viewer.curseforge_project in packs.json yet)"))
+    ready = [{"zip": z, "spots": spots, "version": version}]
     if not upload:
-        log(f"Dry run: {len(ready)} zips in {dist}. Nothing was uploaded (--upload does that).")
+        log(f"Dry run: {z} is ready. Nothing was uploaded (--upload does that).")
         return ready
     token = os.environ.get("CF_API_TOKEN")
-    missing = [x["pack"]["name"] for x in ready if not x["pack"].get("curseforge_project")]
-    if not token or missing:
-        raise SystemExit("To upload: set CF_API_TOKEN, and curseforge_project in packs.json for "
-                         + (", ".join(missing) if missing else "every pack") + ".")
+    project = cfg["viewer"].get("curseforge_project")
+    if not token or not project:
+        raise SystemExit("To upload: set CF_API_TOKEN, and viewer.curseforge_project in packs.json.")
     from . import curseforge
 
     gv, what = curseforge.game_version(token)
     log(f"game version: {gv} {what}")
+    notes = (f"AzerothGPS StreetView {version} with {spots} street views (pictures {data_version}). "
+             "Screenshots of World of Warcraft (c) Blizzard Entertainment. Needs AzerothGPS.")
+    res = curseforge.upload(token, project, str(z),
+                            curseforge.metadata(f"AzerothGPS StreetView {version}", notes, gv,
+                                                cfg["viewer"].get("curseforge_requires")))
+    log(f"  uploaded {z.name}: {res}")
     record = pack.ROOT / "data-releases.jsonl"
-    for x in ready:
-        pk, r = x["pack"], x["report"]
-        notes = (f"Street views of {pk['title']}: {r['points']} spots. Screenshots of World of Warcraft "
-                 "(c) Blizzard Entertainment. Needs AzerothGPS StreetView.")
-        res = curseforge.upload(token, pk["curseforge_project"], str(x["zip"]),
-                                curseforge.metadata(f"StreetView {pk['title']} {version}", notes, gv))
-        log(f"  uploaded {x['zip'].name}: {res}")
-        with record.open("a", encoding="utf-8") as f:
-            f.write(json.dumps({"pack": pk["name"], "version": version, "spots": r["points"],
-                                "bytes": x["zip"].stat().st_size, "curseforge": res,
-                                "at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}) + "\n")
+    with record.open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"addon": name, "version": version, "pictures": data_version, "spots": spots,
+                            "bytes": z.stat().st_size, "curseforge": res,
+                            "at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}) + "\n")
     return ready

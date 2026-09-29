@@ -1,6 +1,6 @@
 """AzerothGPS StreetView developer tool.
 
-  sv.cmd install [--capture]      copy the viewer and the built packs into the game's AddOns folder
+  sv.cmd install [--capture]      copy the viewer with its built pictures into the game's AddOns folder
                                   (--capture adds the manual AGPS_Capture dev tool)
   sv.cmd import                   AGPS_Capture screenshots -> stitched spots -> the packs, then install
   sv.cmd watch                    the same by itself on every /reload (Ctrl+C stops)
@@ -9,12 +9,13 @@
   sv.cmd pull [--from //PC/agps-work] [--watch MIN]
                                   the same straight from the capture PC's share over the LAN (new
                                   and changed spots only; --from is remembered; --watch repeats)
-  sv.cmd build                    rebuild the packs (build/packs/) and print their sizes
-  sv.cmd release-data [--upload]  zip the packs for CurseForge and check them (a dry run);
-                                  --upload sends them (needs CF_API_TOKEN and the project ids in packs.json)
+  sv.cmd build                    rebuild the pictures (build/packs/) and print their size
+  sv.cmd roads                    road sync: retire spots whose road is gone, list spots for new roads
+  sv.cmd release [--upload]       zip the addon with its pictures for CurseForge and check it (a dry run);
+                                  --upload sends it (needs CF_API_TOKEN and viewer.curseforge_project in packs.json)
   sv.cmd media                    regenerate the addon's own art (Media/)
 
-The packs are in packs.json (one per continent, each under CurseForge's limit). The game folder
+The pictures ship inside the viewer addon (packs.json, under CurseForge's limit). The game folder
 defaults to C:\\Program Files (x86)\\World of Warcraft\\_classic_beta_ (set AGPS_WOW or pass
 --wow). sv.cmd runs this with the AzerothGPS venv's Python (Pillow, numpy, lupa).
 """
@@ -36,18 +37,33 @@ DEFAULT_WOW = Path(os.environ.get("AGPS_WOW", r"C:\Program Files (x86)\World of 
 BUILD = ROOT / "build"
 
 
-def mirror(src: Path, dst: Path) -> int:
-    """Copy src over dst and delete what src no longer has. Returns the number of files that
-    are new in dst (new files need a full game restart, changed Lua only /reload)."""
-    new = sum(1 for f in src.rglob("*") if f.is_file() and not (dst / f.relative_to(src)).exists())
-    shutil.copytree(src, dst, dirs_exist_ok=True)
+def mirror(src: Path | list[Path], dst: Path) -> int:
+    """Copy src over dst and delete what src no longer has. Several sources are laid over each
+    other in order (the viewer's code, then its built pictures and Index.lua). Copies only files
+    that changed (size or time). Returns the number of files that are new in dst (new files need a
+    full game restart, changed Lua only /reload)."""
+    want: dict = {}
+    for s in ([src] if isinstance(src, Path) else src):
+        for f in s.rglob("*"):
+            if f.is_file():
+                want[f.relative_to(s)] = f
+    new = 0
+    for rel, f in want.items():
+        d = dst / rel
+        if not d.exists():
+            new += 1
+        elif d.stat().st_size == f.stat().st_size and d.stat().st_mtime >= f.stat().st_mtime:
+            continue
+        d.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(f, d)
+    keep_dirs = {p for rel in want for p in rel.parents}
     for f in sorted(dst.rglob("*"), reverse=True):
         rel = f.relative_to(dst)
-        if not (src / rel).exists():
-            if f.is_dir():
+        if f.is_dir():
+            if rel not in keep_dirs:
                 shutil.rmtree(f)
-            else:
-                f.unlink()
+        elif rel not in want:
+            f.unlink()
     return new
 
 
@@ -55,17 +71,23 @@ def install(wow: Path, capture: bool) -> None:
     addons = wow / "Interface" / "AddOns"
     if not addons.is_dir():
         sys.exit(f"No AddOns folder at {addons}")
-    parts = [(ROOT / "addon" / "AzerothGPS_StreetView", "AzerothGPS_StreetView")]
+    # the viewer: its code with the built pictures and Index.lua laid over it (one addon)
+    viewer = [ROOT / "addon" / "AzerothGPS_StreetView"]
+    parts = []
     for pk in pack.CONFIG["sd"]["packs"]:
         built = BUILD / "packs" / pk["name"]
         if (built / "Index.lua").exists():
-            parts.append((built, pk["name"]))
+            if pk.get("in_viewer"):
+                viewer.append(built)
+            else:
+                parts.append((built, pk["name"]))
+    parts.insert(0, (viewer, "AzerothGPS_StreetView"))
     if capture:
         parts.append((ROOT / "tools" / "AGPS_Capture", "AGPS_Capture"))
-    legacy = addons / pack.LEGACY_PACK
-    if legacy.exists():
-        shutil.rmtree(legacy)  # (the single pack of the first builds, now split per continent)
-        print(f"removed the old {pack.LEGACY_PACK}")
+    for old in pack.LEGACY_PACKS:  # (earlier layouts: the pictures are in the viewer now)
+        if (addons / old).exists():
+            shutil.rmtree(addons / old)
+            print(f"removed the old {old}")
     new = 0
     for src, name in parts:
         n = mirror(src, addons / name)
@@ -126,7 +148,7 @@ def main(argv=None) -> None:
     p_rd = sub.add_parser("roads", help="road sync: retire spots whose road is gone, list spots for new roads")
     p_rd.add_argument("--agps", type=Path, default=ROOT.parent / "azerothgps", help="the AzerothGPS checkout")
     p_rd.add_argument("--harvester", type=Path, default=ROOT.parent / "streetview-harvester")
-    p_r = sub.add_parser("release-data")
+    p_r = sub.add_parser("release", aliases=["release-data"], help="the addon with its pictures, zipped for CurseForge")
     p_r.add_argument("--upload", action="store_true", help="upload to CurseForge (otherwise a dry run)")
     p_r.add_argument("--version", help="the packs' version (default: today, YYYY.MM.DD)")
     sub.add_parser("media")
@@ -166,7 +188,7 @@ def main(argv=None) -> None:
         print(roads.report(result))
         print(f"written: {BUILD / 'road-diff.json'} (retired: out of the packs; add: the harvester's render list)")
         build_and_report()
-    elif a.cmd == "release-data":
+    elif a.cmd in ("release", "release-data"):
         from svtools import release
         release.release_data(BUILD, ROOT / "dist", a.version, upload=a.upload)
     elif a.cmd == "media":

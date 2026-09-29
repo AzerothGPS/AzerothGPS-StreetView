@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: AzerothGPS StreetView
-## Notes: Street-level views on the AzerothGPS map: drag the figure onto a road to look around. Display only.
+## Notes: Street-level views on the AzerothGPS map: drag the figure onto a road to look around, and play Where in the Azeroth?. Display only. Pictures of World of Warcraft (c) Blizzard Entertainment.
 ## Author: AzerothGPS
 ## X-License: All Rights Reserved
 ## X-Copyright: Copyright (c) 2026 AzerothGPS
@@ -14,3 +14,4 @@ Core.lua
 Viewer.lua
 Figure.lua
 Game.lua
+Index.lua

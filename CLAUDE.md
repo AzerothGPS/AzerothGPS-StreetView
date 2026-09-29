@@ -27,22 +27,25 @@ AzerothGPS/AzerothGPS). This repo is **private**: https://github.com/AzerothGPS/
 
 ## Size and shipping (the user: always consider the CurseForge limit)
 
-- CurseForge refuses files of 2 GB or more. `packs.json` has one SD pack per continent
-  (Kalimdor with Zephras Isle; Eastern Kingdoms), each a separate CurseForge project that the
-  viewer requires. Budget 1.8 GB per zip; `build_packs` refuses more, and every build prints the
-  projection to all planned spots (100-yard spacing, about 4,120 spots).
+- **One addon** (the user, 2026-09-29): the pictures ship inside AzerothGPS_StreetView itself, no
+  separate data packs. `packs.json` has a single pack `AzerothGPS_StreetView` (`in_viewer`, every
+  continent); the build writes its pictures and real `Index.lua` to `build/packs/AzerothGPS_StreetView/`,
+  and `sv.cmd install` / `sv.cmd release` lay them over the viewer's code (git has an empty `Index.lua`
+  stub, loaded last by the toc). `install` removes the old Kalimdor/EasternKingdoms/Data pack folders
+  (`pack.LEGACY_PACKS`). CurseForge refuses files of 2 GB or more: budget 1.8 GB for the whole zip;
+  `build_packs` refuses more, and every build prints the projection to all planned spots.
 - **Shipped every ~200 yd** (the user, 2026-09-29): the capture renders every 100 yd into the master,
   `pack.ship_points` thins the packs to `ship_spacing_yd` (a spot is kept unless a kept one is within
   150 yd; neighbors end up ~180-200 yd apart), and the arrows reach `D.NEXT_RANGE` = 310 yd. That puts
-  everything at about 1.05 GB (Kalimdor + Zephras 0.41, Eastern Kingdoms ~0.63).
+  everything at about 0.85-0.9 GB (1,407 planned shipped spots, ~600 KB each).
 - Measured: SD (512 side tiles, 256 up/down, q75) about 470 KB a spot, about 1.1 GB per
   continent; master/HD (1024/512) about 1.45 MB a spot. Check any change to tiles, quality or
   spacing against these before it goes in.
 - HD packs: not made or shipped for now (the user may consider them later). Selling or
   paywalling them would clash with Blizzard's add-on policy (add-ons free) and Fan Content
   Policy (no selling game imagery): flag that if it comes up.
-- Releases: the viewer by tag (workflow); the packs by `sv.cmd release-data --upload`, only when
-  the user asks.
+- Releases: the tag workflow makes a code-only GitHub release; CurseForge gets the one zip (code +
+  pictures) from `sv.cmd release --upload`, only when the user asks.
 
 ## Talking to AzerothGPS
 
@@ -98,12 +101,12 @@ and Blender only read the client's files; nothing runs the game). Details: `PLAN
 Use the AzerothGPS venv: `%USERPROFILE%\.venvs\azerothgps\Scripts\python.exe`.
 
 ```
-python tools/sv.py install     # copy StreetView and the continent packs into the game (--capture: + manual AGPS_Capture)
+python tools/sv.py install     # copy StreetView with its pictures into the game (--capture: + manual AGPS_Capture)
 python tools/sv.py import      # AGPS_Capture screenshots -> stitched spots -> build/packs, then install
 python tools/sv.py watch       # the same on every /reload
 python tools/sv.py pull [--from //PC/agps-work] [--watch 10]  # harvested spots from the capture PC's share (LAN)
-python tools/sv.py release-data  # dry run: build, zip and check the packs (--upload: to CurseForge)
-python tools/sv.py build       # rebuild the packs and print their sizes
+python tools/sv.py release     # dry run: build, zip and check the addon with its pictures (--upload: to CurseForge)
+python tools/sv.py build       # rebuild the pictures and print the size
 python tools/sv.py media       # regenerate Media/ (Figure.tga, Probe.jpg)
 python -m pytest tests -q
 ```

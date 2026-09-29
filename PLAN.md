@@ -7,7 +7,7 @@ Written 2026-09-28. This file is the brief for two Claude sessions:
 
 **Status 2026-09-28:** the REMOTE tools (Parts 2 and 5: AGPS_Harvester, driver, stitcher, point generator) are built in the private repo AzerothGPS/streetview-harvester; start from its README. LOCAL imports its exports with `tools/sv.py import-harvest`.
 
-**Distribution decided 2026-09-28:** 100-yard spacing; one standard (SD) pack per continent on CurseForge, each a required dependency of the viewer and under the 2 GB file limit (`packs.json`, README Releases); no HD packs for now. This supersedes Part 4.1 and 4.8's pack layout where they differ.
+**Distribution decided 2026-09-28, changed 2026-09-29:** rendered every 100 yards, shipped every ~200 yards, and **the pictures ship inside the viewer addon itself** (one CurseForge project, one zip under the 2 GB file limit, about 0.85 GB; `packs.json`, README Releases); no separate data packs and no HD pictures for now. This supersedes Part 4.1 and 4.8's pack layout where they differ.
 
 Sections are tagged LOCAL or REMOTE. REMOTE owns Part 2 and Part 6. LOCAL owns Parts 3, 4, 5. Both follow the interfaces in Part 1 and Part 7.
 

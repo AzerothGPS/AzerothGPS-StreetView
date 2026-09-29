@@ -1,21 +1,36 @@
 {
-  "about": "How AzerothGPS StreetView ships its pictures: standard (SD) packs, one per continent, uploaded to CurseForge as required dependencies of the viewer, so installing the viewer brings them. Every pack's zip stays under budget_bytes (CurseForge refuses files of 2 GB or more). 'spacing_yd' is how far apart the capture PC renders spots (the master keeps them all); 'ship_spacing_yd' is how far apart the packs' spots are (pack.ship_points thins the rendered ones, 2026-09-29: the user chose 200 yd so everything fits in about 1.1 GB). 'planned' is the number of shipped spots expected in that pack (at ship_spacing_yd), for projecting full sizes. The master tiles in build/master are kept at HD resolution; HD packs are not made or shipped for now.",
+  "about": "How AzerothGPS StreetView ships its pictures: inside the viewer addon itself (the user, 2026-09-29: one addon, no separate data packs). The build writes the pictures (SD tiles scaled from build/master) and the real Index.lua into build/packs/AzerothGPS_StreetView/; `sv.cmd install` lays them over the viewer's code in the game, and `sv.cmd release` zips code and pictures together for CurseForge (the pictures never go into git, so the tag workflow only makes a code-only GitHub release). The zip stays under budget_bytes (CurseForge refuses files of 2 GB or more). 'spacing_yd' is how far apart the capture renders spots (the master keeps them all); 'ship_spacing_yd' how far apart the shipped ones are (pack.ship_points; 200 yd, the user 2026-09-29). 'planned' is the shipped spots expected, for projecting the full size. HD packs are not made or shipped for now.",
   "budget_bytes": 1800000000,
   "spacing_yd": 100,
   "ship_spacing_yd": 200,
-  "master": {"tile": 1024, "pole": 512, "quality": 75},
+  "master": {
+    "tile": 1024,
+    "pole": 512,
+    "quality": 75
+  },
   "viewer": {
     "name": "AzerothGPS_StreetView",
     "curseforge_project": null,
-    "curseforge_requires": ["azerothgps"]
+    "curseforge_requires": [
+      "azerothgps"
+    ]
   },
   "sd": {
     "tile": 512,
     "pole": 256,
     "quality": 75,
     "packs": [
-      {"name": "AzerothGPS_StreetView_Kalimdor", "title": "Kalimdor and Zephras Isle", "continents": [1, 2991], "planned": 680, "curseforge_project": null, "curseforge_slug": null},
-      {"name": "AzerothGPS_StreetView_EasternKingdoms", "title": "Eastern Kingdoms", "continents": [0], "planned": 727, "curseforge_project": null, "curseforge_slug": null}
+      {
+        "name": "AzerothGPS_StreetView",
+        "title": "every continent",
+        "continents": [
+          1,
+          2991,
+          0
+        ],
+        "planned": 1407,
+        "in_viewer": true
+      }
     ]
   }
 }

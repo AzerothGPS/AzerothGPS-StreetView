@@ -14,7 +14,7 @@ from svtools import pack  # noqa: E402
 
 lupa = pytest.importorskip("lupa")
 
-KAL = "AzerothGPS_StreetView_Kalimdor"
+KAL = "AzerothGPS_StreetView"  # (the pictures ship inside the viewer)
 
 
 def test_capture_sequence_covers_every_view_once():
@@ -93,7 +93,7 @@ def test_import_and_build_pack(tmp_path):
     assert ns.Data.Load() == 1
     p = ns.Data.byId["1-1629--4373"]
     assert p.zone == "Razor Hill" and p.facing == pytest.approx(1.5)
-    assert ns.Data.ImagePath(p, 0, 0) == "Interface\\AddOns\\AzerothGPS_StreetView_Kalimdor\\Images\\1-1629--4373\\y000_p+00.jpg"
+    assert ns.Data.ImagePath(p, 0, 0) == "Interface\\AddOns\\AzerothGPS_StreetView\\Images\\1-1629--4373\\y000_p+00.jpg"
     assert ns.Data.HasPose(p, 1, 0) and not ns.Data.HasPose(p, 3, 0)
 
 
@@ -255,19 +255,22 @@ def test_cube_tiles_render_the_panorama():
         assert np.abs(img.reshape(-1, 3).astype(float) - want).mean() < 10, name
 
 
-def test_every_point_has_one_pack_and_packs_sit_under_the_viewer():
+def test_every_point_has_one_pack_inside_the_viewer():
     cfg = pack.CONFIG
-    names = [p["name"] for p in cfg["sd"]["packs"]]
     for cont in (0, 1, 2991):
         assert pack.pack_for(cfg, {"cont": cont}) is not None
     assert len({c for p in cfg["sd"]["packs"] for c in p["continents"]}) == sum(len(p["continents"]) for p in cfg["sd"]["packs"])
-    # the packs (and the capture tool) depend on the viewer, so the game lists them under it, with
-    # its figure as their icon; the viewer names none of them (that would be a loop)
+    # one addon (the user, 2026-09-29): the pictures and their Index.lua ship inside the viewer,
+    # whose toc loads Index.lua last (after Data.lua defines the reader)
+    assert [(p["name"], p.get("in_viewer")) for p in cfg["sd"]["packs"]] == [("AzerothGPS_StreetView", True)]
     viewer = (ROOT / "addon" / "AzerothGPS_StreetView" / "AzerothGPS_StreetView.toc").read_text(encoding="utf-8")
-    assert not any(n in viewer for n in names)
-    figure = "## IconTexture: Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Figure"
-    for text in (pack.toc("v", "t"), (ROOT / "tools" / "AGPS_Capture" / "AGPS_Capture.toc").read_text(encoding="utf-8")):
-        assert "## Dependencies: AzerothGPS_StreetView" in text and figure in text
+    files = [l.strip() for l in viewer.splitlines() if l.strip() and not l.startswith("#")]
+    assert files[-1] == "Index.lua" and files.index("Data.lua") < files.index("Index.lua")
+    assert "AzerothGPS_StreetView_Kalimdor" in pack.LEGACY_PACKS and "AzerothGPS_StreetView_EasternKingdoms" in pack.LEGACY_PACKS
+    # the capture tool still depends on the viewer, listed under it with its figure as the icon
+    capture = (ROOT / "tools" / "AGPS_Capture" / "AGPS_Capture.toc").read_text(encoding="utf-8")
+    assert "## Dependencies: AzerothGPS_StreetView" in capture
+    assert "## IconTexture: Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Figure" in capture
     for pk in cfg["sd"]["packs"]:  # (planned sizes stay under the limit at the measured SD size)
         assert pk["planned"] * 700_000 < cfg["budget_bytes"], pk["name"]
 
@@ -287,7 +290,7 @@ def fake_spot(build, pid, cont, x, y, px=128):
     (build / "points.json").write_text(js.dumps(pts))
 
 
-def test_packs_split_by_continent_scale_down_and_respect_the_budget(tmp_path):
+def test_pack_scales_down_and_respects_the_budget(tmp_path):
     import copy
     cfg = copy.deepcopy(pack.CONFIG)
     cfg["sd"]["tile"], cfg["sd"]["pole"] = 64, 32
@@ -296,11 +299,10 @@ def test_packs_split_by_continent_scale_down_and_respect_the_budget(tmp_path):
     fake_spot(build, "0-7-7", 0, 7, 7)
     fake_spot(build, "2991-1-1", 2991, 1, 1)
     reports = {r["name"]: r for r in pack.build_packs(build, "2026.10.01", cfg)}
-    assert reports["AzerothGPS_StreetView_Kalimdor"]["points"] == 2  # (Kalimdor and Zephras Isle)
-    assert reports["AzerothGPS_StreetView_EasternKingdoms"]["points"] == 1
-    tile = build / "packs" / "AzerothGPS_StreetView_EasternKingdoms" / "Images" / "0-7-7" / "cube"
+    assert reports[KAL]["points"] == 3  # (every continent in the one pack)
+    tile = build / "packs" / KAL / "Images" / "0-7-7" / "cube"
     assert Image.open(tile / "F00.jpg").size == (64, 64) and Image.open(tile / "U00.jpg").size == (32, 32)
-    assert not (build / "packs" / "AzerothGPS_StreetView_Kalimdor" / "Images" / "0-7-7").exists()
+    assert not (build / "packs" / KAL / f"{KAL}.toc").exists()  # (the viewer's own toc loads it)
     assert "packs (limit" in pack.budget(list(reports.values()), cfg)
     cfg["budget_bytes"] = 1000
     with pytest.raises(SystemExit):
@@ -326,12 +328,17 @@ def test_release_zips_are_checked(tmp_path):
     build = tmp_path / "build"
     fake_spot(build, "1-5-5", 1, 5, 5)
     ready = release.release_data(build, tmp_path / "dist", "2026.10.01", upload=False, cfg=cfg, log=lambda *_: None)
-    assert [x["pack"]["name"] for x in ready] == ["AzerothGPS_StreetView_Kalimdor"]  # (no empty packs)
+    assert len(ready) == 1 and ready[0]["spots"] == 1
     z = ready[0]["zip"]
+    assert z.name == f"{KAL}-2026.10.01.zip"
     with zipfile.ZipFile(z) as f:
         names = f.namelist()
-    assert "AzerothGPS_StreetView_Kalimdor/AzerothGPS_StreetView_Kalimdor.toc" in names
-    assert release.check_zip(z, "AzerothGPS_StreetView_Kalimdor", cfg["budget_bytes"]) == []
+        index = f.read(f"{KAL}/Index.lua").decode("utf-8")
+    # one addon: the viewer's code with the built pictures and Index.lua laid over its stub
+    for n in (f"{KAL}/{KAL}.toc", f"{KAL}/Viewer.lua", f"{KAL}/Game.lua", f"{KAL}/Images/1-5-5/cube/F00.jpg"):
+        assert n in names, n
+    assert "1-5-5" in index and names.count(f"{KAL}/Index.lua") == 1
+    assert release.check_zip(z, KAL, cfg["budget_bytes"]) == []
     bad = tmp_path / "bad.zip"
     with zipfile.ZipFile(bad, "w") as f:
         f.writestr("P/Index.lua", 'x = "C:\\Users\\someone\\WoW"')
