@@ -43,6 +43,7 @@ class Player:
         self.held = []
         self.printed = []
         self.looked = []
+        self.map_view = None  # (the map's center and zoom, when a test gives one: the result animates from it)
         self.group = group  # the party's channel, or None
         io = self.lua.table_from({
             "now": lambda: clock.t,
@@ -57,6 +58,7 @@ class Player:
             "hold": lambda on: self.held.append(bool(on)),
             "lookAt": lambda c, x, y, z: self.looked.append((c, x, y, z)),
             "world": lambda spot: self.looked.append("world"),
+            "view": lambda: self.map_view,
             "follow": lambda: None,
             "showMap": lambda: None,
             "changed": lambda: None,
@@ -414,3 +416,43 @@ def test_a_guess_on_the_other_continent_is_drawn_through_the_world_map(solo):
     assert ("dot", 10050, 60) in drawn  # the guess, placed on continent 0's coordinates
     assert ("line", 10050, 60, s.x, s.y) in drawn  # the dotted line to the answer
     assert ("dot", s.x, s.y) in drawn  # the answer
+
+
+def test_the_result_pans_and_zooms_out_smoothly_from_where_the_map_is(solo):
+    p, clock, net = solo
+    p.G.Start("solo", 1)
+    s = p.game.spot  # (0-300-300)
+    p.G.io.view = p.lua.eval("function() return 0, 0, 0, 300 end")  # the player's map: at (0, 0), 300 yd out
+    p.G.Guess(s.x + 1000, s.y, s.cont)  # 1,000 yd off: fits on the terrain map
+    run(net, clock, 30)  # (right when the time runs out)
+    assert p.game.pan and p.G.RevealProgress() == 0  # (the line waits for the zoom)
+    zooms = []
+    for _ in range(12):
+        clock.t += 0.1
+        p.G.Animate()
+        zooms.append(p.looked[-1][3])
+    assert zooms == sorted(zooms) and zooms[0] > 300  # zooming out steadily
+    c, x, y, z = p.looked[-1]
+    assert (c, x, y) == (0, 800, 300) and z == pytest.approx(1000 * 0.65 + 80)
+    assert p.game.pan is None
+
+
+def test_solo_can_submit_before_the_time_runs_out(solo):
+    p, clock, net = solo
+    p.G.Start("solo", 1)
+    s = p.game.spot
+    p.G.SubmitNow()  # (nothing placed yet: nothing to submit)
+    assert p.game.phase == "look"
+    run(net, clock, 3)
+    p.G.Guess(s.x, s.y, s.cont)
+    p.G.SubmitNow()
+    assert p.game.phase == "result" and scores(p, "Me-Realm") == [100] and p.closed >= 1
+
+
+def test_party_players_cant_submit_early():
+    (a, b), clock, net = party(2)
+    a.G.Start("party", 1)
+    run(net, clock, 2)
+    a.G.Guess(300, 300, 0)
+    a.G.SubmitNow()
+    assert a.game.phase == "look"

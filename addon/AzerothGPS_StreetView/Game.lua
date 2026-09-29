@@ -35,7 +35,8 @@ Gm.GRACE_SECONDS = 3 -- a round ends this long after the guessing time, whoever 
 Gm.MAX_TRIES = 5 -- street views tried until everyone has one
 Gm.FULL_YD = 25 -- a guess this close gets all 100 points
 Gm.SCALE_YD = 3000 -- ... then 100 * e^(-(yards - 25) / 3000): 90 points ~340 yd off, 60 ~1,550, 40 ~2,800
-Gm.TERRAIN_MAX_YD = 2500 -- the result: guess and spot shown together up to this zoom (the terrain map's widest)
+Gm.TERRAIN_MAX_YD = 2900 -- the result: guess and spot shown together up to this zoom (the terrain map's widest: 3000)
+Gm.PAN_SECONDS = 0.9 -- ... the map pans and zooms out to them this smoothly, then the line grows
 Gm.SPOT_ZOOM_YD = 600 -- ... else the spot alone, this zoomed
 Gm.CELEBRATE_SOLO = 60 -- solo: the average round score that earns the celebration
 Gm.ROUNDS = { 1, 3, 5 }
@@ -217,7 +218,7 @@ Gm.io = {
   random = function(a, b) if a then return math.random(a, b) end return math.random() end,
   -- the rest: the viewer, the map and the panel (Gm.Init sets them)
   open = function() end, close = function() end, hold = function() end, lookAt = function() end,
-  follow = function() end, showMap = function() end, world = function() end, changed = function() end, ask = function() end,
+  follow = function() end, showMap = function() end, world = function() end, view = function() end, changed = function() end, ask = function() end,
   print = function(...) if ns.Print then ns.Print(...) end end,
 }
 local io = function() return Gm.io end
@@ -337,7 +338,14 @@ local function Scored(g)
   if s then
     local fit = g and g.yards and math.max(250, g.yards * 0.65 + 80)
     if fit and fit <= Gm.TERRAIN_MAX_YD then
-      io().lookAt(s.cont, (s.x + g.x) / 2, (s.y + g.y) / 2, fit)
+      local mx, my = (s.x + g.x) / 2, (s.y + g.y) / 2
+      local vx, vy, vc, vz = io().view()
+      if vx and vc == s.cont and vz and vz > 0 then -- (animated from where the map is: Gm.Animate)
+        game.pan = { t0 = Now(), cont = s.cont, x0 = vx, y0 = vy, z0 = vz, x1 = mx, y1 = my, z1 = fit }
+        if game.reveal then game.reveal.t0 = Now() + Gm.PAN_SECONDS end
+      else
+        io().lookAt(s.cont, mx, my, fit)
+      end
     elseif g and g.x and not g.yards then
       io().world(s)
     else
@@ -476,6 +484,13 @@ Submit = function()
   end
   g.score = Gm.Score(g.yards)
   Scored(g)
+end
+
+-- Solo: the guess placed is final now (no waiting for the timer).
+function Gm.SubmitNow()
+  if not game or game.mode ~= "solo" or game.phase ~= "look" or not game.pending then return end
+  io().close()
+  Submit()
 end
 
 -- Has every player still in the game scored this round?
@@ -675,7 +690,18 @@ Gm.REVEAL_SECONDS = 1.5
 function Gm.RevealProgress()
   local r = game and game.reveal
   if not r then return 1 end
-  return math.min(1, (Now() - r.t0) / Gm.REVEAL_SECONDS)
+  return math.max(0, math.min(1, (Now() - r.t0) / Gm.REVEAL_SECONDS))
+end
+
+-- The map's pan and zoom out to the guess and the spot (every frame while it runs).
+function Gm.Animate()
+  local pn = game and game.pan
+  if not pn then return end
+  local k = math.min(1, (Now() - pn.t0) / Gm.PAN_SECONDS)
+  local e = k < 0.5 and 2 * k * k or 1 - (-2 * k + 2) ^ 2 / 2
+  local z = math.exp(math.log(pn.z0) + (math.log(pn.z1) - math.log(pn.z0)) * e) -- (an even zoom speed)
+  io().lookAt(pn.cont, pn.x0 + (pn.x1 - pn.x0) * e, pn.y0 + (pn.y1 - pn.y0) * e, z)
+  if k >= 1 then game.pan = nil end
 end
 
 function Gm.Draw(ctx)
@@ -974,6 +1000,14 @@ local function BuildPanel(parent)
   start:SetScript("OnClick", function() Gm.StartNow() end)
   start:Hide()
   panel.start = start
+  -- solo: done guessing before the time runs out
+  local ok2, submit = pcall(CreateFrame, "Button", nil, panel, "UIPanelButtonTemplate")
+  if not ok2 or not submit then submit = Chip(panel, "Submit guess", 100) end
+  submit:SetSize(100, 20)
+  submit:SetText("Submit guess")
+  submit:SetScript("OnClick", function() Gm.SubmitNow() end)
+  submit:Hide()
+  panel.submit = submit
 end
 
 -- One line about this player's guess.
@@ -1028,7 +1062,8 @@ function Gm.Refresh()
     status = "Getting the next street view ready..."
   elseif ph == "look" then
     status = game.missing and "|cffff8080You don't have this street view (update your StreetView packs): guess anyway!|r"
-      or (game.pending and "Guess placed. |cffffd100Double-click|r again to move it; it counts when the time runs out."
+      or (game.pending and (game.mode == "solo" and "Guess placed. |cffffd100Double-click|r again to move it, or submit it."
+          or "Guess placed. |cffffd100Double-click|r again to move it; it counts when the time runs out.")
         or "Where is this? |cffffd100Double-click the map|r where you think it is.")
   elseif ph == "wait" then
     status = GuessLine(game.guess) .. "\n|cff9d9d9dWaiting for the others...|r"
@@ -1130,6 +1165,12 @@ function Gm.Refresh()
   if panel.start:IsShown() then
     panel.start:ClearAllPoints()
     panel.start:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -h)
+    h = h + 24
+  end
+  panel.submit:SetShown(game.mode == "solo" and ph == "look" and game.pending ~= nil)
+  if panel.submit:IsShown() then
+    panel.submit:ClearAllPoints()
+    panel.submit:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -h)
     h = h + 24
   end
   panel:SetHeight(math.max(40, h))
@@ -1248,6 +1289,10 @@ function Gm.Init(figureButton)
     API.HoldMap("StreetGuess", on, function(x, y, cont) Gm.Guess(x, y, API.BaseContinent(cont)) end)
   end
   io_.lookAt = function(cont, x, y, zoom) if API.LookAt then API.LookAt(cont, x, y, zoom) end end
+  io_.view = function() -- the map's center, continent (the base one) and zoom (yards to the edge)
+    local x, y, c, _, sc, half = API.View()
+    if x and sc and sc > 0 and half then return x, y, API.BaseContinent(c), half / sc end
+  end
   io_.world = function(s) -- (a guess on another continent: zoomed out to the world)
     if API.ShowWorld then API.ShowWorld() elseif API.LookAt then API.LookAt(s.cont, s.x, s.y, 6000) end
   end
@@ -1305,6 +1350,7 @@ function Gm.Init(figureButton)
       if not ok then ns.Print("|cffff6060game clock failed:|r " .. tostring(err)) end
       Gm.RefreshTimer()
     end
+    if game and game.pan then Gm.Animate() end
     if game and game.reveal and Now() - game.reveal.t0 <= Gm.REVEAL_SECONDS + 0.1 then API.Redraw() end
     if game and game.celebrate and panel:IsShown() then Celebrate(t) end
   end)
