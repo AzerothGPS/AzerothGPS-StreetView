@@ -37,8 +37,9 @@ Gm.MAX_TRIES = 5 -- street views tried until everyone has one
 Gm.FULL_YD = 25 -- a guess this close gets all 100 points
 Gm.SCALE_YD = 3800 -- ... then 100 * e^(-((yards - 25) / 3800) ^ 1.3), rounded down: 99 just past 25 yd, 88 at
 Gm.SCORE_POWER = 1.3 -- 800 yd, 72 at 1,600, 48 at 3,000, 16 at 6,000, 3 at 10,000 (the last points the hardest)
-Gm.FIT_MAX_YD = 9000 -- the result: guess and answer shown together up to this zoom (yards to the edge: the
--- terrain map to 3000, the map art beyond, about a continent at 9000); farther apart, the answer alone
+Gm.FIT_MAX_YD = 2950 -- the result: guess and answer shown together up to this zoom (yards from the middle to
+-- the edge), the terrain view's widest (AzerothGPS shows map art past 3000: the view never flips style;
+-- right-click still goes out to the continent); farther apart, the answer alone
 Gm.PAN_SECONDS = 0.9 -- ... the map pans and zooms out to them this smoothly, then the line grows
 Gm.SPOT_ZOOM_YD = 600 -- ... else the spot alone, this zoomed
 Gm.CELEBRATE_MIN = 75 -- the average round score that earns the celebration (solo: the player's; else the winner's)
@@ -259,8 +260,12 @@ function Gm.FitView(spot, points)
     x0, x1 = math.min(x0, q.x), math.max(x1, q.x)
     y0, y1 = math.min(y0, q.y), math.max(y1, q.y)
   end
-  local zoom = math.max(250, math.max(x1 - x0, y1 - y0) * 0.65 + 80)
-  if zoom > Gm.FIT_MAX_YD then return nil end
+  local half = math.max(x1 - x0, y1 - y0) / 2
+  local zoom = math.max(250, half * 1.3 + 80) -- (a margin around them)
+  if zoom > Gm.FIT_MAX_YD then
+    if half > Gm.FIT_MAX_YD * 0.95 then return nil end -- (not both on the terrain view, even tight)
+    zoom = Gm.FIT_MAX_YD
+  end
   return (x0 + x1) / 2, (y0 + y1) / 2, zoom
 end
 

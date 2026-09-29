@@ -515,10 +515,10 @@ def test_a_guess_5000_yd_off_still_shows_both(solo):
     p, clock, net = solo
     p.G.Start("solo", 1)
     s = p.game.spot
-    p.G.Guess(s.x + 5000, s.y, s.cont)  # past the terrain view (3000), on the map art
+    p.G.Guess(s.x + 5000, s.y, s.cont)  # a tight fit: at the terrain view's widest, not the map art
     run(net, clock, 31)
     c, x, y, z = p.looked[-1]
-    assert (c, x, y) == (s.cont, s.x + 2500, s.y) and z == pytest.approx(5000 * 0.65 + 80)
+    assert (c, x, y) == (s.cont, s.x + 2500, s.y) and z == p.G.FIT_MAX_YD < 3000
 
 
 def test_a_raid_gets_colored_squares_and_solo_a_random_orc(solo):
