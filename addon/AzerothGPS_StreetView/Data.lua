@@ -22,15 +22,16 @@ D.STEP = math.pi / 4
 -- for positive angles. /sv flipyaw switches it if the views turn the wrong way.
 D.yawSign = 1
 
-D.byCont, D.byId, D.count = {}, {}, 0
+D.byCont, D.byId, D.count, D.packs = {}, {}, 0, {}
 
 -- Read the installed packs. Returns the number of views.
 function D.Load(packs)
   packs = packs or _G.AzerothGPS_StreetViewPacks
-  D.byCont, D.byId, D.count = {}, {}, 0
+  D.byCont, D.byId, D.count, D.packs = {}, {}, 0, {}
   if type(packs) ~= "table" then return 0 end
   for _, pack in ipairs(packs) do
     if type(pack) == "table" and type(pack.points) == "table" and type(pack.root) == "string" then
+      D.packs[#D.packs + 1] = pack -- (the installed packs: { name, version, ... })
       for _, p in ipairs(pack.points) do
         if type(p) == "table" and p.id and tonumber(p.x) and tonumber(p.y) and p.cont then
           p.pack = pack

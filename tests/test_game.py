@@ -169,20 +169,16 @@ def test_solo_game_runs_its_rounds_and_averages(solo):
     p, clock, net = solo
     assert p.G.Start("solo", 3)
     assert p.held == [True] and p.game.phase == "look" and p.shown == ["0-300-300"]
-    p.G.Guess(300, 300, 0)  # too early: the street view is still up
-    assert p.game.phase == "look" and p.printed
-    run(net, clock, 15)
-    assert p.game.phase == "guess" and p.closed >= 1
-    p.G.Guess(310, 300, 0)  # 10 yd off: all the points
-    assert p.game.phase == "result" and scores(p, "Me-Realm") == [100]
+    run(net, clock, 5)
+    p.G.Guess(310, 300, 0)  # while the street view is up: 10 yd off, all the points
+    assert p.game.phase == "result" and scores(p, "Me-Realm") == [100] and p.closed >= 1
     assert p.looked  # the map shows the guess and the spot
     run(net, clock, 8)
     assert p.game.round == 2 and p.game.phase == "look" and p.shown[-1] == "0-900-900"
-    run(net, clock, 15)
     p.G.Guess(900, 900, 1)  # the wrong continent: nothing
     assert scores(p, "Me-Realm") == [100, 0]
     run(net, clock, 8)
-    run(net, clock, 15 + 31)  # no guess in time: nothing
+    run(net, clock, 16)  # no guess in the 15 seconds: nothing
     assert scores(p, "Me-Realm") == [100, 0, 0]
     run(net, clock, 8)
     g = p.game
@@ -194,7 +190,6 @@ def test_solo_game_runs_its_rounds_and_averages(solo):
 def test_solo_celebrates_a_good_average(solo):
     p, clock, net = solo
     p.G.Start("solo", 1)
-    run(net, clock, 15)
     s = p.game.spot
     p.G.Guess(s.x + 300, s.y, s.cont)
     run(net, clock, 8)
@@ -218,8 +213,6 @@ def test_party_game_between_two_players():
     assert a.game.phase == "look" and b.game.phase == "look"
     assert a.shown == b.shown == ["0-300-300"]
     assert list(b.game.order.values()) == ["Ann-Realm", "Bob-Realm"]
-    run(net, clock, 15)
-    assert a.game.phase == "guess" and b.game.phase == "guess"
     a.G.Guess(300, 400, 0)  # 100 yd off
     net.deliver()
     assert a.game.phase == "wait"
@@ -237,12 +230,11 @@ def test_the_round_ends_when_time_is_up_for_someone_silent():
     (a, b), clock, net = party(2)
     a.G.Start("party", 1)
     run(net, clock, 2)
-    run(net, clock, 15)
-    assert a.game.phase == "guess"
+    assert a.game.phase == "look"
     a.G.Guess(300, 300, 0)
     b.G.OnMessage = None  # (B's game went quiet)
     net.players.pop("Bob-Realm")
-    run(net, clock, 35)
+    run(net, clock, 20)
     assert a.game.phase in ("result", "over")
     assert scores(a, "Ann-Realm") == [100]
 
@@ -298,7 +290,6 @@ def test_whisper_game_plays_through():
     a.G.Start("whisper", 1, "Bob-Realm")
     run(net, clock, 2)
     assert b.game.phase == "look" and b.game.mode == "whisper"
-    run(net, clock, 15)
     b.G.Guess(300, 300, 0)
     a.G.Guess(900, 900, 0)
     run(net, clock, 9)
@@ -315,3 +306,64 @@ def test_busy_players_are_not_asked():
     net.deliver()
     assert b.game.mode == "solo"  # (still in its own game)
     assert a.game.answers["Bob-Realm"] is False
+
+
+TWO_PACKS = """{
+  { name = "AzerothGPS_StreetView_Kalimdor", version = "2026.09.29", root = "K\\\\", points = {
+    { id = "1-100-100", cont = 1, x = 100, y = 100 },
+    { id = "1-2000-500", cont = 1, x = 2000, y = 500 },
+  } },
+  { name = "AzerothGPS_StreetView_EasternKingdoms", version = "2026.09.29", root = "E\\\\", points = {
+    { id = "0-300-300", cont = 0, x = 300, y = 300 },
+    { id = "0-900-900", cont = 0, x = 900, y = 900 },
+  } },
+}"""
+
+
+def pack_players(b_pack):
+    clock, net = Clock(), Net()
+    a = Player("Ann-Realm", clock, net, pack=TWO_PACKS, group="PARTY")
+    b = Player("Bob-Realm", clock, net, pack=b_pack, group="PARTY")
+    return a, b, clock, net
+
+
+def report(p):
+    return {r.name: (list(r.missing.values()), list(r.older.values())) for r in p.game.report.values()}
+
+
+def test_street_views_come_only_from_packs_everyone_has():
+    only_k = TWO_PACKS.split("  { name = \"AzerothGPS_StreetView_EasternKingdoms\"")[0] + "}"
+    a, b, clock, net = pack_players(only_k)
+    a.G.Start("party", 3)
+    net.deliver()
+    net.deliver()
+    # the host sees who lacks which pack as soon as they join
+    assert report(a) == {"Bob-Realm": (["EasternKingdoms"], [])}
+    run(net, clock, 1)
+    assert report(b) == {"Bob-Realm": (["EasternKingdoms"], [])}  # (everyone sees it)
+    assert a.G.PackTitle("EasternKingdoms") == "Eastern Kingdoms"
+    for _ in range(2):
+        run(net, clock, 2)
+        assert a.game.phase == "look" and a.game.spot.cont == 1  # (Kalimdor's only)
+        a.G.Guess(a.game.spot.x, a.game.spot.y, 1)
+        b.G.Guess(0, 0, 1)
+        run(net, clock, 8)
+    assert sorted(a.shown) == sorted(b.shown) == ["1-100-100", "1-2000-500"]
+
+
+def test_an_older_pack_is_reported():
+    older = TWO_PACKS.replace('"AzerothGPS_StreetView_Kalimdor", version = "2026.09.29"',
+                              '"AzerothGPS_StreetView_Kalimdor", version = "2026.09.20"')
+    a, b, clock, net = pack_players(older)
+    a.G.Start("party", 1)
+    net.deliver()
+    net.deliver()
+    assert report(a) == {"Bob-Realm": ([], ["Kalimdor"])}
+
+
+def test_no_pack_in_common_ends_before_it_starts():
+    a, b, clock, net = pack_players(PACK)  # (Bob's is another pack altogether)
+    a.G.Start("party", 1)
+    run(net, clock, 2)
+    assert a.game.phase == "over" and "no map pack" in a.game.reason
+    assert b.game.phase == "over"

@@ -1,6 +1,7 @@
 -- Street Guess: a GeoGuessr-style game on the AzerothGPS map. Everyone gets the same street view
--- (no zone name or coordinates) for 15 seconds, then double-clicks the map where they think it
--- was: the closer, the more points (0-100 a round, the first ones easy, the last ones hard).
+-- (no zone name or coordinates) and has 15 seconds to look around and double-click the map where
+-- they think it is: the closer, the more points (0-100 a round, the first ones easy, the last hard).
+-- Street views come only from the map packs every player has; the panel says who lacks which.
 -- Solo, with the party, or with one player by whisper; 1, 3 or 5 rounds.
 --
 -- While a game is on, the map is held (AzerothGPS.HoldMap): the route and its directions panel
@@ -10,7 +11,8 @@
 -- Players talk through addon messages (prefix "AGPSSV", to the party or the one player whispered)
 -- and only about the game: an invitation is always asked before joining. The host picks the
 -- street views and paces the rounds; each player scores their own guess and tells the others.
---   I:id:rounds            invitation (host)          J:id / D:id / B:id   join / decline / busy
+--   I:id:rounds:packs      invitation (host)          J:id:packs / D:id / B:id   join / decline / busy
+--   K:id:name:packs        a player's packs (host)    (packs: Kalimdor/2026.09.29,EasternKingdoms/...)
 --   L:id:name,name,...     the players (host)         Q:id                 a player left
 --   P:id:round:spot        the next street view (host)   O:id:round / M:id:round   have it / missing
 --   G:id:round             the round starts (host)    S:id:round:score:yards:cont:x:y   a guess
@@ -24,8 +26,7 @@ ns.Game = Gm
 local D = ns.Data
 
 Gm.PREFIX = "AGPSSV"
-Gm.LOOK_SECONDS = 15 -- the street view shows this long
-Gm.GUESS_SECONDS = 30 -- then this long to double-click the map
+Gm.LOOK_SECONDS = 15 -- the street view shows this long: the time to guess
 Gm.RESULT_SECONDS = 7 -- the round's result, before the next round
 Gm.JOIN_SECONDS = 20 -- the host waits this long for answers to an invitation
 Gm.PROPOSE_SECONDS = 3 -- ... and this long for the players to say they have the next street view
@@ -62,12 +63,79 @@ function Gm.Decode(msg)
   return kind, parts
 end
 
--- A random street view for a round: on a continent (not a dungeon), not in `used` yet.
--- rnd(n) gives 1..n (math.random).
-function Gm.PickSpot(used, rnd)
+-- A pack's key in messages ("AzerothGPS_StreetView_EasternKingdoms" -> "EasternKingdoms"), and
+-- how players read it ("Eastern Kingdoms").
+function Gm.PackKey(name)
+  return (tostring(name or "?"):gsub("^AzerothGPS_StreetView_", ""):gsub("[:,/]", ""))
+end
+function Gm.PackTitle(key)
+  return (key:gsub("(%l)(%u)", "%1 %2"):gsub("_", " "))
+end
+
+-- Packs as a message field ({ key = version } -> "EasternKingdoms/2026.09.29,Kalimdor/...").
+function Gm.PackField(t)
+  local out = {}
+  for k, v in pairs(t) do out[#out + 1] = k .. "/" .. (tostring(v):gsub("[:,/]", "")) end
+  table.sort(out)
+  return table.concat(out, ",")
+end
+function Gm.ParsePacks(field)
+  local t = {}
+  for item in (field or ""):gmatch("[^,]+") do
+    local k, v = item:match("^([^/]+)/?(.*)$")
+    if k then t[k] = v end
+  end
+  return t
+end
+-- This player's installed packs: { key = version }.
+function Gm.MyPacks()
+  local t = {}
+  for _, pk in ipairs(D.packs or {}) do t[Gm.PackKey(pk.name)] = tostring(pk.version or "") end
+  return t
+end
+
+-- The packs to play from and who lacks what, over all the players' packs: common = { key = true }
+-- (every player has it), report = { { name, missing = { key, ... }, older = { key, ... } }, ... }.
+-- Players whose packs aren't known yet don't count.
+function Gm.ComparePacks(g)
+  local all, newest = {}, {}
+  for _, name in ipairs(g.order) do
+    for k, v in pairs(g.packs[name] or {}) do
+      all[k] = true
+      if not newest[k] or v > newest[k] then newest[k] = v end
+    end
+  end
+  local common, report = {}, {}
+  for k in pairs(all) do common[k] = true end
+  for _, name in ipairs(g.order) do
+    local mine = g.packs[name]
+    if mine then
+      local miss, older = {}, {}
+      for k in pairs(all) do
+        if not mine[k] then
+          miss[#miss + 1] = k
+          common[k] = nil
+        elseif mine[k] < newest[k] then
+          older[#older + 1] = k -- (fewer street views, maybe: a round checks everyone has its one)
+        end
+      end
+      table.sort(miss)
+      table.sort(older)
+      if #miss > 0 or #older > 0 then report[#report + 1] = { name = name, missing = miss, older = older } end
+    end
+  end
+  return common, report
+end
+
+-- A random street view for a round: on a continent (not a dungeon), not in `used` yet, in one of
+-- the `allowed` packs (keys; nil: any). rnd(n) gives 1..n (math.random).
+function Gm.PickSpot(used, rnd, allowed)
   local ids = {}
   for id, p in pairs(D.byId) do
-    if not used[id] and type(p.cont) == "number" and p.cont < 10000 then ids[#ids + 1] = id end
+    if not used[id] and type(p.cont) == "number" and p.cont < 10000
+        and (not allowed or (p.pack and allowed[Gm.PackKey(p.pack.name)])) then
+      ids[#ids + 1] = id
+    end
   end
   if #ids == 0 then return nil end
   table.sort(ids) -- (the same pick for the same numbers: tests)
@@ -193,8 +261,9 @@ end
 local function NewGame(mode, rounds, host, id)
   local me = io().me()
   game = { id = id or tostring(io().random(100000, 999999)), mode = mode, rounds = rounds, host = host or me, me = me,
-    players = {}, order = {}, round = 0, used = {}, phase = "wait" }
+    players = {}, order = {}, round = 0, used = {}, phase = "wait", packs = {}, report = {} }
   game.isHost = game.host == me
+  game.packs[me] = Gm.MyPacks()
   AddPlayer(game.host)
   if not game.isHost then AddPlayer(me) end
 end
@@ -219,7 +288,7 @@ end
 
 -- host: the next street view, asked of the players first
 local function Propose()
-  local p = Gm.PickSpot(game.used, function(n) return io().random(1, n) end)
+  local p = Gm.PickSpot(game.used, function(n) return io().random(1, n) end, game.common)
   if not p then return Over("No street views are installed") end
   game.used[p.id] = true
   game.spot = p
@@ -241,7 +310,7 @@ end
 Look = function()
   game.phase = "look"
   game.deadline = Now() + Gm.LOOK_SECONDS
-  game.roundEnd = game.deadline + Gm.GUESS_SECONDS + Gm.GRACE_SECONDS
+  game.roundEnd = game.deadline + Gm.GRACE_SECONDS
   game.guess, game.reveal = nil, nil
   game.missing = game.spot == nil
   io().follow()
@@ -289,10 +358,21 @@ Result = function()
   Changed()
 end
 
+-- Who lacks which pack, again (the players or their packs changed).
+local function Compare()
+  game.common, game.report = Gm.ComparePacks(game)
+end
+
 local function Begin()
   if #game.order < 2 then
     return Over(game.mode == "whisper" and (Short(game.target) .. " didn't join") or "No one joined (they need AzerothGPS StreetView)")
   end
+  Compare()
+  if next(game.common) == nil then
+    ToOthers("X", game.id)
+    return Over("There's no map pack every player has")
+  end
+  for _, name in ipairs(game.order) do ToOthers("K", game.id, name, Gm.PackField(game.packs[name] or {})) end
   ToOthers("L", game.id, table.concat(game.order, ","))
   NextRound()
 end
@@ -346,7 +426,7 @@ function Gm.Start(mode, rounds, target)
   game.phase = "invite"
   game.answers = {}
   game.deadline = Now() + Gm.JOIN_SECONDS
-  ToOthers("I", game.id, rounds)
+  ToOthers("I", game.id, rounds, Gm.PackField(game.packs[game.me]))
   Changed()
   return true
 end
@@ -371,12 +451,8 @@ end
 
 -- A double-click on the map: the guess (continent: the base one, AzerothGPS.BaseContinent).
 function Gm.Guess(x, y, cont)
-  if not game then return end
-  if game.phase == "look" then
-    io().print("Look around first: the guess comes when the timer runs out.")
-    return
-  end
-  if game.phase ~= "guess" then return end
+  if not game or game.phase ~= "look" then return end
+  io().close() -- (the map shows how close it was)
   local s = game.spot
   local g = { x = x, y = y, cont = cont }
   if s and cont == s.cont then
@@ -399,14 +475,8 @@ function Gm.Tick()
   if not game then return end
   local now = Now()
   local ph = game.phase
-  if ph == "look" and now >= game.deadline then
+  if ph == "look" and now >= game.deadline then -- (no guess in time)
     io().close()
-    game.phase = "guess"
-    game.deadline = now + Gm.GUESS_SECONDS
-    if game.missing then return Scored(nil) end
-    io().showMap()
-    Changed()
-  elseif ph == "guess" and now >= game.deadline then
     Scored(nil)
   end
   if ph == "joined" and now >= game.deadline then
@@ -433,8 +503,8 @@ function Gm.Tick()
         Look()
       end
     end
-  elseif (ph == "guess" or ph == "wait") and game.mode ~= "solo" and (AllScored() or now >= game.roundEnd) then
-    if ph == "guess" then Scored(nil) end
+  elseif (ph == "look" or ph == "wait") and game.mode ~= "solo" and (AllScored() or now >= game.roundEnd) then
+    if ph == "look" then Scored(nil) end
     ToOthers("N", game.id, game.round)
     Result()
   elseif ph == "result" and now >= game.deadline then
@@ -487,9 +557,10 @@ function Gm.OnMessage(msg, channel, sender)
       if game and game.phase ~= "over" then return io().send(Gm.Encode("B", id), reply, to) end
       NewGame(channel == "WHISPER" and "whisper" or "party", rounds, sender, id)
       game.channel = channel ~= "WHISPER" and channel or nil
+      game.packs[sender] = Gm.ParsePacks(f[3])
       game.phase = "joined"
       game.deadline = Now() + Gm.JOIN_SECONDS + 10 -- (no word from the host by then: it started without us)
-      io().send(Gm.Encode("J", id), reply, to)
+      io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me])), reply, to)
       io().hold(true)
       io().showMap()
       Changed()
@@ -504,6 +575,8 @@ function Gm.OnMessage(msg, channel, sender)
     if kind == "J" and game.phase == "invite" then
       AddPlayer(sender)
       game.answers[sender] = true
+      game.packs[sender] = Gm.ParsePacks(f[2])
+      Compare()
       Changed()
     elseif (kind == "D" or kind == "B") and game.phase == "invite" then
       game.answers[sender] = false
@@ -516,7 +589,11 @@ function Gm.OnMessage(msg, channel, sender)
     end
   else
     if sender ~= game.host and kind ~= "S" and kind ~= "Q" then return end -- (the host runs the game)
-    if kind == "L" then
+    if kind == "K" and f[2] then
+      game.packs[f[2]] = Gm.ParsePacks(f[3])
+      Compare()
+      Changed()
+    elseif kind == "L" then
       if not (","  .. (f[2] or "") .. ","):find("," .. game.me .. ",", 1, true) then
         return Over("The game started without you")
       end
@@ -897,10 +974,8 @@ function Gm.Refresh()
   elseif ph == "propose" or ph == "ready" then
     status = "Getting the next street view ready..."
   elseif ph == "look" then
-    status = game.missing and "|cffff8080You don't have this street view: install the latest StreetView packs.|r"
-      or "Look around: |cffffd100where is this?|r"
-  elseif ph == "guess" then
-    status = "|cffffd100Double-click the map|r where you think it was."
+    status = game.missing and "|cffff8080You don't have this street view (update your StreetView packs): guess anyway!|r"
+      or "Where is this? |cffffd100Double-click the map|r before the time runs out."
   elseif ph == "wait" then
     status = GuessLine(game.guess) .. "\n|cff9d9d9dWaiting for the others...|r"
   elseif ph == "result" then
@@ -926,6 +1001,18 @@ function Gm.Refresh()
       end
       if game.guess and game.mode ~= "solo" then status = GuessLine(game.guess) .. "\n" .. status end
     end
+  end
+  -- who lacks which pack (their street views aren't used)
+  local lacks = {}
+  for _, r in ipairs(game.report or {}) do
+    local what = {}
+    for _, k in ipairs(r.missing) do what[#what + 1] = Gm.PackTitle(k) end
+    for _, k in ipairs(r.older) do what[#what + 1] = "older " .. Gm.PackTitle(k) end
+    lacks[#lacks + 1] = (r.name == game.me and "You" or Short(r.name)) .. ": " .. table.concat(what, ", ")
+  end
+  if #lacks > 0 then
+    status = (status or "") .. "\n|cffff9060Missing map packs|r |cff9d9d9d(their street views aren't used)|r\n|cffffb080"
+      .. table.concat(lacks, "\n") .. "|r"
   end
   panel.status:SetText(status or "")
   -- the players (solo: the rounds' scores)
@@ -1000,9 +1087,9 @@ end
 function Gm.RefreshTimer()
   if not panel or not game then return end
   local ph = game.phase
-  if (ph == "look" or ph == "guess" or ph == "invite") and game.deadline then
+  if (ph == "look" or ph == "invite") and game.deadline then
     local left = game.deadline - Now()
-    local color = left <= 5 and "|cffff5050" or (ph == "guess" and "|cffffd100" or "|cffffffff")
+    local color = left <= 5 and "|cffff5050" or (ph == "look" and "|cffffd100" or "|cffffffff")
     panel.timer:SetText(color .. Clock(left) .. "|r")
   else
     panel.timer:SetText("")
@@ -1047,7 +1134,7 @@ local function BuildButton(parent, figure)
   gameButton:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("Street Guess")
-    GameTooltip:AddLine("Where is this street view? Look around for 15 seconds, then double-click the map where you think it was.", 1, 1, 1, true)
+    GameTooltip:AddLine("Where is this street view? You have 15 seconds to look around and double-click the map where you think it is.", 1, 1, 1, true)
     GameTooltip:AddLine("Solo, with your party, or with one player by whisper.", 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
   end)
