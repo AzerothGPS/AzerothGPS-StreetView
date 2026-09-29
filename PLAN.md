@@ -428,7 +428,7 @@ Rendered with Track 2, like the open world: no game and no server. Instance spot
 
 - **25 instances**: 19 dungeons and 6 raids. Each is a level of its own, `20000 + MapID`, in the instance's own world coordinates. Each has roads per floor (`ns.Roads[level]`, packed points, node heights in `.z`), floors that lie over each other (layers), entrances (outside and inside end), and bosses with positions and kill order.
 - **Road length** (measured 2026-09-28, sum of road edges; overlapping pieces inflate it): about 302,000 yards. Biggest: Naxxramas 52k, Dire Maul 39k, Ahn'Qiraj Temple 30k, Maraudon 23k, Blackrock Depths 19k. Smallest: Stockade 1.3k, Onyxia 1.6k, Shadowfang Keep 3.0k, Deadmines 3.1k.
-- **Missing from the data:** Blackwing Lair (map 469), and WoW Forever's new dungeons and raids (nine new dungeons, Hyjal Summit, Barrow Deeps). AzerothGPS has to add them first (`agps instances --write`), in the AzerothGPS session, before they can get spots.
+- **Missing from the data:** Blackwing Lair (map 469), and WoW Forever's new dungeons and raids (nine new dungeons, Hyjal Summit, Barrow Deeps). AzerothGPS has to add them first (`agps instances --write`) before they can get spots. **Handed to the AzerothGPS chat by the user on 2026-09-28**, together with the API addition in 10.5. Don't do it from here.
 
 ### 10.2 Capture points
 
@@ -455,13 +455,13 @@ Rendered with Track 2, like the open world: no game and no server. Instance spot
 ### 10.5 Viewer (LOCAL, AzerothGPS-StreetView)
 
 - The game **hides the player's position in dungeons** (probed in Ragefire Chasm: `UnitPosition` and friends are nil). "Nearest spot to me" can't work inside. Browsing does: AzerothGPS already shows each instance's map with floors (`G.ShowInstance`, floor wheel). The figure's drag and drop and the spot dots go on that view, for the floor shown.
-- **AzerothGPS API additions** (small, additive, with lupa tests): the instance level and floor currently shown on the map, and instance world to map point. Title: the instance name and the floor, from `ns.Instances`.
+- **AzerothGPS API additions** (small, additive, with lupa tests): the instance level and floor currently shown on the map, and instance world to map point. **The AzerothGPS chat owns this** (handed over 2026-09-28). StreetView waits for it and uses it only through `_G.AzerothGPS`. Title: the instance name and the floor, from `ns.Instances`.
 - **Mini game:** instance spots stay out of the normal rounds. Maybe a "dungeon round" later.
 
 ### 10.6 Packs and size (the user: CurseForge limit is very important)
 
-- **Separate CurseForge projects, optional** (the viewer works without them): `AzerothGPS_StreetView_Dungeons` and `AzerothGPS_StreetView_Raids`, each under the 1.8 GB budget. If dungeons alone exceed it, split them by continent (Eastern Kingdoms / Kalimdor).
-- At the measured ~0.5 MB a spot, 5,000 spots is about 2.5 GB: two packs are needed. Dark interiors may compress smaller. `sv.py build` prints the projection per pack, as it does now.
+- **Decided (the user, 2026-09-28): one separate pack for now**, `AzerothGPS_StreetView_Instances`, its own optional CurseForge project (the viewer works without it). It stays separate until the open-world continent packs' final sizes are known. Then decide whether instances fold into the continent packs (if they have room under 1.8 GB), or split into Dungeons / Raids or per continent.
+- At the measured ~0.5 MB a spot, 5,000 spots is about 2.5 GB, more than one pack. Dark interiors may compress smaller. `sv.py build` prints the projection per pack, as it does now. If the instance pack nears 1.8 GB before the continent sizes are settled, split it then (raids out first).
 - The same rules as everywhere: renders only, never the user's own screenshots (manual captures stay out, `pack.is_manual`).
 
 ### 10.7 References (standing rule)
