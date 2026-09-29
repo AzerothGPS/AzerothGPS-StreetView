@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -69,6 +70,14 @@ EXTRA_POSES = ["y270_p+90", "y270_p-90"]
 
 def point_id(cont: int, x: float, y: float) -> str:
     return f"{int(cont)}-{round(x)}-{round(y)}"
+
+
+def id_matches(pid: str, cont: int, x: float, y: float) -> bool:
+    """Whether a spot's id names its place. The id comes from the exact position and the
+    meta's x/y may be rounded to 0.1 yd, so a coordinate on a .5 can round either way:
+    allow up to 0.55 yd each way."""
+    m = re.fullmatch(r"(-?\d+)-(-?\d+)-(-?\d+)", pid or "")
+    return bool(m) and int(m[1]) == int(cont) and abs(int(m[2]) - x) <= 0.55 and abs(int(m[3]) - y) <= 0.55
 
 
 def crop_2to1(img: Image.Image) -> Image.Image:
@@ -308,7 +317,7 @@ def import_harvest(folder: Path, build: Path, log=print) -> dict:
         pid = meta.get("id")
         cube = meta_file.parent / "cube"
         tiles = sorted(cube.glob("*.jpg")) if cube.is_dir() else []
-        if not pid or pid != point_id(meta["cont"], meta["x"], meta["y"]) or len(tiles) != 24 or not meta.get("cube"):
+        if not id_matches(pid, meta["cont"], meta["x"], meta["y"]) or len(tiles) != 24 or not meta.get("cube"):
             stats["skipped"] += 1
             log(f"  skipped {meta_file.parent.name}: no id, a mismatched id, or not a whole cube")
             continue

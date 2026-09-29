@@ -373,3 +373,12 @@ def test_stitch_repairs_a_picture_taken_at_the_wrong_angle():
     rig = st.calibrate(fixed, rig, width=160)
     back = st.panorama(fixed, rig, 512)
     assert np.abs(back.astype(float) - pano.astype(float)).mean() < 8
+
+
+def test_spot_id_tolerates_rounded_meta():
+    # the id comes from the exact spot (-2576.52 -> -2577); meta.json keeps -2576.5 (-> -2576 by round())
+    assert pack.id_matches("1-561--2577", 1, 560.9, -2576.5)
+    assert pack.id_matches("1-561--2576", 1, 560.9, -2576.5)
+    assert not pack.id_matches("1-561--2579", 1, 560.9, -2576.5)
+    assert not pack.id_matches("0-561--2577", 1, 560.9, -2576.5)
+    assert not pack.id_matches("junk", 1, 560.9, -2576.5)
