@@ -1599,7 +1599,7 @@ function Gm.Refresh()
   -- (a game started, by the menu or an invitation accepted: the menu folds away)
   if ph ~= "over" and fly and fly:IsShown() and fly.target > 0 then HideMenu() end
   local roundText = game.round > 0 and string.format("  |cffffffffRound %d of %d|r", game.round, game.rounds) or ""
-  panel.title:SetText("|cffffd100Where in the Azeroth?|r" .. (game.mode == "solo" and "  |cff9d9d9dsolo|r" or "") .. roundText)
+  panel.title:SetText("|cffffd100Where in the Azeroth?|r" .. roundText)
   local status
   if ph == "invite" then
     local n = #game.order - 1
