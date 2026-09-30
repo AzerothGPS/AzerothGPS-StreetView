@@ -410,11 +410,27 @@ def reported_in_game(wow: Path) -> dict[str, int]:
     return out
 
 
-def retake(build: Path, points: dict, reported: dict[str, int] | None = None) -> dict[str, dict]:
+HELD_FILE = ROOT / "held.json"  # spots found broken by eye: { id: { reason, at (epoch) } }, committed
+
+
+def held_by_eye(path: Path | None = None) -> dict[str, dict]:
+    path = path or HELD_FILE
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def retake(build: Path, points: dict, reported: dict[str, int] | None = None,
+           by_eye: dict[str, dict] | None = None) -> dict[str, dict]:
     """The spots to take again, held back from the packs: broken renders (flat_sides, measured once
-    a spot and kept in points.json) and those reported in game after their current picture was
-    imported. Written to build/retake.json ({ id: { reason, ... } }) for the capture PC."""
+    a spot and kept in points.json), those reported in game, and those in held.json (found broken
+    by eye, e.g. rendered under a city), each until a newer picture is imported. Written to
+    build/retake.json ({ id: { reason, ... } }) for the capture PC."""
     out: dict[str, dict] = {}
+    by_eye = held_by_eye() if by_eye is None else by_eye
+    for pid, h in by_eye.items():
+        p = points.get(pid)
+        if p and h.get("at", 0) >= p.get("imported_at", 0):
+            out[pid] = {"reason": h.get("reason", "held by eye"), "cont": p["cont"], "x": p["x"], "y": p["y"],
+                        "zone": p.get("zone", "")}
     changed = False
     for pid, p in points.items():
         master = build / "master" / pid

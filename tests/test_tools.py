@@ -471,3 +471,16 @@ def test_cave_and_instance_spots_are_tagged_in_the_index():
     lua.execute(pack.index_lua(pts, "v", KAL))
     got = lua.eval("AzerothGPS_StreetViewPacks[1].points")
     assert got[1].kind is None and got[2].kind == "cave"
+
+
+def test_spots_held_by_eye_stay_out_until_rendered_again(tmp_path):
+    build = tmp_path / "build"
+    fake_spot(build, "0-5-5", 0, 5, 5)
+    fake_spot(build, "0-9-9", 0, 9, 9)
+    import json as js
+    pts = js.loads((build / "points.json").read_text())
+    pts["0-5-5"]["imported_at"] = 100
+    held = pack.retake(build, pts, {}, {"0-5-5": {"reason": "under the city", "at": 200}})
+    assert list(held) == ["0-5-5"] and held["0-5-5"]["reason"] == "under the city"
+    pts["0-5-5"]["imported_at"] = 300  # (rendered again after it was held)
+    assert pack.retake(build, pts, {}, {"0-5-5": {"reason": "under the city", "at": 200}}) == {}
