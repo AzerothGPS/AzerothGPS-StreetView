@@ -901,6 +901,20 @@ def test_the_scoreboard_shows_five_and_scrolls(solo):
     assert rows(12, -4) == ([1, 2, 3, 4, 5], 0)
 
 
+def test_the_others_see_that_a_player_guessed_but_not_where():
+    (a, b), clock, net = party(2)
+    a.G.Start("party", 1)
+    run(net, clock, 2)
+    b.G.Guess(300, 3300, 0)
+    b.G.Guess(300, 3000, 0)  # (moved: nothing more is sent)
+    sent = [m for _, m, _, _ in net.queue]
+    assert sent == [f"Y:{a.game.id}:1"]
+    run(net, clock, 1)
+    bob = a.game.players["Bob-Realm"]
+    assert bob.placed[1] and bob.scores[1] is None and bob.guesses[1] is None
+    assert not (a.game.players["Ann-Realm"].placed or {}).get(1)
+
+
 def test_no_developer_tools_ship():
     # (the demo, reporting pictures and the capture tool are in the private AzerothGPS_StreetView_Dev)
     shipped = "".join(f.read_text(encoding="utf-8") for f in ADDON.glob("*.lua"))

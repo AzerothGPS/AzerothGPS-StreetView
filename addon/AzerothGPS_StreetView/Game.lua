@@ -24,6 +24,7 @@
 --                          names need (an addon message holds 255 bytes)   Q:id   a player left
 --   P:id:round:spot        the next street view (host)   O:id:round / M:id:round   have it / missing
 --   G:id:round             the round starts (host)    S:id:round:score:yards:cont:x:y   a guess
+--   Y:id:round             a guess placed (not where: that's S, when the time runs out)
 --   N:id:round             the round is over (host)   F:id  the game is over   X:id  the host ended it
 -- The logic below has no frames (tests/test_game.py drives it under lupa through Gm.io); the
 -- window parts are at the end, built by Gm.Init.
@@ -913,7 +914,14 @@ end
 -- It's only placed: another double-click moves it, and the one placed when the time runs out counts.
 function Gm.Guess(x, y, cont)
   if not game or game.phase ~= "look" then return end
+  -- (the first one this round: the others see that this player guessed, not where; Y)
+  if not game.pending and game.mode ~= "solo" then ToOthers("Y", game.id, game.round) end
   game.pending = { x = x, y = y, cont = cont }
+  local mine = game.players[game.me]
+  if mine then
+    mine.placed = mine.placed or {}
+    mine.placed[game.round] = true
+  end
   Changed()
 end
 
@@ -1108,7 +1116,7 @@ function Gm.OnMessage(msg, channel, sender)
       and Gm.SameRoot(sender, game.host) and not game.players[sender] then
       Rename(game.host, sender)
     end
-    if sender ~= game.host and kind ~= "S" and kind ~= "Q" then return end -- (the host runs the game)
+    if sender ~= game.host and kind ~= "S" and kind ~= "Q" and kind ~= "Y" then return end -- (the host runs the game)
     if game.phase == "over" then return end -- (turned away or ended: a round starting doesn't bring it back)
     if kind == "W" and game.phase == "joined" then -- (the lobby's seconds left)
       if f[3] and f[3] ~= game.me and not game.nameSet and Gm.SameRoot(f[3], game.me) then Rename(game.me, f[3]) end
@@ -1170,7 +1178,12 @@ function Gm.OnMessage(msg, channel, sender)
       Over(Short(sender) .. " ended the game")
     end
   end
-  if kind == "S" and round and game.players[sender] then
+  if kind == "Y" and round and round == game.round and game.players[sender] then -- (they placed a guess)
+    local pl = game.players[sender]
+    pl.placed = pl.placed or {}
+    pl.placed[round] = true
+    Changed()
+  elseif kind == "S" and round and game.players[sender] then
     local pl = game.players[sender]
     pl.scores[round] = tonumber(f[3]) or 0
     local x, y, c = tonumber(f[6]), tonumber(f[7]), tonumber(f[5])
@@ -1786,7 +1799,9 @@ function Gm.Refresh()
           lastText = done and (ScoreColor(cur) .. "+" .. ((ph == "result" or ph == "over") and roundText[i] or cur) .. "|r")
             or "|cff808080-|r"
         else
-          lastText = done and "|cff40ff40guessed|r" or "|cff808080...|r"
+          local pl = game.players[s.name]
+          local placed = pl and pl.placed and pl.placed[game.round]
+          lastText = (done or placed) and "|cff40ff40guessed|r" or "|cff808080...|r"
         end
       end
       row.name:SetText(string.format("%d. %s%s|r%s", i, Gm.ColorCode(Gm.PlayerColor(game, s.name)), Short(s.name),
