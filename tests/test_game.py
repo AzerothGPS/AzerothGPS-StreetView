@@ -888,15 +888,17 @@ def test_an_open_game_with_first_and_last_names():
         assert p.game.phase == "look" and sorted(p.game.order.values()) == ["Ann Smith-Realm", "Bob Jones-Realm"], p.name
 
 
-def test_the_scoreboard_shows_three_then_eight_and_always_this_player(solo):
+def test_the_scoreboard_shows_five_and_scrolls(solo):
     p, _, _ = solo
-    rows = lambda n, mine, exp: list(p.G.BoardRows(n, mine, exp).values())
-    assert p.G.BOARD_ROWS == 3 and p.G.BOARD_ROWS_MAX == 8
-    assert rows(2, 1, False) == [1, 2]
-    assert rows(10, 2, False) == [1, 2, 3]
-    assert rows(10, 7, False) == [1, 2, 3, 7]  # (this player's own rank, under the top three)
-    assert rows(10, 7, True) == [1, 2, 3, 4, 5, 6, 7, 8]
-    assert rows(40, 25, True) == [1, 2, 3, 4, 5, 6, 7, 8, 25]
+    def rows(n, offset):
+        r, off = p.G.BoardRows(n, offset)
+        return list(r.values()), off
+    assert p.G.BOARD_ROWS == 5
+    assert rows(3, 0) == ([1, 2, 3], 0)
+    assert rows(5, 2) == ([1, 2, 3, 4, 5], 0)  # (five fit: nothing to scroll)
+    assert rows(12, 3) == ([4, 5, 6, 7, 8], 3)
+    assert rows(12, 99) == ([8, 9, 10, 11, 12], 7)  # (scrolled past the end: the last five)
+    assert rows(12, -4) == ([1, 2, 3, 4, 5], 0)
 
 
 def test_no_developer_tools_ship():

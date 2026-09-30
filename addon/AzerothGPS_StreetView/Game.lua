@@ -39,8 +39,7 @@ Gm.MSG_MAX = 240 -- an addon message's length, with room to spare (the game's li
 Gm.HOST_SILENT_SECONDS = 75 -- no word from the host this long (they went offline): the game is over
 Gm.RESULT_SECONDS = 10 -- the round's result, before the next round (the user, 2026-09-29)
 Gm.OVER_SECONDS = 60 -- the final result stays this long, then the game closes and the map is the map again
-Gm.BOARD_ROWS = 3 -- the scoreboard's players at first ("-"); its "+" shows up to
-Gm.BOARD_ROWS_MAX = 8 -- ... this many (the user, 2026-09-30)
+Gm.BOARD_ROWS = 5 -- the scoreboard's players shown; more scroll (the mouse wheel over it; the user, 2026-09-30)
 Gm.MENU_IDLE_SECONDS = 20 -- the game's menu, left alone this long (no choice, no mouse over it), closes
 Gm.JOIN_SECONDS = 30 -- the lobby: the game starts this long after the host starts it (the host can start
 -- it sooner; a party's starts as soon as everyone answered), counted down for every player who joined
@@ -266,14 +265,13 @@ function Gm.Winners(list)
   return out
 end
 
--- The scoreboard's rows (ranks), from `n` players: the top Gm.BOARD_ROWS (the panel's "+": the top
--- Gm.BOARD_ROWS_MAX), and this player's own rank (`mine`) after them when it's lower down.
-function Gm.BoardRows(n, mine, expanded)
+-- The scoreboard's rows (ranks), from `n` players scrolled down by `offset`: Gm.BOARD_ROWS of them;
+-- and the offset kept in range.
+function Gm.BoardRows(n, offset)
+  offset = math.max(0, math.min(offset or 0, n - Gm.BOARD_ROWS))
   local out = {}
-  local limit = math.min(n, expanded and Gm.BOARD_ROWS_MAX or Gm.BOARD_ROWS)
-  for i = 1, limit do out[i] = i end
-  if mine and mine > limit and mine <= n then out[#out + 1] = mine end
-  return out
+  for i = offset + 1, math.min(n, offset + Gm.BOARD_ROWS) do out[#out + 1] = i end
+  return out, offset
 end
 
 -- How to show numbers side by side ({ { whole, fine }, ... } -> strings): whole, unless another shows
@@ -1489,7 +1487,7 @@ local function BuildMenu(parent)
 end
 
 -- The panel: where the directions are, while a game is on.
-local ROWS = Gm.BOARD_ROWS_MAX + 1 -- (the rows' font strings: the most shown, and this player's own below them)
+local ROWS = Gm.BOARD_ROWS -- (the rows' font strings)
 
 local function BuildPanel(parent)
   panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
@@ -1555,20 +1553,25 @@ local function BuildPanel(parent)
     r.last:SetPoint("RIGHT", panel, "RIGHT", -64, 0)
     panel.rows[i] = r
   end
-  -- the scoreboard's "+" / "-": more players shown, or the top three again (on the row with the
-  -- panel's other buttons)
-  local toggle = Chip(panel, "+", 22, function()
-    panel.expanded = not panel.expanded
+  -- the scoreboard: more players than it shows scroll with the mouse wheel over it (the map
+  -- doesn't zoom there); a thin bar at its right edge shows where
+  local board = CreateFrame("Frame", nil, panel)
+  board:EnableMouseWheel(true)
+  board:SetScript("OnMouseWheel", function(_, delta)
+    panel.scroll = (panel.scroll or 0) - delta
     Gm.Refresh()
   end)
-  toggle:SetHeight(20)
-  toggle:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText(panel.expanded and ("Show the top " .. Gm.BOARD_ROWS) or ("Show up to " .. Gm.BOARD_ROWS_MAX .. " players"), 1, 1, 1)
-    GameTooltip:Show()
-  end)
-  toggle:Hide()
-  panel.boardToggle = toggle
+  board:Hide()
+  panel.board = board
+  local track = board:CreateTexture(nil, "ARTWORK")
+  track:SetColorTexture(1, 1, 1, 0.1)
+  track:SetWidth(3)
+  track:SetPoint("TOPRIGHT", board, "TOPRIGHT", 0, 0)
+  track:SetPoint("BOTTOMRIGHT", board, "BOTTOMRIGHT", 0, 0)
+  local thumb = board:CreateTexture(nil, "OVERLAY")
+  thumb:SetColorTexture(1, 0.82, 0, 0.7)
+  thumb:SetWidth(3)
+  board.thumb = thumb
   local ok, start = pcall(CreateFrame, "Button", nil, panel, "UIPanelButtonTemplate")
   if not ok or not start then start = Chip(panel, "Start now", 90) end
   start:SetSize(90, 20)
@@ -1768,12 +1771,9 @@ function Gm.Refresh()
       ts[i] = { s.total, s.fine }
     end
     local roundText, totalText = Gm.ShowTied(rs), Gm.ShowTied(ts)
-    if panel.boardGame ~= game.id then panel.boardGame, panel.expanded = game.id, false end -- (a new game: 3 again)
-    local mine
-    for i, s in ipairs(list) do
-      if s.name == game.me then mine = i end
-    end
-    local ranks = Gm.BoardRows(#list, mine, panel.expanded)
+    if panel.boardGame ~= game.id then panel.boardGame, panel.scroll = game.id, 0 end -- (a new game: the top)
+    local ranks
+    ranks, panel.scroll = Gm.BoardRows(#list, panel.scroll)
     for k, i in ipairs(ranks) do
       local s = list[i]
       local row = panel.rows[k]
@@ -1801,12 +1801,23 @@ function Gm.Refresh()
       row.total:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, y - (k - 1) * 14)
       rowsShown = k
     end
-    -- "+": more of the players (up to Gm.BOARD_ROWS_MAX); "-": back to the top Gm.BOARD_ROWS
-    local more = #list > Gm.BOARD_ROWS
-    panel.boardToggle:SetShown(more)
-    if more then panel.boardToggle.label:SetText(panel.expanded and "-" or "+") end
+    -- more than it shows: the wheel scrolls, and the bar shows where
+    local board = panel.board
+    board:SetShown(#list > Gm.BOARD_ROWS)
+    if board:IsShown() then
+      local top, rowsH = y + 2, rowsShown * 14
+      board:ClearAllPoints()
+      board:SetPoint("TOPLEFT", panel, "TOPLEFT", 4, top)
+      board:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, top)
+      board:SetHeight(rowsH)
+      local th = math.max(8, rowsH * Gm.BOARD_ROWS / #list)
+      board.thumb:ClearAllPoints()
+      board.thumb:SetPoint("TOPRIGHT", board, "TOPRIGHT", 0,
+        -(rowsH - th) * panel.scroll / math.max(1, #list - Gm.BOARD_ROWS))
+      board.thumb:SetHeight(th)
+    end
   end
-  if game.mode == "solo" then panel.boardToggle:Hide() end
+  if game.mode == "solo" then panel.board:Hide() end
   for i = 1, ROWS do
     local row = panel.rows[i]
     local on = i <= rowsShown
@@ -1845,7 +1856,7 @@ function Gm.Refresh()
   local reopen = (ph == "look" or ph == "wait" or ph == "result" or ph == "over") and game.spot ~= nil
     and not game.missing and not (ns.Viewer.Current() and ns.Viewer.Current().game)
   panel.reopen:SetShown(reopen)
-  local list, extra = { panel.boardToggle, panel.submit, panel.reopen }, panel.boardToggle:IsShown()
+  local list, extra = { panel.submit, panel.reopen }, false
   for _, e in ipairs(Gm.extraButtons) do
     local on = e.shown(game) and true or false
     e.button:SetShown(on)
