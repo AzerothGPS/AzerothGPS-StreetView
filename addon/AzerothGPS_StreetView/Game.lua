@@ -1337,6 +1337,8 @@ function Gm.Refresh()
   panel:SetPoint("TOPRIGHT", -4, -4)
   panel:Show()
   local ph = game.phase
+  -- (a game started, by the menu or an invitation accepted: the menu folds away)
+  if ph ~= "over" and fly and fly:IsShown() and fly.target > 0 then HideMenu() end
   local roundText = game.round > 0 and string.format("  |cffffffffRound %d of %d|r", game.round, game.rounds) or ""
   panel.title:SetText("|cffffd100Where in the Azeroth?|r" .. (game.mode == "solo" and "  |cff9d9d9dsolo|r" or "") .. roundText)
   local status
@@ -1547,6 +1549,7 @@ local function BuildButton(parent, figure)
   gameButton:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
   gameButton:RegisterForClicks("LeftButtonUp")
   gameButton:SetScript("OnClick", function()
+    if fly:IsShown() and fly.target > 0 then return HideMenu() end -- (open: the click closes it, game or not)
     if game then
       if game.phase == "over" then Gm.Leave() else io().print("A game is on: its X leaves it.") end
       return
