@@ -461,3 +461,13 @@ def test_road_sync_retires_spots_off_the_roads_and_lists_new_roads():
     # shipping every ~200 yd: only every other new spot needs rendering
     r = roads.diff(rendered, planned, current, 100, 200)
     assert len(r["add"]) == 6
+
+
+def test_cave_and_instance_spots_are_tagged_in_the_index():
+    pts = [{"id": "1-5-5", "cont": 1, "x": 5, "y": 5, "facing": 0, "zone": "Z", "poses": [], "cube": {"pad": 0.08}},
+           {"id": "1-9-9", "cont": 1, "x": 9, "y": 9, "facing": 0, "zone": "Z", "poses": [], "cube": {"pad": 0.08},
+            "kind": "cave"}]
+    lua = lupa.LuaRuntime()
+    lua.execute(pack.index_lua(pts, "v", KAL))
+    got = lua.eval("AzerothGPS_StreetViewPacks[1].points")
+    assert got[1].kind is None and got[2].kind == "cave"

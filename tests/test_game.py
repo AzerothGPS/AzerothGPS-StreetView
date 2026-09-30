@@ -19,7 +19,8 @@ PACK = """{ { name = "t", root = "R\\\\", ext = "jpg", points = {
   { id = "0-300-300", cont = 0, x = 300, y = 300 },
   { id = "0-900-900", cont = 0, x = 900, y = 900 },
   { id = "1-5000-5000", cont = 1, x = 5000, y = 5000 },
-  { id = "20036-1-1", cont = 20036, x = 1, y = 1 },
+  { id = "20036-1-1", cont = 20036, x = 1, y = 1, kind = "instance" },
+  { id = "1-8000-8000", cont = 1, x = 8000, y = 8000, kind = "cave" },
 } } }"""
 
 
@@ -165,10 +166,10 @@ def test_spots_are_on_continents_and_never_twice(solo):
     seen = set()
     for _ in range(5):
         s = p.G.PickSpot(used, lambda n: 1)
-        assert s.cont < 10000 and s.id not in seen
+        assert s.cont < 10000 and s.id not in seen and s.kind is None
         seen.add(s.id)
         used[s.id] = True
-    assert p.G.PickSpot(used, lambda n: 1) is None  # (only the dungeon's is left)
+    assert p.G.PickSpot(used, lambda n: 1) is None  # (only the dungeon's and the cave's are left)
 
 
 def test_solo_game_runs_its_rounds_and_averages(solo):

@@ -420,19 +420,24 @@ Do not start a milestone until the previous one passed its in-game check on the 
 4. Which race the capture character uses (fixes the camera height for the whole dataset, Tracks 1 and 3).
 5. After R2: whether the Track 2 render look is acceptable for the public data packs, or whether only real screenshots (Track 1 or Track 3) may ship. That choice sets how many points the user is willing to capture by hand.
 
-## 10. Instances: street views in dungeons and raids (planned 2026-09-28)
+## 10. Instances: street views in dungeons and raids (planned 2026-09-28, changed 2026-09-29)
 
-Rendered with Track 2, like the open world: no game and no server. Instance spots are a separate pack family, so the open-world packs and their budget stay as they are.
+Rendered with Track 2, like the open world: no game and no server. **Changed by the user on 2026-09-29: key spots only (entrances, bosses, stairs), shipped inside the main AzerothGPS_StreetView addon**, not a dense 30-yard walk in a separate pack. About 450 spots, about 0.27 GB, so the one addon stays near 1.1 GB. The 30-yard notes below are kept as the fallback if key spots turn out too sparse.
 
 ### 10.1 What exists already (AzerothGPS, `Data/Instances.lua`)
 
-- **25 instances**: 19 dungeons and 6 raids. Each is a level of its own, `20000 + MapID`, in the instance's own world coordinates. Each has roads per floor (`ns.Roads[level]`, packed points, node heights in `.z`), floors that lie over each other (layers), entrances (outside and inside end), and bosses with positions and kill order.
+- **37 instances** (counted 2026-09-29; AzerothGPS has since added Blackwing Lair and Forever's new ones): 54 entrances, 302 bosses. Originally **25 instances**: 19 dungeons and 6 raids. Each is a level of its own, `20000 + MapID`, in the instance's own world coordinates. Each has roads per floor (`ns.Roads[level]`, packed points, node heights in `.z`), floors that lie over each other (layers), entrances (outside and inside end), and bosses with positions and kill order.
 - **Road length** (measured 2026-09-28, sum of road edges; overlapping pieces inflate it): about 302,000 yards. Biggest: Naxxramas 52k, Dire Maul 39k, Ahn'Qiraj Temple 30k, Maraudon 23k, Blackrock Depths 19k. Smallest: Stockade 1.3k, Onyxia 1.6k, Shadowfang Keep 3.0k, Deadmines 3.1k.
-- **Missing from the data:** Blackwing Lair (map 469), and WoW Forever's new dungeons and raids (nine new dungeons, Hyjal Summit, Barrow Deeps). AzerothGPS has to add them first (`agps instances --write`) before they can get spots. **Handed to the AzerothGPS chat by the user on 2026-09-28**, together with the API addition in 10.5. Don't do it from here.
+- **Missing from the data (2026-09-28):** Blackwing Lair (map 469), and WoW Forever's new dungeons and raids. Handed to the AzerothGPS chat on 2026-09-28 and since added (Blackwing Lair, Demon Fall Canyon, Karazhan Crypts, City of Dalaran, Excavation Site: Wetlands, Ruins of Lordaeron, The Hall of Thanes, The Tainted Scar, Storm Cliffs, The Crystal Vale, Nightmare Grove, Scarlet Enclave). The API addition in 10.5 is still theirs.
 
-### 10.2 Capture points
+### 10.2 Capture points: key spots only (the user, 2026-09-29)
 
-- From the instance roads, with each node's height: `harvester points --instances [--only "Ragefire Chasm"]`.
+- `harvester points --instances [--only "Ragefire Chasm"]` plans three kinds, all tagged `kind = "instance"` in meta.json and the Index (Where in the Azeroth? skips any spot with a `kind`):
+  - **Entrances:** one just inside each entrance (the inside end in `ns.Instances[level].entrances`), facing into the instance. 54 today.
+  - **Bosses:** one per boss, 15 to 25 yards back along the road from the boss's position toward the way in, facing the boss (the renders have no creatures, so a spot on the boss shows an empty floor; back a little, the room is in view). Bosses that share a room within ~25 yards share a spot. 302 today, somewhat fewer after sharing.
+  - **Stairs and floor changes:** one at each end of a road stretch that climbs steeply (roughly over 1 yard up per 3 along) or joins two floors (layers), at the landing, facing along the road. Estimated ~100; the planner reports the real count.
+- Dedupe only on the same floor (within 20 yards and 4 yards of height). About 450 spots in all; render time about 11 hours at 1.5 minutes a spot.
+- The rest of this section is the earlier dense plan, kept as the fallback:
 - **Spacing 30 yards** (corridors are short and turn often; 100 yards would skip whole rooms). Also add a spot facing each boss (from its position, 15 to 20 yards back along the road), one just inside each entrance, and one at each floor change.
 - **Dedupe only on the same floor** (within 20 yards and 4 yards of height). Stacked floors keep their own spots.
 - **Point id:** `<level>-<x>-<y>-<z>` (for example `20389-5-12-(-24)`, written as `20389-5-12-m24`) because floors stack. `pack.point_id`, the viewer's `Data.lua` and the harvester must agree. This is the one format change; open-world ids stay `<cont>-<x>-<y>`.
@@ -456,12 +461,12 @@ Rendered with Track 2, like the open world: no game and no server. Instance spot
 
 - The game **hides the player's position in dungeons** (probed in Ragefire Chasm: `UnitPosition` and friends are nil). "Nearest spot to me" can't work inside. Browsing does: AzerothGPS already shows each instance's map with floors (`G.ShowInstance`, floor wheel). The figure's drag and drop and the spot dots go on that view, for the floor shown.
 - **AzerothGPS API additions** (small, additive, with lupa tests): the instance level and floor currently shown on the map, and instance world to map point. **The AzerothGPS chat owns this** (handed over 2026-09-28). StreetView waits for it and uses it only through `_G.AzerothGPS`. Title: the instance name and the floor, from `ns.Instances`.
-- **Mini game:** instance spots stay out of the normal rounds. Maybe a "dungeon round" later.
+- **No walking arrows inside:** key spots are rooms apart, so the arrows would jump through walls. Instance spots open from their dots on the instance map (per floor), one view at a time; the arrows are hidden there.
+- **Where in the Azeroth?:** instances **and caves** never come up (the user, 2026-09-29). Any spot with a `kind` (`"instance"`, `"cave"`) is skipped by `Gm.PickSpot`, as is any level of 10000 or more. Maybe a "dungeon round" later.
 
 ### 10.6 Packs and size (the user: CurseForge limit is very important)
 
-- **Decided (the user, 2026-09-28): one separate pack for now**, `AzerothGPS_StreetView_Instances`, its own optional CurseForge project (the viewer works without it). It stays separate until the open-world continent packs' final sizes are known. Then decide whether instances fold into the continent packs (if they have room under 1.8 GB), or split into Dungeons / Raids or per continent.
-- At the measured ~0.5 MB a spot, 5,000 spots is about 2.5 GB, more than one pack. Dark interiors may compress smaller. `sv.py build` prints the projection per pack, as it does now. If the instance pack nears 1.8 GB before the continent sizes are settled, split it then (raids out first).
+- **Decided (the user, 2026-09-29): inside the main addon.** The instance spots go into the one `AzerothGPS_StreetView` pack (packs.json: add their levels to its continents list, or let `pack_for` take `kind = "instance"` spots). About 450 spots at ~600 KB is ~0.27 GB; with the open world (~0.84 GB) the zip is about 1.1 GB, under the 1.8 GB budget. (The 2026-09-28 plan, a separate optional `AzerothGPS_StreetView_Instances` pack for a dense 4,000-6,000 spots, ~2.5-3.5 GB, is dropped.)
 - The same rules as everywhere: renders only, never the user's own screenshots (manual captures stay out, `pack.is_manual`).
 
 ### 10.7 References (standing rule)
@@ -479,7 +484,7 @@ Before each instance: collect online screenshots, Forever-era first, into `work\
 | I4 | Raids: Onyxia, Molten Core, Zul'Gurub, Ruins of Ahn'Qiraj, Ahn'Qiraj Temple, Naxxramas (and Blackwing Lair once AzerothGPS has it) | Same |
 | I5 | Forever's new dungeons and raids, after AzerothGPS adds them | Same |
 
-**Render time:** about 1.5 minutes a spot with cached scenes, so 5,000 spots is about 125 hours (five days of GPU). Instances run after the open-world pass, or in between as the user prefers.
+**Render time:** about 1.5 minutes a spot with cached scenes, so the ~450 key spots are about 11 hours (one more overnight run). Instances run after the open-world pass, once I0 passes.
 
 ## 11. Keeping the street views current (after the first capture; the user, 2026-09-29)
 

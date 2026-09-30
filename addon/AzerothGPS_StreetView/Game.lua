@@ -163,7 +163,8 @@ end
 function Gm.PickSpot(used, rnd, allowed)
   local ids = {}
   for id, p in pairs(D.byId) do
-    if not used[id] and type(p.cont) == "number" and p.cont < 10000
+    -- (open-world road spots only: never instances, caves or other levels, p.kind; the user, 2026-09-29)
+    if not used[id] and type(p.cont) == "number" and p.cont < 10000 and not p.kind
         and (not allowed or (p.pack and allowed[Gm.PackKey(p.pack.name)]))
         and (not Gm.Usable or Gm.Usable(p)) then
       ids[#ids + 1] = id

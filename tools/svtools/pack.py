@@ -136,10 +136,12 @@ def index_lua(points: list[dict], version: str, name: str = LEGACY_PACK) -> str:
         poses = "" if p.get("cube") else ", ".join(f'["{n}"] = true' for n in p["poses"])
         cube = p.get("cube")
         cube_lua = f' cube = {{ pad = {cube["pad"]} }},' if cube else ""
+        kind = p.get("kind")  # (cave or instance spots: never in Where in the Azeroth?)
+        kind_lua = f' kind = {lua_str(kind)},' if kind else ""
         lines.append(
             f'    {{ id = {lua_str(p["id"])}, cont = {int(p["cont"])}, x = {p["x"]:.1f}, y = {p["y"]:.1f}, '
             f'z = {p.get("z") or 0:.1f}, facing = {p["facing"]:.4f}, zone = {lua_str(p.get("zone") or "")}, '
-            f'poses = {{ {poses} }},{cube_lua} }},'
+            f'poses = {{ {poses} }},{cube_lua}{kind_lua} }},'
         )
     lines += ["  },", "})", ""]
     return "\n".join(lines)
@@ -334,6 +336,7 @@ def import_harvest(folder: Path, build: Path, log=print) -> dict:
         points[pid] = {
             "id": pid, "cont": meta["cont"], "x": meta["x"], "y": meta["y"], "z": meta.get("z") or 0,
             "facing": meta.get("facing") or 0, "zone": meta.get("zone") or "", "mapID": meta.get("mapID"),
+            "kind": meta.get("kind"),
             "date": meta.get("captured", ""), "build": meta.get("client_build", ""), "poses": [],
             "cube": meta["cube"], "source": "harvester", "imported_at": int(time.time()),
         }
