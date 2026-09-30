@@ -48,7 +48,11 @@ class Player:
         self.map_view = None  # (the map's center and zoom, when a test gives one: the result animates from it)
         self.map_state = None  # (the map before the game: restored when it ends)
         self.group = group  # the party's channel, or None
+        self.posted = []  # (text, chatType, index) posted in chat
         io = self.lua.table_from({
+            "joinChannel": lambda ch: net.channels.setdefault(ch, set()).add(name),
+            "leaveChannel": lambda ch: net.channels.get(ch, set()).discard(name),
+            "post": lambda text, chat, index=None: self.posted.append((text, chat, index)),
             "now": lambda: clock.t,
             "me": lambda: name,
             "send": self.send,
@@ -93,17 +97,25 @@ class Player:
 
 class Net:
     def __init__(self):
-        self.players, self.queue = {}, []
+        self.players, self.queue, self.channels = {}, [], {}
+
+    def hears(self, name, sender, chat, target):
+        """Whether `name` gets a message (party: everyone else; whisper: one; a channel: its members)."""
+        if name == sender:
+            return False
+        if chat == "WHISPER":
+            return name == target
+        if chat == "CHANNEL":
+            return name in self.channels.get(target, ()) and sender in self.channels.get(target, ())
+        return True
 
     def deliver(self):
-        """Hand every queued message to its receivers (party: everyone else; whisper: one)."""
+        """Hand every queued message to its receivers."""
         n = 0
         while self.queue:
             sender, msg, chat, target = self.queue.pop(0)
             for name, p in list(self.players.items()):
-                if name == sender:
-                    continue
-                if chat == "WHISPER" and name != target:
+                if not self.hears(name, sender, chat, target):
                     continue
                 p.G.OnMessage(msg, chat, sender)
                 n += 1
@@ -674,6 +686,127 @@ def test_standings_can_leave_out_the_round_being_played():
     shown = {s.name: s.total for s in a.G.Standings(g, g.round - 1).values()}
     assert shown["Bob-Realm"] == scores(a, "Bob-Realm")[0]  # (only round 1 counts before round 2's result)
     assert {s.name: s.total for s in a.G.Standings(g).values()}["Bob-Realm"] == shown["Bob-Realm"] + 100
+
+
+def test_the_lobby_counts_down_the_same_for_everyone_who_joins():
+    clock, net = Clock(), Net()
+    a = Player("Ann-Realm", clock, net, group="PARTY")
+    b = Player("Bob-Realm", clock, net, group="PARTY")
+    c = Player("Cid-Realm", clock, net, group="PARTY")
+    c.ask = lambda sender, rounds, yes, no: c.later.append(yes)  # (Cid answers late)
+    c.later = []
+    c.G.io.ask = c.ask
+    assert a.G.JOIN_SECONDS == 30
+    a.G.Start("party", 1)
+    start = a.game.deadline
+    run(net, clock, 1)
+    assert b.game.phase == "joined" and abs(b.game.startAt - start) <= 1
+    run(net, clock, 11)
+    c.later[0]()  # (clicks Join 12 s in)
+    net.deliver()
+    assert c.game.phase == "joined" and abs(c.game.startAt - start) <= 1  # (18 s left, not 30)
+    run(net, clock, 2)
+    assert a.game.phase == "look"  # (everyone answered: no need to wait)
+
+
+def test_the_lobby_waits_for_the_countdown_until_everyone_answered():
+    (a, b, c), clock, net = party(3)
+    c.G.io.ask = lambda sender, rounds, yes, no: None  # (Cid never answers)
+    a.G.Start("party", 1)
+    run(net, clock, 20)
+    assert a.game.phase == "invite" and b.game.phase == "joined" and b.game.startAt - clock.t == pytest.approx(10, abs=1)
+    run(net, clock, 11)
+    assert a.game.phase == "look" and b.game.phase == "look"
+
+
+def open_game(n=3, rounds=1):
+    clock, net = Clock(), Net()
+    ps = [Player(f"P{i:02d}-Realm", clock, net) for i in range(n)]  # (no party: strangers)
+    assert ps[0].G.Start("open", rounds)
+    return ps, clock, net
+
+
+def test_an_open_game_is_joined_from_its_link_in_chat():
+    (a, b, c), clock, net = open_game(3)
+    g = a.game
+    assert g.open and g.phase == "invite" and net.queue == []  # (no invitation: the link is posted)
+    assert a.G.PostLink("SAY")
+    assert not a.G.PostLink("GUILD")  # (not again so soon)
+    text, chat, _ = a.posted[0]
+    assert chat == "SAY" and f"AGPSSV-{g.id}-1" in text
+    shown = b.G.Linkify(text, "P00")  # (chat gives the author without the realm on the same realm)
+    assert "|Hgarrmission:agpssv:" + g.id + ":1:P00|h" in shown and "AGPSSV-" not in shown
+    link = shown.split("|H")[1].split("|h")[0]
+    run(net, clock, 5)
+    assert b.G.OnLink(link) and b.game.phase == "joined" and not b.game.startAt
+    run(net, clock, 1)
+    assert b.game.startAt == pytest.approx(g.deadline, abs=1)  # (the host's countdown)
+    assert list(g.order.values()) == ["P00-Realm", "P01-Realm"] and a.game.phase == "invite"
+    assert c.G.OnLink(link)
+    run(net, clock, 30)
+    for p in (a, b, c):
+        assert p.game.phase == "look" and len(p.game.order) == 3, p.name
+    for p in (a, b, c):
+        p.G.Guess(300, 300, 0)
+    run(net, clock, 45)
+    assert all(v is not None for v in (a.game.players["P02-Realm"].scores[1], c.game.players["P01-Realm"].scores[1]))
+    assert a.game.phase == "over"
+    for p in (a, b, c):
+        p.G.Leave()
+    assert all(not m for m in net.channels.values())  # (everyone left the game's channel)
+
+
+def test_an_open_game_turns_late_and_extra_players_away():
+    (a, b), clock, net = open_game(2)
+    link = f"garrmission:agpssv:{a.game.id}:1:P00-Realm"
+    a.G.StartNow()  # (nobody yet: over)
+    assert a.game.phase == "over"
+    assert b.G.OnLink(link)
+    run(net, clock, 1)
+    assert b.game.phase == "over" and "over" in b.game.reason
+    b.G.Leave()
+    a.G.Leave()
+    # full: the 40 players
+    ps, clock, net = open_game(41)
+    link = f"garrmission:agpssv:{ps[0].game.id}:1:P00-Realm"
+    for p in ps[1:]:
+        assert p.G.OnLink(link)
+        net.deliver()
+    assert ps[40].game.phase == "over" and "full" in ps[40].game.reason
+    run(net, clock, 1)
+    assert ps[0].game.phase == "look" and len(ps[0].game.order) == 40  # (full: it started)
+    assert all(p.game.phase == "look" for p in ps[1:40])
+
+
+def test_a_link_clicked_as_the_game_starts_stays_out_of_it():
+    # (fuzz seed 3685: "started without you", then the first round's P brought the player back in)
+    (a, b, c), clock, net = open_game(3)
+    link = f"garrmission:agpssv:{a.game.id}:1:P00-Realm"
+    b.G.OnLink(link)
+    run(net, clock, 1)
+    c.G.OnLink(link)  # (its J is on the way as the host starts)
+    a.G.StartNow()
+    run(net, clock, 3)
+    assert c.game.phase == "over" and list(a.game.order.values()) == ["P00-Realm", "P01-Realm"]
+    run(net, clock, 40)
+    assert c.game.phase == "over" and c.game.round == 0
+
+
+def test_a_link_to_a_host_who_never_answers_gives_up():
+    (a, b), clock, net = open_game(2)
+    link = f"garrmission:agpssv:{a.game.id}:3:P00-Realm"
+    net.players.pop("P00-Realm")  # (the host went offline)
+    assert b.G.OnLink(link)
+    run(net, clock, 11)
+    assert b.game.phase == "over" and "No answer" in b.game.reason
+
+
+def test_join_codes_parse_only_real_rounds(solo):
+    p, _, _ = solo
+    assert p.G.ParseJoinCode("hey AGPSSV-123456-3 come") == ("123456", 3)
+    assert p.G.ParseJoinCode("AGPSSV-123456-4") is None and p.G.ParseJoinCode("hello") is None
+    assert p.G.Linkify("no code here", "Bob") == "no code here"
+    assert p.G.OnLink("garrmission:other") is False
 
 
 def test_no_developer_tools_ship():

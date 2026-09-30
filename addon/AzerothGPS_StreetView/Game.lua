@@ -3,16 +3,20 @@
 -- they think it is (again to move the guess: the one placed when the time runs out counts): the
 -- closer, the more points (0-100 a round, the first ones easy, the last hard).
 -- Street views come only from the map packs every player has; the panel says who lacks which.
--- Solo, with the party, or with one player by whisper; 1, 3 or 5 rounds.
+-- Solo, with the party, with one player by whisper, or an open game (a link posted in chat: whoever
+-- clicks it joins, up to 40); 1, 3 or 5 rounds. The lobby counts down 30 s, the same for everyone.
 --
 -- While a game is on, the map is held (AzerothGPS.HoldMap): the route and its directions panel
 -- aren't shown (the route goes on; the arrow window still guides) and the game's panel takes the
 -- directions' place; its X leaves the game and brings the route back.
 --
--- Players talk through addon messages (prefix "AGPSSV", to the party or the one player whispered)
--- and only about the game: an invitation is always asked before joining. The host picks the
+-- Players talk through addon messages (prefix "AGPSSV", to the party, the one player whispered or an
+-- open game's hidden channel "AGPSSV<id>") and only about the game: an invitation is always asked
+-- before joining (an open game's link is the asking: clicking it joins). The host picks the
 -- street views and paces the rounds; each player scores their own guess and tells the others.
---   I:id:rounds:packs      invitation (host)          J:id:packs / D:id / B:id   join / decline / busy
+--   I:id:rounds:packs:secs invitation (host)          J:id:packs / D:id / B:id   join / decline / busy
+--   W:id:secs              the lobby's seconds left (host, on each join)   U:id:why   (host) can't join:
+--                          full / started / over (an open game's J, whispered)
 --   K:id:name:packs        a player's packs (host)    (packs: Kalimdor/2026.09.29,EasternKingdoms/...)
 --   L:id:ver:part:parts:name,name,...   the players (host), split over as many messages as a raid's
 --                          names need (an addon message holds 255 bytes)   Q:id   a player left
@@ -33,7 +37,11 @@ Gm.MSG_MAX = 240 -- an addon message's length, with room to spare (the game's li
 Gm.HOST_SILENT_SECONDS = 75 -- no word from the host this long (they went offline): the game is over
 Gm.RESULT_SECONDS = 10 -- the round's result, before the next round (the user, 2026-09-29)
 Gm.OVER_SECONDS = 60 -- the final result stays this long, then the game closes and the map is the map again
-Gm.JOIN_SECONDS = 20 -- the host waits this long for answers to an invitation
+Gm.JOIN_SECONDS = 30 -- the lobby: the game starts this long after the host starts it (the host can start
+-- it sooner; a party's starts as soon as everyone answered), counted down for every player who joined
+Gm.MAX_PLAYERS = 40 -- an open game (the link posted in chat) takes this many, then starts
+Gm.LINK_ANSWER_SECONDS = 10 -- a link clicked: no word from its host this long, the game is gone
+Gm.POST_COOLDOWN = 5 -- the link posted: again after this long (no spamming the channels)
 Gm.PROPOSE_SECONDS = 3 -- ... and this long for the players to say they have the next street view
 Gm.GRACE_SECONDS = 3 -- a round ends this long after the guessing time, whoever hasn't answered
 Gm.MAX_TRIES = 5 -- street views tried until everyone has one
@@ -343,8 +351,18 @@ Gm.io = {
     return r ~= "" and (n .. "-" .. r) or n
   end,
   send = function(msg, chatType, target)
-    if C_ChatInfo and C_ChatInfo.SendAddonMessage then C_ChatInfo.SendAddonMessage(Gm.PREFIX, msg, chatType, target) end
+    if not (C_ChatInfo and C_ChatInfo.SendAddonMessage) then return end
+    if chatType == "CHANNEL" and type(target) == "string" then -- (an open game's channel, by name)
+      local index = GetChannelName(target)
+      if not index or index == 0 then return end
+      target = index
+    end
+    C_ChatInfo.SendAddonMessage(Gm.PREFIX, msg, chatType, target)
   end,
+  -- an open game's hidden chat channel (its addon messages; never shown in a chat window)
+  joinChannel = function(name) if JoinTemporaryChannel then JoinTemporaryChannel(name) end end,
+  leaveChannel = function(name) if LeaveChannelByName then LeaveChannelByName(name) end end,
+  post = function(text, chatType, index) SendChatMessage(text, chatType, nil, index) end,
   group = function() -- the party's channel, nil when not in one
     if IsInRaid and IsInRaid() then return "RAID" end
     if IsInGroup and IsInGroup() then return "PARTY" end
@@ -389,12 +407,20 @@ local function RemovePlayer(name)
   end
 end
 
--- To everyone else in the game: the party's channel, or a whisper each.
+-- An open game's channel: its name from the game's id, joined and left through io (guarded: the
+-- tests' io and older ones may lack them).
+function Gm.ChannelName(id) return "AGPSSV" .. id end
+local function JoinChannel(name) if io().joinChannel then io().joinChannel(name) end end
+local function LeaveChannel(g) if g and g.open and g.chanName and io().leaveChannel then io().leaveChannel(g.chanName) end end
+-- (the target that goes with game.channel: an open game's channel name, else none)
+local function ChanTarget() return game.open and game.chanName or nil end
+
+-- To everyone else in the game: the party's channel (an open game's own), or a whisper each.
 local function ToOthers(...)
   if game.mode == "solo" then return end
   local msg = Gm.Encode(...)
   if game.mode == "party" then
-    io().send(msg, game.channel)
+    io().send(msg, game.channel, ChanTarget())
   else
     for _, name in ipairs(game.order) do
       if name ~= game.me then io().send(msg, "WHISPER", name) end
@@ -421,6 +447,7 @@ local function SendRoster()
 end
 
 local function NewGame(mode, rounds, host, id)
+  LeaveChannel(game) -- (the last game, over but not closed yet)
   local me = io().me()
   game = { id = id or tostring(io().random(100000, 999999)), mode = mode, rounds = rounds, host = host or me, me = me,
     players = {}, order = {}, round = 0, used = {}, phase = "wait", packs = {}, report = {}, looks = {} }
@@ -582,16 +609,21 @@ local function AllAnswered()
   local n = 0
   for _ in pairs(game.answers) do n = n + 1 end
   if game.mode == "whisper" then return n >= 1 end
+  if game.open then return #game.order >= Gm.MAX_PLAYERS end -- (anyone may still click the link)
   return n >= io().groupSize() - 1
 end
 
--- Start a game as its host. mode: "solo", "party" or "whisper" (target: the player's name).
+-- Start a game as its host. mode: "solo", "party", "whisper" (target: the player's name) or "open"
+-- (a party of whoever clicks the link the host posts in chat, up to Gm.MAX_PLAYERS, over the game's
+-- own hidden channel).
 function Gm.Start(mode, rounds, target)
   if game and game.phase ~= "over" then
     io().print("A game is already on.")
     return false
   end
-  if mode == "party" and not io().group() then
+  local open = mode == "open"
+  if open then mode = "party" end
+  if mode == "party" and not open and not io().group() then
     io().print("You're not in a party.")
     return false
   end
@@ -617,6 +649,10 @@ function Gm.Start(mode, rounds, target)
   NewGame(mode, rounds)
   game.before = io().mapState()
   game.channel = mode == "party" and io().group() or nil
+  if open then
+    game.open, game.channel, game.chanName = true, "CHANNEL", Gm.ChannelName(game.id)
+    JoinChannel(game.chanName)
+  end
   game.target = mode == "whisper" and target or nil
   io().hold(true)
   io().showMap()
@@ -628,7 +664,93 @@ function Gm.Start(mode, rounds, target)
   game.phase = "invite"
   game.answers = {}
   game.deadline = Now() + Gm.JOIN_SECONDS
-  ToOthers("I", game.id, rounds, Gm.PackField(game.packs[game.me]))
+  -- (the seconds left: the lobby's countdown, the same for everyone)
+  if not open then ToOthers("I", game.id, rounds, Gm.PackField(game.packs[game.me]), Gm.JOIN_SECONDS) end
+  Changed()
+  return true
+end
+
+-- The lobby's seconds left (host), whole.
+local function SecondsLeft() return math.max(0, math.ceil(game.deadline - Now())) end
+
+-- An open game's invitation, as posted in chat: plain text (chat can't carry an addon's own links);
+-- players with StreetView see its code as a link to click (Gm.Linkify), the rest read it.
+function Gm.JoinText(g)
+  g = g or game
+  return string.format("Where in the Azeroth? (AzerothGPS StreetView): join my game, %s: AGPSSV-%s-%d",
+    g.rounds == 1 and "1 round" or (g.rounds .. " rounds"), g.id, g.rounds)
+end
+
+-- The game's id and rounds in a chat line with its code, else nil.
+function Gm.ParseJoinCode(text)
+  local id, rounds = tostring(text or ""):match("AGPSSV%-(%d+)%-(%d+)")
+  rounds = tonumber(rounds)
+  if not id then return nil end
+  for _, n in ipairs(Gm.ROUNDS) do
+    if n == rounds then return id, rounds end
+  end
+end
+
+-- A chat line with the code, the code a link (to Gm.OnLink) to join `author`'s game.
+function Gm.Linkify(text, author)
+  if type(text) ~= "string" or not author or author == "" then return text end
+  local id, rounds = Gm.ParseJoinCode(text)
+  if not id then return text end
+  author = author:gsub(":", "")
+  local link = string.format("|cff66ccff|Hgarrmission:agpssv:%s:%d:%s|h[Join Where in the Azeroth?]|h|r", id, rounds, author)
+  return (text:gsub("AGPSSV%-%d+%-%d+", function() return link end, 1))
+end
+
+-- The link clicked (its "garrmission:agpssv:id:rounds:host").
+function Gm.OnLink(link)
+  local id, rounds, host = tostring(link):match("^garrmission:agpssv:(%d+):(%d+):(.+)$")
+  if id then return Gm.JoinLink(host, id, tonumber(rounds)) end
+  return false
+end
+
+-- Join an open game from its link: the game's channel, and a J whispered to its host (who answers
+-- with the lobby's seconds left, W, or why not, U).
+function Gm.JoinLink(host, id, rounds)
+  if not host or not id or not rounds then return false end
+  if not host:find("-", 1, true) then
+    local realm = io().me():match("%-(.+)$")
+    if realm then host = host .. "-" .. realm end
+  end
+  if host == io().me() then
+    io().print("That's your own game: post the link for others to click.")
+    return false
+  end
+  if game and game.phase ~= "over" then
+    if game.id ~= id then io().print("A game is already on.") end
+    return false
+  end
+  if next(D.byId) == nil then
+    io().print("No street views are installed.")
+    return false
+  end
+  NewGame("party", rounds, host, id)
+  game.open, game.channel, game.chanName = true, "CHANNEL", Gm.ChannelName(id)
+  JoinChannel(game.chanName)
+  game.phase = "joined"
+  game.before = io().mapState()
+  game.askedAt = Now()
+  game.deadline = Now() + Gm.JOIN_SECONDS + 10
+  game.heardHost = Now()
+  io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me])), "WHISPER", host)
+  io().hold(true)
+  io().showMap()
+  Changed()
+  return true
+end
+
+-- Host of an open game: post the link (chatType "SAY", "GUILD", "PARTY", "RAID" or "CHANNEL" with
+-- the channel's number). A click's work (the game's chat needs one for say and the channels).
+function Gm.PostLink(chatType, index)
+  if not (game and game.isHost and game.open and game.phase == "invite") then return false end
+  local now = Now()
+  if game.postedAt and now - game.postedAt < Gm.POST_COOLDOWN then return false end
+  game.postedAt, game.postReady = now, nil
+  if io().post then io().post(Gm.JoinText(game), chatType, index) end
   Changed()
   return true
 end
@@ -655,6 +777,7 @@ function Gm.Leave()
     ToOthers(game.isHost and "X" or "Q", game.id)
   end
   local before = game.before
+  LeaveChannel(game)
   game = nil
   io().close()
   io().hold(false)
@@ -729,6 +852,9 @@ function Gm.Tick()
   if ph == "joined" and now >= game.deadline then
     return Over("The game started without you")
   end
+  if ph == "joined" and game.open and not game.startAt and now - game.askedAt >= Gm.LINK_ANSWER_SECONDS then
+    return Over("No answer from " .. Short(game.host) .. ": the game is over, or they're offline")
+  end
   -- (the host went offline or out of reach: nothing more will come)
   if not game.isHost and ph ~= "joined" and game.heardHost and now - game.heardHost > Gm.HOST_SILENT_SECONDS then
     return Over("Lost touch with " .. Short(game.host) .. " (the host)")
@@ -800,6 +926,7 @@ function Gm.OnMessage(msg, channel, sender)
     if not id or not rounds then return end
     local reply = channel == "WHISPER" and "WHISPER" or channel
     local to = channel == "WHISPER" and sender or nil
+    local left, heard = tonumber(f[4]) or Gm.JOIN_SECONDS, Now() -- (the lobby's countdown)
     if game and game.phase ~= "over" then
       io().send(Gm.Encode("B", id), reply, to)
       return
@@ -811,7 +938,8 @@ function Gm.OnMessage(msg, channel, sender)
       game.packs[sender] = Gm.ParsePacks(f[3])
       game.phase = "joined"
       game.before = io().mapState()
-      game.deadline = Now() + Gm.JOIN_SECONDS + 10 -- (no word from the host by then: it started without us)
+      game.startAt = heard + left
+      game.deadline = game.startAt + 10 -- (no word from the host by then: it started without us)
       game.heardHost = Now()
       io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me])), reply, to)
       io().hold(true)
@@ -822,15 +950,32 @@ function Gm.OnMessage(msg, channel, sender)
     end)
     return
   end
+  if kind == "J" and channel == "WHISPER" and id and (not game or id ~= game.id or game.phase == "over") then
+    return io().send(Gm.Encode("U", id, "over"), "WHISPER", sender) -- (a link to a game that's over)
+  end
   if not game or id ~= game.id then return end
   if sender == game.host then game.heardHost = Now() end
   local round = tonumber(f[2])
   if game.isHost then
-    if kind == "J" and game.phase == "invite" then
+    if kind == "J" and game.open and game.phase ~= "invite" and not game.players[sender] then
+      io().send(Gm.Encode("U", game.id, "started"), "WHISPER", sender)
+    elseif kind == "J" and game.open and #game.order >= Gm.MAX_PLAYERS and not game.players[sender] then
+      io().send(Gm.Encode("U", game.id, "full"), "WHISPER", sender)
+    elseif kind == "J" and game.phase == "invite" then
       AddPlayer(sender)
       game.answers[sender] = true
       game.packs[sender] = Gm.ParsePacks(f[2])
       Compare()
+      -- the lobby's seconds left, to whoever just joined (a party: everyone, the same countdown)
+      if game.open then
+        if game.deadline - Now() < 3 then -- (joined at the last moment: time to hear the channel)
+          game.deadline = Now() + 3
+          ToOthers("W", game.id, SecondsLeft())
+        end
+        io().send(Gm.Encode("W", game.id, SecondsLeft()), "WHISPER", sender)
+      else
+        ToOthers("W", game.id, SecondsLeft())
+      end
       Changed()
     elseif (kind == "D" or kind == "B") and game.phase == "invite" then
       game.answers[sender] = false
@@ -843,7 +988,18 @@ function Gm.OnMessage(msg, channel, sender)
     end
   else
     if sender ~= game.host and kind ~= "S" and kind ~= "Q" then return end -- (the host runs the game)
-    if kind == "K" and f[2] then
+    if game.phase == "over" then return end -- (turned away or ended: a round starting doesn't bring it back)
+    if kind == "W" and game.phase == "joined" then -- (the lobby's seconds left)
+      local left = tonumber(f[2])
+      if left then
+        game.startAt = Now() + left
+        game.deadline = game.startAt + 10
+        Changed()
+      end
+    elseif kind == "U" and game.phase == "joined" then -- (the host turned the join down)
+      local why = { full = "'s game is full", started = "'s game already started", over = "'s game is over" }
+      return Over(Short(sender) .. (why[f[2]] or " turned the join down"))
+    elseif kind == "K" and f[2] then
       game.packs[f[2]] = Gm.ParsePacks(f[3])
       Compare()
       Changed()
@@ -879,7 +1035,7 @@ function Gm.OnMessage(msg, channel, sender)
       game.phase = "ready"
       game.spot = Gm.OnMap(D.byId[f[3]], io().base)
       local reply = game.mode == "whisper" and "WHISPER" or game.channel
-      io().send(Gm.Encode(game.spot and "O" or "M", game.id, round), reply, game.mode == "whisper" and game.host or nil)
+      io().send(Gm.Encode(game.spot and "O" or "M", game.id, round), reply, game.mode == "whisper" and game.host or ChanTarget())
       Changed()
     elseif kind == "G" and round == game.round then
       Look()
@@ -904,7 +1060,7 @@ end
 
 -- The party changed: whoever isn't in it any more has left the game.
 function Gm.OnRoster()
-  if not game or game.mode ~= "party" or game.phase == "over" then return end
+  if not game or game.mode ~= "party" or game.open or game.phase == "over" then return end -- (an open game: no party)
   if not io().group() then return Over("You left the party") end
   for i = #game.order, 1, -1 do
     local name = game.order[i]
@@ -1147,8 +1303,11 @@ local function BuildMenu(parent)
   end)
   local whisper = Chip(fly, "Whisper", 60, function() fly.mode = "whisper" ShowMenu("whisper") end)
   Tip(whisper, "Whisper", "Play against one player: your target, a name you type, or shift-click their name in chat.")
-  local s1 = Step("mode", { solo, party, whisper })
-  for _, c in ipairs({ solo, party, whisper }) do c:SetParent(s1) end
+  local link = Chip(fly, "Link", 40, function() fly.mode = "open" ShowMenu("rounds") end)
+  Tip(link, "Link", "An open game: post its link in say, guild or a channel, and whoever clicks it joins (they need"
+    .. " AzerothGPS StreetView; your realm and faction), up to " .. Gm.MAX_PLAYERS .. " players.")
+  local s1 = Step("mode", { solo, party, whisper, link })
+  for _, c in ipairs({ solo, party, whisper, link }) do c:SetParent(s1) end
 
   local function RoundChips(parent)
     local list = {}
@@ -1272,6 +1431,35 @@ local function BuildPanel(parent)
   start:SetScript("OnClick", function() Gm.StartNow() end)
   start:Hide()
   panel.start = start
+  -- an open game's host: post the link (where: say, guild, the group, the numbered channels joined)
+  panel.postLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  panel.postLabel:SetText("Post the link:")
+  panel.postLabel:Hide()
+  panel.posts = {}
+  local function Post(text, width, chatType, index, tip)
+    local b = Chip(panel, text, width, function() Gm.PostLink(chatType, index) end)
+    Tip(b, "Post the link in " .. tip, "Players with AzerothGPS StreetView click it to join.")
+    b.shown = function()
+      if chatType == "GUILD" then return IsInGuild and IsInGuild() end
+      if chatType == "PARTY" then return IsInGroup and IsInGroup() and not (IsInRaid and IsInRaid()) end
+      if chatType == "RAID" then return IsInRaid and IsInRaid() end
+      if chatType == "CHANNEL" then
+        local n, name = GetChannelName(index)
+        if not n or n == 0 or not name then return false end
+        b.label:SetText((name:match("^([^%-]+)") or name):gsub("%s+$", ""))
+        b:SetWidth(math.max(44, b.label:GetStringWidth() + 14))
+        return true
+      end
+      return true
+    end
+    b:Hide()
+    panel.posts[#panel.posts + 1] = b
+  end
+  Post("Say", 36, "SAY", nil, "say")
+  Post("Guild", 44, "GUILD", nil, "guild chat")
+  Post("Party", 44, "PARTY", nil, "party chat")
+  Post("Raid", 40, "RAID", nil, "raid chat")
+  for i = 1, 4 do Post("/" .. i, 44, "CHANNEL", i, "chat channel " .. i) end
   -- solo: done guessing before the time runs out
   local ok2, submit = pcall(CreateFrame, "Button", nil, panel, "UIPanelButtonTemplate")
   if not ok2 or not submit then submit = Chip(panel, "Submit guess", 100) end
@@ -1344,10 +1532,16 @@ function Gm.Refresh()
   local status
   if ph == "invite" then
     local n = #game.order - 1
-    status = game.mode == "whisper" and ("Waiting for " .. Short(game.target) .. " to answer...")
-      or string.format("Invited your party: %d joined so far.", n)
+    if game.open then
+      status = string.format("Open game: %d joined so far (up to %d). Post the link: whoever clicks it joins.",
+        n, Gm.MAX_PLAYERS - 1)
+    else
+      status = game.mode == "whisper" and ("Waiting for " .. Short(game.target) .. " to answer...")
+        or string.format("Invited your party: %d joined so far.", n)
+    end
   elseif ph == "joined" then
-    status = "You joined " .. Short(game.host) .. "'s game. Waiting for it to start..."
+    status = game.open and not game.startAt and ("Joining " .. Short(game.host) .. "'s game...")
+      or ("You joined " .. Short(game.host) .. "'s game. It starts when the countdown ends.")
   elseif ph == "propose" or ph == "ready" then
     status = "Getting the next street view ready..."
   elseif ph == "look" then
@@ -1462,6 +1656,26 @@ function Gm.Refresh()
     panel.start:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -h)
     h = h + 24
   end
+  local posting = game.isHost and game.open and ph == "invite"
+  panel.postLabel:SetShown(posting)
+  local cooling = posting and game.postedAt and Now() - game.postedAt < Gm.POST_COOLDOWN
+  local x = 8
+  if posting then
+    panel.postLabel:ClearAllPoints()
+    panel.postLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -h - 4)
+    x = x + panel.postLabel:GetStringWidth() + 6
+  end
+  for _, b in ipairs(panel.posts) do
+    local on = posting and b.shown() and true or false
+    b:SetShown(on)
+    if on then
+      b:ClearAllPoints()
+      b:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -h)
+      b:SetAlpha(cooling and 0.4 or 1)
+      x = x + b:GetWidth() + 3
+    end
+  end
+  if posting then h = h + 22 end
   panel.submit:SetShown(game.mode == "solo" and ph == "look" and game.pending ~= nil)
   local reopen = (ph == "look" or ph == "wait" or ph == "result" or ph == "over") and game.spot ~= nil
     and not game.missing and not (ns.Viewer.Current() and ns.Viewer.Current().game)
@@ -1514,11 +1728,25 @@ function Gm.RefreshTimer()
     local want = not game.missing and not (V and V.Current() and V.Current().game)
     if want ~= panel.reopen:IsShown() then Gm.Refresh() end
   end
-  if (ph == "look" or ph == "invite") and game.deadline then
+  if ph == "invite" or ph == "joined" then -- (the lobby: when the game starts, the same for everyone)
+    local at = ph == "invite" and game.deadline or game.startAt
+    if at then
+      local left = at - Now()
+      panel.timer:SetText("|cff9d9d9dstarts in|r " .. (left <= 5 and "|cffff5050" or "|cffffffff") .. Clock(left) .. "|r")
+      if game.postedAt and ph == "invite" and Now() - game.postedAt >= Gm.POST_COOLDOWN and panel.postLabel:IsShown()
+        and not game.postReady then
+        game.postReady = true -- (the post buttons bright again)
+        Gm.Refresh()
+      end
+    else
+      panel.timer:SetText("")
+    end
+    if V and V.SetTimer then V.SetTimer(nil) end
+  elseif ph == "look" and game.deadline then
     local left = game.deadline - Now()
-    local color = left <= 5 and "|cffff5050" or (ph == "look" and "|cffffd100" or "|cffffffff")
+    local color = left <= 5 and "|cffff5050" or "|cffffd100"
     panel.timer:SetText(color .. Clock(left) .. "|r")
-    if V and V.SetTimer then V.SetTimer(ph == "look" and (color .. Clock(left) .. "|r") or nil) end
+    if V and V.SetTimer then V.SetTimer(color .. Clock(left) .. "|r") end
   else
     panel.timer:SetText("")
     if V and V.SetTimer then V.SetTimer(nil) end
@@ -1762,6 +1990,40 @@ function Gm.Init(figureButton)
   if API.OnLayout then API.OnLayout("StreetGuess", function() Gm.Refresh() end) end -- (the frame's portrait on or off)
 
   if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then C_ChatInfo.RegisterAddonMessagePrefix(Gm.PREFIX) end
+  -- an open game's link: its code in chat shown as a link to click; the click joins (the
+  -- "garrmission" link type: the game's own click handling leaves it alone)
+  if ChatFrame_AddMessageEventFilter then
+    local function Linkify(_, _, msg, author, ...)
+      if type(msg) == "string" and msg:find("AGPSSV%-%d") then
+        local new = Gm.Linkify(msg, author)
+        if new ~= msg then return false, new, author, ... end
+      end
+      return false
+    end
+    for _, e in ipairs({ "CHAT_MSG_SAY", "CHAT_MSG_YELL", "CHAT_MSG_GUILD", "CHAT_MSG_OFFICER", "CHAT_MSG_PARTY",
+      "CHAT_MSG_PARTY_LEADER", "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RAID_WARNING", "CHAT_MSG_WHISPER",
+      "CHAT_MSG_WHISPER_INFORM", "CHAT_MSG_CHANNEL" }) do
+      ChatFrame_AddMessageEventFilter(e, Linkify)
+    end
+    -- (the game's hidden channel: no "joined channel" lines)
+    local function Hidden(_, _, ...)
+      for i = 1, select("#", ...) do
+        local v = select(i, ...)
+        if type(v) == "string" and v:find("AGPSSV%d%d%d") then return true end
+      end
+      return false
+    end
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", Hidden)
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE_USER", Hidden)
+  end
+  if hooksecurefunc and SetItemRef then
+    hooksecurefunc("SetItemRef", function(link)
+      if type(link) == "string" and link:find("^garrmission:agpssv:") then
+        local ok, err = pcall(Gm.OnLink, link)
+        if not ok then ns.Print("|cffff6060joining failed:|r " .. tostring(err)) end
+      end
+    end)
+  end
   local ev = CreateFrame("Frame")
   ev:RegisterEvent("CHAT_MSG_ADDON")
   ev:RegisterEvent("GROUP_ROSTER_UPDATE")

@@ -60,7 +60,13 @@ additive, with a lupa test) rather than reaching into AzerothGPS's private names
 
 ## Where in the Azeroth? (Street Guess, Game.lua)
 
-A GeoGuessr-style game from the button above the figure: solo, party or whisper, 1/3/5 rounds.
+A GeoGuessr-style game from the button above the figure: solo, party, whisper or Link, 1/3/5 rounds.
+Link (2026-09-30) is an open game: the host posts a plain-text code `AGPSSV-<id>-<rounds>` in say,
+guild, the group or a numbered channel (panel buttons; chat needs the click); other players' chat
+filter turns it into a `garrmission:agpssv:` link, and a click joins the game's hidden channel
+`AGPSSV<id>` (messages go there) and whispers J to the host, who takes up to 40 (same realm and
+faction). Every game's lobby counts down 30 s for everyone who joined (I and W carry the seconds left);
+the host can start sooner, and a party's starts once everyone answered.
 A street view pops up for 30 s with a countdown on it and the panel (no zone name or coordinates,
 no walking on, not marked on the map); in that time the player double-clicks the map to place a
 guess (again to move it), and the one placed when the time runs out counts;

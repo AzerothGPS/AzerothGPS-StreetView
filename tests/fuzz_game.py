@@ -38,7 +38,7 @@ class LossyNet(T.Net):
                 self.late.append((sender, msg, chat, target))  # (arrives on a later tick)
                 continue
             for name, p in list(self.players.items()):
-                if name == sender or (chat == "WHISPER" and name != target):
+                if not self.hears(name, sender, chat, target):
                     continue
                 if self.loss and self.rng.random() < self.loss:
                     continue
@@ -52,8 +52,8 @@ def names(n):
 
 
 def make_game(rng):
-    mode = rng.choice(["solo", "party", "whisper", "raid"])
-    n = {"solo": 1, "whisper": 2, "party": rng.randint(2, 5), "raid": rng.randint(2, 40)}[mode]
+    mode = rng.choice(["solo", "party", "whisper", "raid", "open"])
+    n = {"solo": 1, "whisper": 2, "party": rng.randint(2, 5), "raid": rng.randint(2, 40), "open": rng.randint(2, 42)}[mode]
     if mode == "solo" and rng.random() < 0.3:
         n = rng.randint(2, 6)  # (others in the group who aren't playing)
     lossy = rng.random() < 0.2
@@ -98,10 +98,21 @@ def play(seed, log):
     started = host.G.Start("party" if mode == "raid" else mode, rounds, target)
     if not started:
         return f"{mode}: Start refused ({host.printed[-1:] })"
+    # an open game: strangers click the posted link, some after it started or once it's full
+    clicks = {}
+    if mode == "open":
+        host.G.PostLink("SAY")
+        link = f"garrmission:agpssv:{host.game.id}:{rounds}:{host.name.split('-')[0]}"
+        for p in players[1:]:
+            clicks[p.name] = clock.t + rng.uniform(0.5, 38)
     t_end = clock.t + 60 + rounds * 60 + 120
     left, dropped, gone, snap = set(), set(), set(), {}
     while clock.t < t_end:
         clock.t += 0.5
+        for p in players:
+            if p.name in clicks and clock.t >= clicks[p.name]:
+                clicks.pop(p.name)
+                p.G.OnLink(link)
         for p in players:  # (a player who dropped out of the group still runs their own game)
             if p.name in gone:
                 continue  # (disconnected: their client is gone)
@@ -145,7 +156,7 @@ def play(seed, log):
         if gone and rng.random() < 0.1:  # (the group roster catches up with a disconnect)
             for q in net.players.values():
                 q.G.OnRoster()
-        if all((not p.game) or p.game.phase == "over" for p in players):
+        if not clicks and all((not p.game) or p.game.phase == "over" for p in players):
             for p in players:  # (take the last results)
                 g = p.game
                 if g and p.name not in snap:
