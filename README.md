@@ -10,9 +10,45 @@ the road under the pointer brightest, with the street views as dots. Drop it and
 view opens in its own window, where you can look around and walk ahead. The spot and the
 direction you look show on the map.
 
-Later: a geo-guessing mini game with rounds, scores and multiplayer games (see `PLAN.md`).
+Street views cover the open world of the Eastern Kingdoms, Kalimdor and Zephras Isle, a spot about
+every 200 yards along the roads (1,407 in all), and ship inside the addon. Cities and the key spots of
+dungeons (entrances, bosses, stairs) are planned (`PLAN.md`).
 
-Status: early development, private.
+Status: 1.0.0 in preparation (private repo; CurseForge release planned).
+
+## Where in the Azeroth?
+
+<p align="center">
+  <img src="assets/where-in-the-azeroth.png" alt="Where in the Azeroth? logo" width="420">
+</p>
+
+A GeoGuessr-style game on the AzerothGPS map, from the button above the figure. A street view pops
+up with no zone name or coordinates; look around, then double-click the map where you think it
+is. When the time is up the answer shows on the map with a dotted line from your guess, and the
+closer you were, the more points you get.
+
+- **Modes:** Solo, Party (everyone in your party or raid with StreetView is asked), Whisper (one
+  player: your target, a typed name, or shift-click their name in chat) and Link (an open game: post
+  its link in say, guild, your group or a numbered channel, and whoever clicks it joins, up to 40
+  players on your realm and faction).
+- **Rounds:** 1, 3 or 5. Each street view shows for 30 seconds with a countdown on the picture; the
+  guess placed when the time runs out counts (double-click again to move it). 10 seconds between
+  rounds, counted down under the title.
+- **Lobby:** a multiplayer game starts 30 seconds after the host starts it, counted down for every
+  player whenever they joined; the host can start sooner, and a party's game starts as soon as
+  everyone answered.
+- **Scoring:** 0 to 100 points a round: 100 within 25 yards, 92 at 200, 78 at 500, 58 at 1,000,
+  30 at 2,000, 7 at 4,000, nothing on another continent. Players with the same points are told apart
+  by who was closer, shown with decimals (for example 99.8 and 99.6).
+- **Scoreboard:** five players at a time, the mouse wheel scrolls the rest, and your own row stays
+  pinned under them. The others show "guessed" as soon as they place a guess; their points stay
+  hidden until the round's result. Hover a player's marker on the map for their name and scores.
+- **Fair play:** only open-world and city spots are used (never dungeons or caves), and only spots
+  from map packs every player has. During a game the map hides your route, dungeons and transports,
+  and your view comes back as it was when the game ends. A good average (75+) earns a celebration.
+
+Players' games talk only through the addon's own messages (prefix `AGPSSV`); invitations are always
+asked. Players are named as the game shows them: WoW Forever's first and last names.
 
 ## Layout
 
@@ -21,11 +57,15 @@ Status: early development, private.
   - `Data.lua`: the installed views and the view maths (tested under lupa).
   - `Viewer.lua`: the street view window.
   - `Figure.lua`: the figure on the map, the road highlight and the view marker.
+  - `Game.lua`: Where in the Azeroth? (the rules and messages under lupa in `tests/test_game.py`, random
+    games in `tests/fuzz_game.py`).
   - `Core.lua`: settings and `/sv` commands.
   - `Media/`: our own art, made by `tools/sv.py media`: `Figure.tga` (64x64, from
     `assets/figure.png`: the map's drag figure), `Logo.tga` (128x128, from `assets/logo.png`:
     the addon icon and the viewer's portrait) and the JPEG test card.
-- `assets/`: the full-size art: `logo.png` (also for the CurseForge page later) and `figure.png`.
+- `assets/`: the full-size art: `logo.png` (also for the CurseForge page), `figure.png`, the game's
+  `where-in-the-azeroth.png` and the orc guess animations.
+- `docs/`: `curseforge.md` (the CurseForge page's description) and `wiki/` (the GitHub wiki's pages).
 - The developer tools are in the private repo AzerothGPS/AzerothGPS-StreetView-Dev (clone it next
   to this one): one addon with the manual capture tool for example views on your own client
   (it never moves the character or the camera: you turn and press the game's own Set View keys,
@@ -61,8 +101,8 @@ Status: early development, private.
    (about 40 seconds a spot; `sv.cmd stitch --force` redoes them), and installs it (not the
    capture tool). Restart the game (new files).
 7. Drag the figure from the map onto the road. Drag the picture to look around, the mouse
-   wheel zooms, the arrow buttons turn 45 degrees. White arrows on the ground point along
-   the roads and toward nearby street views (hidden while you drag); click one to go that way.
+   wheel zooms. White arrows on the ground point along the roads and toward nearby street views
+   (hidden while you drag); click one to go that way.
 
 `sv.cmd` in this folder runs `tools/sv.py` with the AzerothGPS venv's Python (it has Pillow
 and lupa). It works from any folder in PowerShell or Command Prompt when called by its full

@@ -136,3 +136,13 @@ restart**. AzerothGPS itself installs with `agps install-addon` from its own rep
 ## Commits
 
 Commit and push completed work to origin (the private repo), short imperative messages.
+
+## Docs and the wiki
+
+- `docs/curseforge.md`: the CurseForge page (settings and description); `CHANGELOG.md` has the release notes.
+- `docs/wiki/`: the GitHub wiki's pages (`Home.md`, `_Sidebar.md`...). The wiki is its own repo,
+  `AzerothGPS-StreetView.wiki.git`, which exists only after the first page is made in the web UI (and
+  wikis are enabled in the repo's settings). Then: clone it next to this repo, copy `docs/wiki/*` in,
+  copy the images it uses into its `images/` (`assets/logo.png`, `assets/where-in-the-azeroth.png`,
+  showcase pictures), commit as AzerothGPS and push. Keep `docs/wiki/` the source: edit here, copy over.
+
