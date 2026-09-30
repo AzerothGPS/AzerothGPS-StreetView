@@ -295,6 +295,28 @@ function Gm.Average(g)
   return g.round > 0 and math.floor(total / g.round + 0.5) or 0
 end
 
+-- A player's guess marker's tooltip (mouse over it in a round's result or the final one): their
+-- name, the round's score and distance, and their total. { { text, r, g, b }, ... }
+function Gm.PlayerTip(g, name)
+  local pl = g and g.players[name]
+  if not pl then return {} end
+  local c = Gm.PlayerColor(g, name)
+  local lines = { { (name == g.me and "You" or Gm.Short(name)), c[1], c[2], c[3] } }
+  local r = g.round
+  local sc, gs = pl.scores[r], pl.guesses[r]
+  if sc then
+    local yd = gs and gs.yards
+    lines[#lines + 1] = { string.format("Round %d: %d points%s", r, sc,
+      yd and (" (" .. Gm.Yards(yd) .. " yd off)") or (gs and gs.x and " (another continent)" or "")), 1, 1, 1 }
+  end
+  if r > 1 then
+    local total = 0
+    for i = 1, r do total = total + (pl.scores[i] or 0) end
+    lines[#lines + 1] = { string.format("Total: %d after %d rounds", total, r), 0.8, 0.8, 0.8 }
+  end
+  return lines
+end
+
 function Gm.Yards(n)
   n = math.floor(n + 0.5)
   if n >= 1000 then return string.format("%d,%03d", math.floor(n / 1000), n % 1000) end
@@ -947,9 +969,13 @@ local function PlayerMark(ctx, name, x, y, label)
     ctx.Dot(x, y, { 0, 0, 0 }, 11, 0.8)
     ctx.Dot(x, y, Gm.PlayerColor(game, name), 8, 1)
   end
-  if label and Gm.marks then
+  if Gm.marks and (label or game.phase == "result" or game.phase == "over") then
     local lx, ly = ctx.ToScreen(x, y)
-    Gm.marks.Label(lx, ly + (orc and 20 or 0), Short(name), Gm.PlayerColor(game, name))
+    if label then Gm.marks.Label(lx, ly + (orc and 20 or 0), Short(name), Gm.PlayerColor(game, name)) end
+    -- (in the results: mouse over the marker for the name and scores; party and raid games)
+    if game.mode ~= "solo" and (game.phase == "result" or game.phase == "over") and Gm.marks.Hot then
+      Gm.marks.Hot(lx, ly + (orc and 8 or 0), name)
+    end
   end
 end
 
@@ -1546,7 +1572,7 @@ local function BuildMarks(canvas)
   local layer = CreateFrame("Frame", nil, canvas)
   layer:SetAllPoints()
   layer:SetFrameLevel(canvas:GetFrameLevel() + 25)
-  local pool, used = { guess = {}, answer = {}, label = {} }, { guess = 0, answer = 0, label = 0 }
+  local pool, used = { guess = {}, answer = {}, label = {}, hot = {} }, { guess = 0, answer = 0, label = 0, hot = 0 }
   local function Get(kind)
     local n = used[kind] + 1
     used[kind] = n
@@ -1564,7 +1590,32 @@ local function BuildMarks(canvas)
     return t
   end
   local M = {}
-  function M.Begin() used.guess, used.answer, used.label = 0, 0, 0 end
+  function M.Begin() used.guess, used.answer, used.label, used.hot = 0, 0, 0, 0 end
+  -- a spot over a player's marker that shows their name and scores when the mouse is on it
+  function M.Hot(sx, sy, name)
+    local n = used.hot + 1
+    used.hot = n
+    local f = pool.hot[n]
+    if not f then
+      f = CreateFrame("Frame", nil, layer)
+      f:SetSize(26, 26)
+      f:EnableMouse(true)
+      f:SetScript("OnEnter", function(self)
+        if not (GameTooltip and game) then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        for i, l in ipairs(Gm.PlayerTip(game, self.name)) do
+          if i == 1 then GameTooltip:SetText(l[1], l[2], l[3], l[4]) else GameTooltip:AddLine(l[1], l[2], l[3], l[4]) end
+        end
+        GameTooltip:Show()
+      end)
+      f:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+      pool.hot[n] = f
+    end
+    f.name = name
+    f:ClearAllPoints()
+    f:SetPoint("CENTER", layer, "CENTER", sx, sy)
+    f:Show()
+  end
   -- a player's name by their guess
   function M.Label(sx, sy, text, c)
     local n = used.label + 1

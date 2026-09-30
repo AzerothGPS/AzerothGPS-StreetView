@@ -641,3 +641,21 @@ def test_the_game_ends_when_the_host_goes_silent():
         clock.t += 0.5
         b.G.Tick()
     assert b.game.phase == "over" and "Lost touch" in b.game.reason
+
+
+def test_a_players_marker_tooltip_names_them_with_their_scores():
+    (a, b), clock, net = party(2)
+    a.G.Start("party", 3)
+    run(net, clock, 2)
+    a.G.Guess(300, 400, 0)  # 100 yd off
+    b.G.Guess(300, 3300, 0)
+    run(net, clock, 31)
+    tip = [l[1] for l in a.G.PlayerTip(a.game, "Bob-Realm").values()]
+    assert tip[0] == "Bob" and tip[1].startswith("Round 1: ") and "3,000 yd off" in tip[1]
+    assert [l[1] for l in a.G.PlayerTip(a.game, "Ann-Realm").values()][0] == "You"
+    run(net, clock, 11 + 2)
+    b.G.Guess(1, 1, 1)  # (another continent)
+    run(net, clock, 31)
+    tip = [l[1] for l in a.G.PlayerTip(a.game, "Bob-Realm").values()]
+    assert "another continent" in tip[1] and tip[2].startswith("Total: ")
+    assert len(a.G.PlayerTip(a.game, "Nobody-Realm")) == 0
