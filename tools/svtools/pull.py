@@ -59,10 +59,16 @@ def pull(src: Path, build: Path, log=print) -> dict:
         shutil.rmtree(staging)
     staged = {}
     for meta in sorted(out.glob("*/meta.json")):
-        digest = hashlib.sha1(meta.read_bytes()).hexdigest()
-        if pulled.get(meta.parent.name) == digest:
+        # (a spot the capture PC is rendering again right now: its files come and go under us;
+        # it's skipped and pulled next time)
+        try:
+            digest = hashlib.sha1(meta.read_bytes()).hexdigest()
+            if pulled.get(meta.parent.name) == digest:
+                continue
+            shutil.copytree(meta.parent, staging / meta.parent.name)
+        except (OSError, shutil.Error):
+            shutil.rmtree(staging / meta.parent.name, ignore_errors=True)
             continue
-        shutil.copytree(meta.parent, staging / meta.parent.name)
         staged[meta.parent.name] = digest
     stats = {"points": 0, "images": 0, "skipped": 0}
     if staged:
