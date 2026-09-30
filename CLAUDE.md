@@ -12,12 +12,17 @@ AzerothGPS/AzerothGPS). This repo is **private**: https://github.com/AzerothGPS/
   content and large.
 - Nothing personal in the repo: no Windows user names or paths, WoW account folder names,
   character names or emails. Author is "AzerothGPS".
-- `tools/AGPS_Capture` is a **manual** developer tool for the user's real Blizzard account:
-  it never moves the character or the camera (the user turns and presses the game's Set View
-  keys; it only hides names and takes a screenshot per key press). Never published, and
-  `sv.py install` leaves it out unless `--capture` is passed.
+- **Developer tools are not in this addon** (the user, 2026-09-30): they live in the private repo
+  AzerothGPS/AzerothGPS-StreetView-Dev (checked out next to this one), one addon
+  `AzerothGPS_StreetView_Dev`: the **manual** capture tool for the user's real Blizzard account (it
+  never moves the character or the camera: the user turns and presses the game's Set View keys; it
+  only hides names and takes a screenshot per key press), `/sv demo [players] [rounds]` (a real
+  Where in the Azeroth? game against bots, nothing sent) and the Report picture button (`/sv reports`).
+  Never published; `sv.py install --dev` installs it. The shipped addon only offers hooks for it
+  (`AzerothGPS_StreetView_Extend`, `ns.commands`, `Gm.internal`, `Gm.OnPanel`/`Gm.extraButtons`,
+  `Gm.Skip`), and a test checks no dev tool ships.
 - **The user's own screenshots are never shipped** (the user, 2026-09-28). Spots from
-  AGPS_Capture are `source: "manual"` (`pack.is_manual`): they stay in the master as ground
+  the capture tool are `source: "manual"` (`pack.is_manual`): they stay in the master as ground
   truth for checking renders, and `build_packs` leaves them out. The raw screenshots don't stay
   in the game install: they live in `data/manual-captures/Screenshots` (git-ignored).
 - **No automation of any kind on this PC's game.** Automated teleporting and capture live in
@@ -102,8 +107,8 @@ and Blender only read the client's files; nothing runs the game). Details: `PLAN
 Use the AzerothGPS venv: `%USERPROFILE%\.venvs\azerothgps\Scripts\python.exe`.
 
 ```
-python tools/sv.py install     # copy StreetView with its pictures into the game (--capture: + manual AGPS_Capture)
-python tools/sv.py import      # AGPS_Capture screenshots -> stitched spots -> build/packs, then install
+python tools/sv.py install     # copy StreetView with its pictures into the game (--dev: + the private dev addon)
+python tools/sv.py import      # the dev addon's capture screenshots -> stitched spots -> build/packs, then install
 python tools/sv.py watch       # the same on every /reload
 python tools/sv.py pull [--from //PC/agps-work] [--watch 10]  # harvested spots from the capture PC's share (LAN)
 python tools/sv.py release     # dry run: build, zip and check the addon with its pictures (--upload: to CurseForge)

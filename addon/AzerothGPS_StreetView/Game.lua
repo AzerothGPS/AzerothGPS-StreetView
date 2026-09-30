@@ -636,49 +636,15 @@ function Gm.StartNow()
   if game and game.isHost and game.phase == "invite" then Begin() end
 end
 
--- A finished party round with made-up players (dev: `/sv demo [players]`), to look at the results
--- (the markers, lines and mouse-over names) without a group. Nothing is sent to anyone.
-local DEMO_NAMES = { "Thrall", "Jaina", "Rexxar", "Sylvanas", "Cairne", "Voljin", "Magni", "Tyrande",
-  "Malfurion", "Baine", "Rokhan", "Muradin", "Gazlowe", "Drekthar", "Vanndar", "Garrosh", "Anduin",
-  "Varian", "Gelbin", "Genn", "Liadrin", "Lorthemar", "Velen", "Nobundo", "Zekhan", "Saurfang",
-  "Nazgrim", "Eitrigg", "Broxigar", "Aggra", "Draka", "Durotan", "Orgrim", "Kilrogg", "Grommash",
-  "Hamuul", "Mulgore", "Shandris", "Maiev" }
-function Gm.Demo(n)
-  if game and game.phase ~= "over" then
-    io().print("A game is already on.")
-    return false
-  end
-  n = math.max(2, math.min(40, math.floor(tonumber(n) or 5)))
-  local p = Gm.PickSpot({}, function(k) return io().random(1, k) end)
-  if not p then
-    io().print("No street views are installed.")
-    return false
-  end
-  NewGame("party", 1)
-  game.demo = true
-  game.channel = n > #Gm.ORCS and "RAID" or "PARTY"
-  game.before = io().mapState()
-  for i = 2, n do AddPlayer((DEMO_NAMES[i - 1] or ("Player" .. i)) .. "-Demo") end
-  Gm.AssignLooks(game, game.order, function(k) return io().random(1, k) end)
-  game.spot = Gm.OnMap(p, io().base)
-  game.round = 1
-  local steps = { 30, 250, 800, 1600, 3000 }
-  for i, name in ipairs(game.order) do
-    local d = steps[(i - 1) % #steps + 1] * (0.7 + io().random() * 0.6)
-    local a = io().random() * 2 * math.pi
-    local g = { x = game.spot.x + d * math.cos(a), y = game.spot.y + d * math.sin(a), cont = game.spot.cont, yards = d }
-    game.players[name].guesses[1] = g
-    game.players[name].scores[1] = Gm.Score(d)
-    if name == game.me then game.guess = g end
-  end
-  io().hold(true)
-  io().showMap()
-  io().open(p, 0)
-  game.reveal = { t0 = Now() }
-  Over()
-  ShowResult(true)
-  return true
-end
+-- For the developer tools (the private AzerothGPS_StreetView_Dev addon, never shipped): the
+-- game's internals, to set up a game without a group.
+Gm.internal = {
+  NewGame = function(...) return NewGame(...) end,
+  AddPlayer = function(name) return AddPlayer(name) end,
+  Over = function(reason) return Over(reason) end,
+  ShowResult = function(all) return ShowResult(all) end,
+  Changed = function() return Changed() end,
+}
 
 -- Leave the game (its X): the map shows the route again.
 function Gm.Leave()
@@ -731,24 +697,6 @@ function Gm.ShowAgain()
   end
 end
 
--- A broken picture: reported (kept in the saved settings: `sv.cmd pull` holds it back from the
--- packs and puts it on the retake list), and never picked again.
-function Gm.Reported(id)
-  return ns.db and ns.db.reported and ns.db.reported[id] ~= nil
-end
-function Gm.Report()
-  local s = game and game.spot
-  if not (s and ns.db) then return end
-  ns.db.reported = ns.db.reported or {}
-  if ns.db.reported[s.id] then -- (clicked again: a mistake, undone)
-    ns.db.reported[s.id] = nil
-    io().print("Street View " .. s.id .. " is no longer reported.")
-  else
-    ns.db.reported[s.id] = time and time() or 1
-    io().print("Street View " .. s.id .. " reported: left out from now on and taken again. Click again to undo.")
-  end
-  Changed()
-end
 
 -- Solo: the guess placed is final now (no waiting for the timer).
 function Gm.SubmitNow()
@@ -1090,7 +1038,9 @@ local function Clock(sec)
 end
 
 -- A small gold-edged button (AzerothGPS's map draws its own the same way).
-local function Chip(parent, text, width, onClick)
+local Chip
+function Gm.Chip(...) return Chip(...) end
+Chip = function(parent, text, width, onClick)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(width, MENU_H - 6)
   local edge = b:CreateTexture(nil, "BACKGROUND")
@@ -1336,16 +1286,14 @@ local function BuildPanel(parent)
   reopen:SetScript("OnClick", function() Gm.ShowAgain() end)
   reopen:Hide()
   panel.reopen = reopen
-  -- a broken picture (all one color, black...): held back from the packs and taken again
-  local report = Chip(panel, "Report picture", 104, function() Gm.Report() end)
-  report:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Report this street view", 1, 1, 1)
-    GameTooltip:AddLine("Its picture is broken (one color, black, inside a wall...): it's left out of the games and the next data update, and taken again.", nil, nil, nil, true)
-    GameTooltip:Show()
-  end)
-  report:Hide()
-  panel.report = report
+  for _, fn in ipairs(Gm.panelHooks) do fn(panel) end
+end
+
+-- More buttons on the game's panel (the dev addon's): fn(panel) once it's built; a button added to
+-- Gm.extraButtons as { button, shown = function(game), refresh = function(game) } is laid out with the rest.
+Gm.panelHooks, Gm.extraButtons = {}, {}
+function Gm.OnPanel(fn)
+  if panel then fn(panel) else Gm.panelHooks[#Gm.panelHooks + 1] = fn end
 end
 
 -- One line about this player's guess.
@@ -1510,16 +1458,19 @@ function Gm.Refresh()
   local reopen = (ph == "look" or ph == "wait" or ph == "result" or ph == "over") and game.spot ~= nil
     and not game.missing and not (ns.Viewer.Current() and ns.Viewer.Current().game)
   panel.reopen:SetShown(reopen)
-  -- (a developer's tool: /sv dev. A player's report would only hide the spot on their own machine)
-  local report = ns.db and ns.db.dev and (ph == "result" or ph == "over" or ph == "wait") and game.spot ~= nil
-  panel.report:SetShown(report)
-  if report then
-    local done = Gm.Reported(game.spot.id)
-    panel.report.label:SetText(done and "Reported (undo)" or "Report picture")
+  local list, extra = { panel.submit, panel.reopen }, false
+  for _, e in ipairs(Gm.extraButtons) do
+    local on = e.shown(game) and true or false
+    e.button:SetShown(on)
+    if on then
+      extra = true
+      if e.refresh then e.refresh(game) end
+    end
+    list[#list + 1] = e.button
   end
-  if panel.submit:IsShown() or reopen or report then
+  if panel.submit:IsShown() or reopen or extra then
     local x = 8
-    for _, b in ipairs({ panel.submit, panel.reopen, panel.report }) do
+    for _, b in ipairs(list) do
       if b:IsShown() then
         b:ClearAllPoints()
         b:SetPoint("TOPLEFT", panel, "TOPLEFT", x, -h)
@@ -1781,7 +1732,7 @@ function Gm.Init(figureButton)
   local canvas = API.MapCanvas and API.MapCanvas()
   if canvas then Gm.marks = BuildMarks(canvas) end
   Gm.Usable = function(p)
-    if ns.db and ns.db.reported and ns.db.reported[p.id] then return false end
+    if Gm.Skip and Gm.Skip(p) then return false end -- (the dev addon's reported pictures)
     return not (D.loadable and not D.loadable[p.id])
   end
   API.SetOverlay("StreetGuess", Gm.Draw)

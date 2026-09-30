@@ -57,10 +57,12 @@ local HELP = {
   "/sv hide - close the viewer.",
   "/sv flipyaw - turn the views the other way (if left and right are swapped).",
   "/sv probe - check that this game client shows JPEG images.",
-  "/sv dev - the Report picture button in Where in the Azeroth? on or off (for taking broken pictures again).",
-  "/sv reports - the street views reported as broken; /sv unreport <id> or /sv unreport all.",
-  "/sv demo [players] - (dev) a finished Where in the Azeroth? round with made-up players, 2-40.",
 }
+
+-- The private developer addon (AzerothGPS_StreetView_Dev, never shipped) adds its /sv commands
+-- and tools through this: fn(ns), called once.
+ns.commands, ns.commandHelp = {}, {}
+function AzerothGPS_StreetView_Extend(fn) fn(ns) end
 
 SLASH_AZEROTHGPSSTREETVIEW1 = "/sv"
 SLASH_AZEROTHGPSSTREETVIEW2 = "/streetview"
@@ -88,34 +90,11 @@ SlashCmdList.AZEROTHGPSSTREETVIEW = function(msg)
     ns.Viewer.Refresh()
   elseif cmd == "probe" then
     ns.Viewer.Probe()
-  elseif cmd == "demo" then
-    if not ns.db.dev then
-      Print("/sv demo is a dev tool: turn on /sv dev first.")
-    else
-      ns.Game.Demo(rest)
-    end
-  elseif cmd == "dev" then
-    ns.db.dev = not ns.db.dev or nil
-    Print(ns.db.dev and "Report picture is on (Where in the Azeroth?)." or "Report picture is off.")
-  elseif cmd == "reports" then
-    local n = 0
-    for id in pairs(ns.db.reported or {}) do
-      n = n + 1
-      Print("  reported: " .. id)
-    end
-    Print(n == 0 and "No street views reported." or (n .. " reported. /sv unreport <id> or /sv unreport all"))
-  elseif cmd == "unreport" then
-    if rest == "all" then
-      ns.db.reported = nil
-      Print("No street views reported now.")
-    elseif ns.db.reported and ns.db.reported[rest] then
-      ns.db.reported[rest] = nil
-      Print("Street View " .. rest .. " is no longer reported.")
-    else
-      Print("Not reported: " .. tostring(rest) .. " (/sv reports lists them)")
-    end
+  elseif ns.commands[cmd] then -- (the dev addon's)
+    ns.commands[cmd](rest)
   else
     for _, line in ipairs(HELP) do Print(line) end
+    for _, line in ipairs(ns.commandHelp) do Print(line) end
   end
 end
 

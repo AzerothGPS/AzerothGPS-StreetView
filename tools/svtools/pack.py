@@ -165,10 +165,15 @@ def toc(version: str, title: str = "AzerothGPS StreetView Data") -> str:
     ])
 
 
+# the capture tool's saved list: the dev addon's now, the old AGPS_Capture addon's before
+CAPTURE_SAVES = ["AzerothGPS_StreetView_Dev.lua", "AGPS_Capture.lua"]
+
+
 def read_captures(wow: Path) -> list[dict]:
-    """Every AGPS_Capture spot from all accounts' SavedVariables."""
+    """Every manual capture spot from all accounts' SavedVariables."""
     out = []
-    for sv in sorted((wow / "WTF" / "Account").glob("*/SavedVariables/AGPS_Capture.lua")):
+    files = [f for name in CAPTURE_SAVES for f in (wow / "WTF" / "Account").glob(f"*/SavedVariables/{name}")]
+    for sv in sorted(files):
         db = load_savedvariables(sv).get("AGPSCaptureDB") or {}
         caps = db.get("captures") or []
         if isinstance(caps, dict):
@@ -398,10 +403,13 @@ def flat_sides(master: Path) -> int:
 
 
 def reported_in_game(wow: Path) -> dict[str, int]:
-    """The street views players reported as broken in Street Guess (the game's saved settings,
-    AzerothGPSStreetViewDB.reported = { [id] = time }), over every account in the game folder."""
+    """The street views reported as broken with the dev addon's Report picture
+    (AzerothGPSStreetViewDevDB.reported = { [id] = time }; before, AzerothGPSStreetViewDB.reported),
+    over every account in the game folder."""
     out: dict[str, int] = {}
-    for sv in (wow / "WTF" / "Account").glob("*/SavedVariables/AzerothGPS_StreetView.lua"):
+    files = [f for name in ("AzerothGPS_StreetView_Dev.lua", "AzerothGPS_StreetView.lua")
+             for f in (wow / "WTF" / "Account").glob(f"*/SavedVariables/{name}")]
+    for sv in files:
         text = sv.read_text(encoding="utf-8", errors="replace")
         m = re.search(r'\["reported"\]\s*=\s*\{(.*?)\n\s*\}', text, re.S)
         if m:

@@ -26,11 +26,12 @@ Status: early development, private.
     `assets/figure.png`: the map's drag figure), `Logo.tga` (128x128, from `assets/logo.png`:
     the addon icon and the viewer's portrait) and the JPEG test card.
 - `assets/`: the full-size art: `logo.png` (also for the CurseForge page later) and `figure.png`.
-- `tools/AGPS_Capture/`: manual developer addon for example views on your own client. It
-  never moves the character or the camera: you turn and press the game's own Set View keys,
-  and it hides names and takes one screenshot per key press. Never shipped, and only
-  installed on request (`sv.py install --capture`). The automated capture for a private
-  server lives in the separate private repo AzerothGPS/streetview-harvester.
+- The developer tools are in the private repo AzerothGPS/AzerothGPS-StreetView-Dev (clone it next
+  to this one): one addon with the manual capture tool for example views on your own client
+  (it never moves the character or the camera: you turn and press the game's own Set View keys,
+  and it hides names and takes one screenshot per key press), `/sv demo` (a game against bots) and
+  Report picture. Never shipped; installed with `sv.cmd install --dev`. The automated capture for a
+  private server lives in the separate private repo AzerothGPS/streetview-harvester.
 - `tools/sv.py`: install the addons; import manual captures (`import`) or points exported by
   the harvester on the capture PC (`import-harvest <folder>`) into the pictures.
 - `packs.json`: how the pictures ship (inside the viewer: continents, tile sizes, spacing, the
@@ -42,7 +43,7 @@ Status: early development, private.
 
 ## Taking example views on your own PC (manual)
 
-1. `sv.cmd install --capture`, then restart the game completely.
+1. `sv.cmd install --dev` (needs the AzerothGPS-StreetView-Dev checkout), then restart the game completely.
 2. One time, in first person (mouse wheel all the way in), turning with the right mouse
    button: look level and type `/svcap save level`, look up about 50 degrees and
    `/svcap save up`, down about 50 degrees and `/svcap save down`, straight up and

@@ -21,7 +21,10 @@ def test_capture_sequence_covers_every_view_once():
     """The manual capture's 28 steps, shot at the facing the guide asks for, name exactly the
     views the viewer and the pack use (turning right = the viewer's counter-clockwise order)."""
     lua = lupa.LuaRuntime()
-    lua.execute((ROOT / "tools" / "AGPS_Capture" / "Poses.lua").read_text(encoding="utf-8"))
+    poses = ROOT.parent / "AzerothGPS-StreetView-Dev" / "addon" / "AzerothGPS_StreetView_Dev" / "Poses.lua"
+    if not poses.exists():
+        pytest.skip("needs the AzerothGPS-StreetView-Dev checkout next to this one")
+    lua.execute(poses.read_text(encoding="utf-8"))
     C = lua.globals().AGPSCapture
     facing0 = 1.0
     names = []
@@ -267,10 +270,12 @@ def test_every_point_has_one_pack_inside_the_viewer():
     files = [l.strip() for l in viewer.splitlines() if l.strip() and not l.startswith("#")]
     assert files[-1] == "Index.lua" and files.index("Data.lua") < files.index("Index.lua")
     assert "AzerothGPS_StreetView_Kalimdor" in pack.LEGACY_PACKS and "AzerothGPS_StreetView_EasternKingdoms" in pack.LEGACY_PACKS
-    # the capture tool still depends on the viewer, listed under it with its figure as the icon
-    capture = (ROOT / "tools" / "AGPS_Capture" / "AGPS_Capture.toc").read_text(encoding="utf-8")
-    assert "## Dependencies: AzerothGPS_StreetView" in capture
-    assert "## IconTexture: Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Figure" in capture
+    # the developer addon (private repo) depends on the viewer, listed under it with its figure
+    dev = ROOT.parent / "AzerothGPS-StreetView-Dev" / "addon" / "AzerothGPS_StreetView_Dev" / "AzerothGPS_StreetView_Dev.toc"
+    if dev.exists():
+        text = dev.read_text(encoding="utf-8")
+        assert "## Dependencies: AzerothGPS_StreetView" in text
+        assert "## IconTexture: Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Figure" in text
     for pk in cfg["sd"]["packs"]:  # (planned sizes stay under the limit at the measured SD size)
         assert pk["planned"] * 700_000 < cfg["budget_bytes"], pk["name"]
 

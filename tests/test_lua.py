@@ -9,7 +9,7 @@ lupa = pytest.importorskip("lupa")
 
 ROOT = Path(__file__).resolve().parents[1]
 ADDON = ROOT / "addon" / "AzerothGPS_StreetView"
-LUA_FILES = sorted(ROOT.glob("addon/**/*.lua")) + sorted(ROOT.glob("tools/AGPS_Capture/*.lua"))
+LUA_FILES = sorted(ROOT.glob("addon/**/*.lua"))  # (the dev addon's are tested in its own repo)
 
 
 def load(lua, ns, path: Path):

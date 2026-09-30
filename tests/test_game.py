@@ -661,14 +661,9 @@ def test_a_players_marker_tooltip_names_them_with_their_scores():
     assert len(a.G.PlayerTip(a.game, "Nobody-Realm")) == 0
 
 
-def test_the_dev_demo_shows_a_finished_round_with_made_up_players(solo):
-    p, clock, net = solo
-    assert p.G.Demo(12)
-    g = p.game
-    assert g.phase == "over" and g.mode == "party" and g.channel == "RAID" and len(g.order) == 12
-    assert all(g.players[n].scores[1] is not None for n in g.order.values())
-    assert [l[1] for l in p.G.PlayerTip(g, "Jaina-Demo").values()][0] == "Jaina"
-    assert net.queue == [] and p.held == [True]  # (nothing sent; the map is held)
-    p.G.Leave()
-    assert p.game is None and p.held[-1] is False
-    assert p.G.Demo(3) and p.game.channel == "PARTY"
+def test_no_developer_tools_ship():
+    # (the demo, reporting pictures and the capture tool are in the private AzerothGPS_StreetView_Dev)
+    shipped = "".join(f.read_text(encoding="utf-8") for f in ADDON.glob("*.lua"))
+    for word in ("Report picture", "DEMO_NAMES", "/sv demo", "db.reported", "AGPSCapture"):
+        assert word not in shipped, word
+

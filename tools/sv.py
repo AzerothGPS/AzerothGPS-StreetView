@@ -1,8 +1,10 @@
 """AzerothGPS StreetView developer tool.
 
-  sv.cmd install [--capture]      copy the viewer with its built pictures into the game's AddOns folder
-                                  (--capture adds the manual AGPS_Capture dev tool)
-  sv.cmd import                   AGPS_Capture screenshots -> stitched spots -> the packs, then install
+  sv.cmd install [--dev]          copy the viewer with its built pictures into the game's AddOns folder
+                                  (--dev adds the private developer addon AzerothGPS_StreetView_Dev from
+                                  the AzerothGPS-StreetView-Dev checkout next to this one: the manual
+                                  capture tool, /sv demo against bots, Report picture)
+  sv.cmd import                   the dev addon's capture screenshots -> stitched spots -> the packs, then install
   sv.cmd watch                    the same by itself on every /reload (Ctrl+C stops)
   sv.cmd stitch [--id ID] [--force]  (re)stitch imported spots
   sv.cmd import-harvest <folder>  spots stitched by streetview-harvester -> the packs, then install
@@ -67,7 +69,11 @@ def mirror(src: Path | list[Path], dst: Path) -> int:
     return new
 
 
-def install(wow: Path, capture: bool) -> None:
+DEV_ADDON = ROOT.parent / "AzerothGPS-StreetView-Dev" / "addon" / "AzerothGPS_StreetView_Dev"
+OLD_DEV = ["AGPS_Capture"]  # (the capture tool's own addon, before the dev tools were one addon)
+
+
+def install(wow: Path, dev: bool) -> None:
     addons = wow / "Interface" / "AddOns"
     if not addons.is_dir():
         sys.exit(f"No AddOns folder at {addons}")
@@ -82,8 +88,14 @@ def install(wow: Path, capture: bool) -> None:
             else:
                 parts.append((built, pk["name"]))
     parts.insert(0, (viewer, "AzerothGPS_StreetView"))
-    if capture:
-        parts.append((ROOT / "tools" / "AGPS_Capture", "AGPS_Capture"))
+    if dev:
+        if not DEV_ADDON.is_dir():
+            sys.exit(f"No developer addon at {DEV_ADDON} (clone AzerothGPS/AzerothGPS-StreetView-Dev next to this repo)")
+        parts.append((DEV_ADDON, "AzerothGPS_StreetView_Dev"))
+        for old in OLD_DEV:
+            if (addons / old).exists():
+                shutil.rmtree(addons / old)
+                print(f"removed the old {old} (it's in AzerothGPS_StreetView_Dev now)")
     for old in pack.LEGACY_PACKS:  # (earlier layouts: the pictures are in the viewer now)
         if (addons / old).exists():
             shutil.rmtree(addons / old)
@@ -129,7 +141,8 @@ def main(argv=None) -> None:
     ap.add_argument("--wow", type=Path, default=DEFAULT_WOW, help="the _classic_beta_ folder")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p_inst = sub.add_parser("install")
-    p_inst.add_argument("--capture", action="store_true", help="also install the manual AGPS_Capture dev tool")
+    p_inst.add_argument("--dev", "--capture", dest="dev", action="store_true",
+                        help="also install the private developer addon (capture, bot demo, Report picture)")
     p_imp = sub.add_parser("import")
     p_imp.add_argument("--no-install", action="store_true")
     p_imp.add_argument("--no-stitch", action="store_true", help="skip stitching (faster)")
@@ -157,7 +170,7 @@ def main(argv=None) -> None:
     a = ap.parse_args(argv)
 
     if a.cmd == "install":
-        install(a.wow, a.capture)
+        install(a.wow, a.dev)
     elif a.cmd == "import":
         stats = pack.import_captures(a.wow, BUILD)
         k = 0 if a.no_stitch else pack.stitch_points(a.wow, BUILD)
@@ -199,13 +212,13 @@ def main(argv=None) -> None:
 
 
 def watch(wow: Path, every: float) -> None:
-    """Import new spots on their own: whenever the game saves AGPS_Capture's list (on /reload
+    """Import new spots on their own: whenever the game saves the capture tool's list (on /reload
     or logging out), import and stitch what's new, then install. Stop with Ctrl+C."""
     import time
 
     def stamps():
         return {f: (f.stat().st_mtime, f.stat().st_size)
-                for f in (wow / "WTF" / "Account").glob("*/SavedVariables/AGPS_Capture.lua")}
+                for name in pack.CAPTURE_SAVES for f in (wow / "WTF" / "Account").glob(f"*/SavedVariables/{name}")}
 
     seen = stamps()
     print(f"watching {len(seen)} saved capture list(s); /reload in game after capturing. Ctrl+C stops.", flush=True)
