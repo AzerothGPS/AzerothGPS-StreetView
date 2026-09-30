@@ -35,8 +35,9 @@ Gm.PROPOSE_SECONDS = 3 -- ... and this long for the players to say they have the
 Gm.GRACE_SECONDS = 3 -- a round ends this long after the guessing time, whoever hasn't answered
 Gm.MAX_TRIES = 5 -- street views tried until everyone has one
 Gm.FULL_YD = 25 -- a guess this close gets all 100 points
-Gm.SCALE_YD = 3800 -- ... then 100 * e^(-((yards - 25) / 3800) ^ 1.3), rounded down: 99 just past 25 yd, 88 at
-Gm.SCORE_POWER = 1.3 -- 800 yd, 72 at 1,600, 48 at 3,000, 16 at 6,000, 3 at 10,000 (the last points the hardest)
+Gm.SCALE_YD = 1700 -- ... then 100 * e^(-((yards - 25) / 1700) ^ 1.1), rounded down: 99 just past 25 yd, 92 at
+Gm.SCORE_POWER = 1.1 -- 200 yd, 78 at 500, 58 at 1,000, 30 at 2,000, 7 at 4,000, 1 at 6,000 (tightened by the
+-- user, 2026-09-30: somewhere in the right zone is no longer nearly full marks)
 Gm.FIT_MAX_YD = 2950 -- the result: guess and answer shown together up to this zoom (yards from the middle to
 -- the edge), the terrain view's widest (AzerothGPS shows map art past 3000: the view never flips style;
 -- right-click still goes out to the continent); farther apart, the answer alone
@@ -1345,7 +1346,8 @@ function Gm.Refresh()
         parts[#parts + 1] = sc and (ScoreColor(sc) .. sc .. "|r") or "|cff808080-|r"
       end
       local row = panel.rows[1]
-      row.name:SetText("Rounds: " .. table.concat(parts, ", "))
+      -- (each round's score, not rounds left: the user read "Rounds: 0" as that)
+      row.name:SetText((#parts > 1 and "Round scores: " or "Round score: ") .. table.concat(parts, ", "))
       row.last:SetText("")
       row.total:SetText(ph == "over" and "" or string.format("Average %d", Gm.Average(game)))
       row.name:ClearAllPoints()
