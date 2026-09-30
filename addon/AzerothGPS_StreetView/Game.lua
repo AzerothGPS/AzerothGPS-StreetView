@@ -1294,8 +1294,7 @@ function Gm.Refresh()
   elseif ph == "wait" then
     status = GuessLine(game.guess) .. "\n|cff9d9d9dWaiting for the others...|r"
   elseif ph == "result" then
-    local nextIn = game.round < game.rounds and (game.isHost or game.mode ~= "solo") and "\n|cff9d9d9dNext round in a moment|r" or ""
-    status = GuessLine(game.guess) .. nextIn
+    status = GuessLine(game.guess) -- (the countdown to the next round: the panel's timer)
   elseif ph == "over" then
     if game.reason then
       status = "|cffff8080" .. game.reason .. "|r"
@@ -1428,6 +1427,11 @@ function Gm.RefreshTimer()
     return
   end
   local ph = game.phase
+  if ph == "result" and game.deadline and game.round < game.rounds then -- (the next round, counted down)
+    panel.timer:SetText("|cff9d9d9dnext round in " .. Clock(game.deadline - Now()) .. "|r")
+    if V and V.SetTimer then V.SetTimer(nil) end
+    return
+  end
   if ph == "over" and game.closeAt then -- (closing by itself)
     panel.timer:SetText("|cff9d9d9dcloses in " .. Clock(game.closeAt - Now()) .. "|r")
     if V and V.SetTimer then V.SetTimer(nil) end
