@@ -59,6 +59,7 @@ local HELP = {
   "/sv probe - check that this game client shows JPEG images.",
   "/sv dev - the Report picture button in Where in the Azeroth? on or off (for taking broken pictures again).",
   "/sv reports - the street views reported as broken; /sv unreport <id> or /sv unreport all.",
+  "/sv demo [players] - (dev) a finished Where in the Azeroth? round with made-up players, 2-40.",
 }
 
 SLASH_AZEROTHGPSSTREETVIEW1 = "/sv"
@@ -87,6 +88,12 @@ SlashCmdList.AZEROTHGPSSTREETVIEW = function(msg)
     ns.Viewer.Refresh()
   elseif cmd == "probe" then
     ns.Viewer.Probe()
+  elseif cmd == "demo" then
+    if not ns.db.dev then
+      Print("/sv demo is a dev tool: turn on /sv dev first.")
+    else
+      ns.Game.Demo(rest)
+    end
   elseif cmd == "dev" then
     ns.db.dev = not ns.db.dev or nil
     Print(ns.db.dev and "Report picture is on (Where in the Azeroth?)." or "Report picture is off.")

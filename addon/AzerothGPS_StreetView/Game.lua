@@ -636,6 +636,50 @@ function Gm.StartNow()
   if game and game.isHost and game.phase == "invite" then Begin() end
 end
 
+-- A finished party round with made-up players (dev: `/sv demo [players]`), to look at the results
+-- (the markers, lines and mouse-over names) without a group. Nothing is sent to anyone.
+local DEMO_NAMES = { "Thrall", "Jaina", "Rexxar", "Sylvanas", "Cairne", "Voljin", "Magni", "Tyrande",
+  "Malfurion", "Baine", "Rokhan", "Muradin", "Gazlowe", "Drekthar", "Vanndar", "Garrosh", "Anduin",
+  "Varian", "Gelbin", "Genn", "Liadrin", "Lorthemar", "Velen", "Nobundo", "Zekhan", "Saurfang",
+  "Nazgrim", "Eitrigg", "Broxigar", "Aggra", "Draka", "Durotan", "Orgrim", "Kilrogg", "Grommash",
+  "Hamuul", "Mulgore", "Shandris", "Maiev" }
+function Gm.Demo(n)
+  if game and game.phase ~= "over" then
+    io().print("A game is already on.")
+    return false
+  end
+  n = math.max(2, math.min(40, math.floor(tonumber(n) or 5)))
+  local p = Gm.PickSpot({}, function(k) return io().random(1, k) end)
+  if not p then
+    io().print("No street views are installed.")
+    return false
+  end
+  NewGame("party", 1)
+  game.demo = true
+  game.channel = n > #Gm.ORCS and "RAID" or "PARTY"
+  game.before = io().mapState()
+  for i = 2, n do AddPlayer((DEMO_NAMES[i - 1] or ("Player" .. i)) .. "-Demo") end
+  Gm.AssignLooks(game, game.order, function(k) return io().random(1, k) end)
+  game.spot = Gm.OnMap(p, io().base)
+  game.round = 1
+  local steps = { 30, 250, 800, 1600, 3000 }
+  for i, name in ipairs(game.order) do
+    local d = steps[(i - 1) % #steps + 1] * (0.7 + io().random() * 0.6)
+    local a = io().random() * 2 * math.pi
+    local g = { x = game.spot.x + d * math.cos(a), y = game.spot.y + d * math.sin(a), cont = game.spot.cont, yards = d }
+    game.players[name].guesses[1] = g
+    game.players[name].scores[1] = Gm.Score(d)
+    if name == game.me then game.guess = g end
+  end
+  io().hold(true)
+  io().showMap()
+  io().open(p, 0)
+  game.reveal = { t0 = Now() }
+  Over()
+  ShowResult(true)
+  return true
+end
+
 -- Leave the game (its X): the map shows the route again.
 function Gm.Leave()
   if not game then return end
