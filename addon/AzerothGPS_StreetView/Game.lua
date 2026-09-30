@@ -14,7 +14,8 @@
 -- street views and paces the rounds; each player scores their own guess and tells the others.
 --   I:id:rounds:packs      invitation (host)          J:id:packs / D:id / B:id   join / decline / busy
 --   K:id:name:packs        a player's packs (host)    (packs: Kalimdor/2026.09.29,EasternKingdoms/...)
---   L:id:name,name,...     the players (host)         Q:id                 a player left
+--   L:id:ver:part:parts:name,name,...   the players (host), split over as many messages as a raid's
+--                          names need (an addon message holds 255 bytes)   Q:id   a player left
 --   P:id:round:spot        the next street view (host)   O:id:round / M:id:round   have it / missing
 --   G:id:round             the round starts (host)    S:id:round:score:yards:cont:x:y   a guess
 --   N:id:round             the round is over (host)   F:id  the game is over   X:id  the host ended it
@@ -28,6 +29,8 @@ local D = ns.Data
 
 Gm.PREFIX = "AGPSSV"
 Gm.LOOK_SECONDS = 30 -- the street view shows this long: the time to guess
+Gm.MSG_MAX = 240 -- an addon message's length, with room to spare (the game's limit is 255 bytes)
+Gm.HOST_SILENT_SECONDS = 75 -- no word from the host this long (they went offline): the game is over
 Gm.RESULT_SECONDS = 10 -- the round's result, before the next round (the user, 2026-09-29)
 Gm.OVER_SECONDS = 60 -- the final result stays this long, then the game closes and the map is the map again
 Gm.JOIN_SECONDS = 20 -- the host waits this long for answers to an invitation
@@ -376,6 +379,23 @@ local function ToOthers(...)
   end
 end
 
+-- The players (host), in as many L messages as it takes: a raid's "Name-Realm"s don't fit in one.
+local function SendRoster()
+  game.rosterVer = (game.rosterVer or 0) + 1
+  local room = Gm.MSG_MAX - #Gm.Encode("L", game.id, game.rosterVer, 99, 99, "")
+  local parts, cur, len = {}, {}, 0
+  for _, name in ipairs(game.order) do
+    if #cur > 0 and len + 1 + #name > room then
+      parts[#parts + 1] = table.concat(cur, ",")
+      cur, len = {}, 0
+    end
+    len = len + (#cur > 0 and 1 or 0) + #name
+    cur[#cur + 1] = name
+  end
+  parts[#parts + 1] = table.concat(cur, ",")
+  for k, names in ipairs(parts) do ToOthers("L", game.id, game.rosterVer, k, #parts, names) end
+end
+
 local function NewGame(mode, rounds, host, id)
   local me = io().me()
   game = { id = id or tostring(io().random(100000, 999999)), mode = mode, rounds = rounds, host = host or me, me = me,
@@ -529,7 +549,7 @@ local function Begin()
   end
   for _, name in ipairs(game.order) do ToOthers("K", game.id, name, Gm.PackField(game.packs[name] or {})) end
   Gm.AssignLooks(game, game.order, function(n) return io().random(1, n) end)
-  ToOthers("L", game.id, table.concat(game.order, ","))
+  SendRoster()
   NextRound()
 end
 
@@ -693,6 +713,10 @@ function Gm.Tick()
   if ph == "joined" and now >= game.deadline then
     return Over("The game started without you")
   end
+  -- (the host went offline or out of reach: nothing more will come)
+  if not game.isHost and ph ~= "joined" and game.heardHost and now - game.heardHost > Gm.HOST_SILENT_SECONDS then
+    return Over("Lost touch with " .. Short(game.host) .. " (the host)")
+  end
   if not game or not game.isHost then return end
   ph = game.phase
   if ph == "invite" and (now >= game.deadline or AllAnswered()) then
@@ -740,7 +764,7 @@ local function Gone(name)
     if #game.order < 2 and game.phase ~= "invite" and game.phase ~= "over" then
       return Over("Everyone else left")
     end
-    if game.phase ~= "invite" then ToOthers("L", game.id, table.concat(game.order, ",")) end
+    if game.phase ~= "invite" then SendRoster() end
   end
   Changed()
 end
@@ -772,6 +796,7 @@ function Gm.OnMessage(msg, channel, sender)
       game.phase = "joined"
       game.before = io().mapState()
       game.deadline = Now() + Gm.JOIN_SECONDS + 10 -- (no word from the host by then: it started without us)
+      game.heardHost = Now()
       io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me])), reply, to)
       io().hold(true)
       io().showMap()
@@ -782,6 +807,7 @@ function Gm.OnMessage(msg, channel, sender)
     return
   end
   if not game or id ~= game.id then return end
+  if sender == game.host then game.heardHost = Now() end
   local round = tonumber(f[2])
   if game.isHost then
     if kind == "J" and game.phase == "invite" then
@@ -806,11 +832,22 @@ function Gm.OnMessage(msg, channel, sender)
       Compare()
       Changed()
     elseif kind == "L" then
-      if not (","  .. (f[2] or "") .. ","):find("," .. game.me .. ",", 1, true) then
+      -- (a part of the roster; applied once every part of its version is in)
+      local ver, part, parts = tonumber(f[2]), tonumber(f[3]), tonumber(f[4])
+      if not (ver and part and parts) or parts < 1 or parts > 40 or part < 1 or part > parts then return end
+      if ver < (game.rosterVer or 0) then return end -- (an older roster, late)
+      if ver > (game.rosterVer or 0) or not game.rosterParts then game.rosterVer, game.rosterParts = ver, {} end
+      game.rosterParts[part] = f[5] or ""
+      for k = 1, parts do
+        if not game.rosterParts[k] then return end
+      end
+      local list = table.concat(game.rosterParts, ",", 1, parts)
+      game.rosterParts = {}
+      if not (","  .. list .. ","):find("," .. game.me .. ",", 1, true) then
         return Over("The game started without you")
       end
       local keep, roster = {}, {}
-      for name in (f[2] or ""):gmatch("[^,]+") do
+      for name in list:gmatch("[^,]+") do
         keep[name] = true
         roster[#roster + 1] = name
         AddPlayer(name)

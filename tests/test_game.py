@@ -605,3 +605,39 @@ def test_the_street_view_stays_up_after_the_round_until_leaving(solo):
     assert p.shown[-1] == p.shown[1]  # (and can be shown again from the panel)
     p.G.Leave()
     assert p.closed == 1
+
+
+def test_a_raid_of_40_with_long_names_all_know_each_other():
+    # (the roster doesn't fit in one addon message: it goes in parts, each under 255 bytes)
+    clock, net = Clock(), Net()
+    names = [f"Longplayername{i:02d}-Argentdawnrealm" for i in range(40)]
+    ps = [Player(n, clock, net, group="RAID") for n in names]
+    sent = []
+    orig = ps[0].send
+    ps[0].send = lambda msg, chat, target=None: (sent.append(msg), orig(msg, chat, target))
+    ps[0].G.io.send = ps[0].send
+    assert ps[0].G.Start("party", 1)
+    run(net, clock, 2)
+    assert all(len(m) <= 255 for m in sent)
+    assert sum(1 for m in sent if m.startswith("L:")) > 1
+    for p in ps:
+        assert p.game.phase == "look" and len(p.game.order) == 40, p.name
+    for i, p in enumerate(ps):
+        p.G.Guess(300, 300 + i * 50, 0)
+    run(net, clock, 35)
+    for p in ps:  # (everyone has everyone's score)
+        assert all(p.game.players[n].scores[1] is not None for n in names), p.name
+
+
+def test_the_game_ends_when_the_host_goes_silent():
+    clock, net = Clock(), Net()
+    a = Player("Ann-Realm", clock, net)
+    b = Player("Bob-Realm", clock, net)
+    a.G.Start("whisper", 3, "Bob-Realm")
+    run(net, clock, 2)
+    assert b.game.phase == "look"
+    net.players.pop("Ann-Realm")  # (the host went offline)
+    for _ in range(int((b.G.LOOK_SECONDS + b.G.HOST_SILENT_SECONDS + 5) / 0.5)):
+        clock.t += 0.5
+        b.G.Tick()
+    assert b.game.phase == "over" and "Lost touch" in b.game.reason
