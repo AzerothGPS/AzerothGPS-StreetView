@@ -15,7 +15,8 @@ local PAD = 4 -- picture inset from the frame's edge
 local BORDER = 3 -- the dark border (as the AzerothGPS map's)
 local CHROME_TITLE = 22 -- the game frame's title bar, above the frame (as the map's)
 local TITLE_H = 22 -- our own title bar, inside the frame, when the game frame isn't there
-local BAR_H = 30 -- the controls strip along the top
+local BAR_H = 0 -- the controls strip along the top: none (the user, 2026-09-30: the picture is
+-- dragged, zoomed with the wheel and walked with its arrows; the buttons and heading text only took room)
 local CONTROLS_X = 60 -- controls start right of the portrait (or badge)
 local MIN_W, MAX_W = 360, 1400
 local DRAG_STEP = 60 -- UI units of dragging across the picture per view turned
@@ -193,6 +194,8 @@ function V.Build()
   info:SetPoint("LEFT", ahead, "RIGHT", 8, 0)
   info:SetPoint("RIGHT", -10, 0)
   info:SetJustifyH("RIGHT")
+  for _, b in ipairs({ left, right, up, down, ahead }) do b:Hide() end
+  info:Hide()
 
   -- the picture
   view = CreateFrame("Frame", nil, frame)
@@ -559,7 +562,7 @@ function V.Open(p, heading, game)
   cur.game = game or nil
   if not game then timerBox:Hide() end
   cur.dirs = not game and D.Directions(p, API and API.Roads and API.Roads(p.cont)) or nil
-  if ahead.SetEnabled then ahead:SetEnabled(not game) end
+  if ahead.SetEnabled then ahead:SetEnabled(not game) end -- (hidden: V.GoAhead stays for the arrows)
   lastMarkHeading = nil
   frame:Show()
   V.Refresh()
