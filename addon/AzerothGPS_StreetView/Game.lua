@@ -1637,7 +1637,6 @@ function Gm.Refresh()
         status = "No one scored."
       elseif #w == 1 then
         status = (w[1] == game.me and "|cffffd100You win!|r" or ("|cffffd100" .. Short(w[1]) .. " wins!|r"))
-          .. (game.tiebreak and " |cff9d9d9d(same points: the closer guesses win)|r" or "")
       else
         local names = {}
         for _, n in ipairs(w) do names[#names + 1] = Short(n) end
