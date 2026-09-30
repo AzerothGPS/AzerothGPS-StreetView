@@ -185,15 +185,15 @@ def test_solo_game_runs_its_rounds_and_averages(solo):
     run(net, clock, 26)  # the 30 seconds are up: 10 yd off, all the points
     assert p.game.phase == "result" and scores(p, "Me-Realm") == [100] and p.closed >= 1
     assert p.looked  # the map shows the guess and the spot
-    run(net, clock, 8)
+    run(net, clock, 11)  # (past the 10 s result)
     assert p.game.round == 2 and p.game.phase == "look" and p.shown[-1] == "0-900-900"
     p.G.Guess(900, 900, 1)  # the wrong continent: nothing
     run(net, clock, 31)
     assert scores(p, "Me-Realm") == [100, 0]
-    run(net, clock, 8)
+    run(net, clock, 11)  # (past the 10 s result)
     run(net, clock, 31)  # no guess in the 30 seconds: nothing
     assert scores(p, "Me-Realm") == [100, 0, 0]
-    run(net, clock, 8)
+    run(net, clock, 11)  # (past the 10 s result)
     g = p.game
     assert g.phase == "over" and p.G.Average(g) == 33 and not g.celebrate
     p.G.Leave()
@@ -205,7 +205,7 @@ def test_solo_celebrates_a_good_average(solo):
     p.G.Start("solo", 1)
     s = p.game.spot
     p.G.Guess(s.x + 300, s.y, s.cont)
-    run(net, clock, 31 + 8)
+    run(net, clock, 31 + 11)
     assert p.game.phase == "over" and p.G.Average(p.game) == 96 and p.game.celebrate
 
 
@@ -234,7 +234,7 @@ def test_party_game_between_two_players():
     assert a.game.phase == "result" and b.game.phase == "result"
     assert b.game.players["Ann-Realm"].scores[1] == a.G.Score(100)
     assert b.game.players["Ann-Realm"].guesses[1].x == 300  # (her guess shows on B's map)
-    run(net, clock, 8)
+    run(net, clock, 11)  # (past the 10 s result)
     for p in (a, b):
         assert p.game.phase == "over" and list(p.game.winners.values()) == ["Ann-Realm"] and p.game.celebrate
 
@@ -359,7 +359,7 @@ def test_street_views_come_only_from_packs_everyone_has():
         assert a.game.phase == "look" and a.game.spot.cont == 1  # (Kalimdor's only)
         a.G.Guess(a.game.spot.x, a.game.spot.y, 1)
         b.G.Guess(0, 0, 1)
-        run(net, clock, 31 + 8)
+        run(net, clock, 31 + 11)
     assert sorted(a.shown) == sorted(b.shown) == ["1-100-100", "1-2000-500"]
 
 
@@ -389,12 +389,12 @@ def test_the_result_shows_both_only_when_they_fit_on_the_terrain_map(solo):
     run(net, clock, 31)
     c, x, y, z = p.looked[-1]
     assert (c, x, y) == (0, 500, 300) and z <= p.G.FIT_MAX_YD
-    run(net, clock, 8)
+    run(net, clock, 11)  # (past the 10 s result)
     s = p.game.spot  # (0-900-900)
     p.G.Guess(s.x + 20000, s.y, s.cont)  # 20,000 yd off: too far to fit, just the spot
     run(net, clock, 31)
     assert p.looked[-1] == (0, 900, 900, p.G.SPOT_ZOOM_YD)
-    run(net, clock, 8)
+    run(net, clock, 11)  # (past the 10 s result)
     s = p.game.spot
     p.G.Guess(0, 0, 1 - s.cont)  # the other continent: the world
     run(net, clock, 31)
@@ -499,7 +499,7 @@ def test_no_celebration_below_75(solo):
     p.G.Start("solo", 1)
     s = p.game.spot
     p.G.Guess(s.x + 1500, s.y, s.cont)  # ~73 points: good, but not a celebration
-    run(net, clock, 31 + 8)
+    run(net, clock, 31 + 11)
     assert p.game.phase == "over" and 70 <= p.G.Average(p.game) < 75 and not p.game.celebrate
 
 
@@ -509,7 +509,7 @@ def test_a_party_winner_under_75_gets_no_celebration():
     run(net, clock, 2)
     a.G.Guess(300, 3300, 0)  # 3,000 yd off: wins, but only 48
     b.G.Guess(300, 9300, 0)
-    run(net, clock, 32 + 8)
+    run(net, clock, 32 + 11)
     assert a.game.phase == "over" and list(a.game.winners.values()) == ["Ann-Realm"] and not a.game.celebrate
 
 
@@ -544,7 +544,7 @@ def test_a_raid_gets_colored_squares_and_solo_a_random_orc(solo):
 def test_a_finished_game_closes_after_a_minute(solo):
     p, clock, net = solo
     p.G.Start("solo", 1)
-    run(net, clock, 31 + 8)
+    run(net, clock, 31 + 11)
     assert p.game.phase == "over"
     run(net, clock, 50)
     assert p.G.Current() is not None  # (still showing the result)
