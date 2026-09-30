@@ -38,5 +38,13 @@
  "0--8749-1082": {
   "reason": "Stormwind (placement fix OK, on the city floor) but large solid-black patches on the ground (missing floor material?); 2026-09-30 spot-check",
   "at": 1790753092
+ },
+ "0--8712-861": {
+  "reason": "rendered under Stormwind City (camera on the terrain below the city model); capture PC sweep 2026-09-30",
+  "at": 1790755126
+ },
+ "0--9008-945": {
+  "reason": "rendered under Stormwind City (camera on the terrain below the city model); capture PC sweep 2026-09-30",
+  "at": 1790755126
  }
 }
