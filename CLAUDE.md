@@ -59,8 +59,8 @@ A GeoGuessr-style game from the button above the figure: solo, party or whisper,
 A street view pops up for 30 s with a countdown on it and the panel (no zone name or coordinates,
 no walking on, not marked on the map); in that time the player double-clicks the map to place a
 guess (again to move it), and the one placed when the time runs out counts;
-only open-world road spots are used, never instances or caves (the user, 2026-09-29: any spot with a
-`kind`, which the harvester's meta.json sets and the Index carries, or a level of 10000+ is skipped); street views come only from the map packs every player has (they're exchanged on joining; the
+only open-world road spots are used, never instances or caves (the user, 2026-09-29: cities are in, Undercity's level too, placed on its continent by `Gm.OnMap`; any spot with a
+`kind`, which the harvester's meta.json sets and the Index carries, or a level of 20000+ is skipped); street views come only from the map packs every player has (they're exchanged on joining; the
 panel lists who lacks which, or has an older one). `Gm.Score` gives 0-100 (full within 25 yd, then
 `floor(100 * e^(-((yd - 25) / 3800) ^ 1.3))`: 88 at 800 yd, 72 at 1,600, 16 at 6,000; the last points the hardest;
 the celebration needs an average round score of 75: the player's solo, the winner's otherwise). While a game is on the map is held (`AzerothGPS.HoldMap`, API

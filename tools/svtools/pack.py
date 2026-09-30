@@ -47,11 +47,12 @@ def is_manual(point: dict) -> bool:
 
 
 def pack_for(cfg: dict, point: dict) -> dict | None:
-    """The SD pack a point belongs in (by continent), or None."""
+    """The SD pack a point belongs in (by continent), or None. The pack inside the viewer takes
+    every level the others don't (city levels such as Undercity's 10001, instances later)."""
     for pk in cfg["sd"]["packs"]:
         if int(point["cont"]) in pk["continents"]:
             return pk
-    return None
+    return next((pk for pk in cfg["sd"]["packs"] if pk.get("in_viewer")), None)
 
 
 SHOT_EXTS = (".jpg", ".jpeg", ".tga", ".png")

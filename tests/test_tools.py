@@ -257,7 +257,7 @@ def test_cube_tiles_render_the_panorama():
 
 def test_every_point_has_one_pack_inside_the_viewer():
     cfg = pack.CONFIG
-    for cont in (0, 1, 2991):
+    for cont in (0, 1, 2991, 10001):  # (and Undercity's level)
         assert pack.pack_for(cfg, {"cont": cont}) is not None
     assert len({c for p in cfg["sd"]["packs"] for c in p["continents"]}) == sum(len(p["continents"]) for p in cfg["sd"]["packs"])
     # one addon (the user, 2026-09-29): the pictures and their Index.lua ship inside the viewer,

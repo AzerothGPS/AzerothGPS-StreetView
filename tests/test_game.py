@@ -20,6 +20,7 @@ PACK = """{ { name = "t", root = "R\\\\", ext = "jpg", points = {
   { id = "0-900-900", cont = 0, x = 900, y = 900 },
   { id = "1-5000-5000", cont = 1, x = 5000, y = 5000 },
   { id = "20036-1-1", cont = 20036, x = 1, y = 1, kind = "instance" },
+  { id = "10001-1600-240", cont = 10001, x = 1600, y = 240 },
   { id = "1-8000-8000", cont = 1, x = 8000, y = 8000, kind = "cave" },
 } } }"""
 
@@ -164,9 +165,9 @@ def test_spots_are_on_continents_and_never_twice(solo):
     p, _, _ = solo
     used = p.lua.table()
     seen = set()
-    for _ in range(5):
+    for _ in range(6):  # (the five on the continents and Undercity's)
         s = p.G.PickSpot(used, lambda n: 1)
-        assert s.cont < 10000 and s.id not in seen and s.kind is None
+        assert s.cont < 20000 and s.id not in seen and s.kind is None
         seen.add(s.id)
         used[s.id] = True
     assert p.G.PickSpot(used, lambda n: 1) is None  # (only the dungeon's and the cave's are left)
@@ -571,3 +572,12 @@ def test_reported_and_unloadable_spots_are_never_picked(solo):
     p.lua.globals()._usable(p.G)
     p.G.Start("solo", 1)
     assert p.game.spot.id not in ("0-300-300", "0-900-900")
+
+
+def test_city_level_spots_are_placed_on_their_continent(solo):
+    p, _, _ = solo
+    uc = p.lua.eval('function(G) return G.OnMap({ id = "10001-1600-240", cont = 10001, x = 1600, y = 240, pack = "k" },'
+                    ' function(c) return c == 10001 and 0 or c end) end')(p.G)
+    assert uc.cont == 0 and uc.id == "10001-1600-240" and uc.x == 1600 and uc.pack == "k"
+    same = p.lua.eval('function(G) local q = { cont = 1, x = 5, y = 5 } return G.OnMap(q, function(c) return 0 end) == q end')(p.G)
+    assert same  # (spots on a continent are used as they are)

@@ -163,8 +163,9 @@ end
 function Gm.PickSpot(used, rnd, allowed)
   local ids = {}
   for id, p in pairs(D.byId) do
-    -- (open-world road spots only: never instances, caves or other levels, p.kind; the user, 2026-09-29)
-    if not used[id] and type(p.cont) == "number" and p.cont < 10000 and not p.kind
+    -- (the continents and the cities, Undercity's level included; never instances or caves: those
+    -- are levels of 20000 and up, or have a p.kind. The user, 2026-09-29)
+    if not used[id] and type(p.cont) == "number" and p.cont < 20000 and not p.kind
         and (not allowed or (p.pack and allowed[Gm.PackKey(p.pack.name)]))
         and (not Gm.Usable or Gm.Usable(p)) then
       ids[#ids + 1] = id
@@ -173,6 +174,18 @@ function Gm.PickSpot(used, rnd, allowed)
   if #ids == 0 then return nil end
   table.sort(ids) -- (the same pick for the same numbers: tests)
   return D.byId[ids[(rnd or math.random)(#ids)]]
+end
+
+-- The spot as the game uses it: on its base continent (a city level such as Undercity's is drawn in
+-- its continent's coordinates, and guesses are placed on the continent). A copy; the pictures stay the spot's.
+function Gm.OnMap(p, base)
+  if not (p and base and p.cont >= 10000) then return p end
+  local c = base(p.cont)
+  if not c or c == p.cont then return p end
+  local q = {}
+  for k, v in pairs(p) do q[k] = v end
+  q.cont = c
+  return q
 end
 
 -- The players by total so far (ties by name): { { name, total, last, rounds }, ... }.
@@ -292,6 +305,10 @@ local game
 -- Default io: the game client (tests replace it).
 Gm.io = {
   now = function() return GetTime() end,
+  base = function(c) -- (a city level's continent: AzerothGPS.BaseContinent)
+    local API = _G.AzerothGPS
+    return API and API.BaseContinent and API.BaseContinent(c) or c
+  end,
   me = function()
     local n, r = UnitFullName("player")
     r = (r and r ~= "") and r or (GetNormalizedRealmName and GetNormalizedRealmName()) or ""
@@ -433,7 +450,7 @@ local function Propose()
   local p = Gm.PickSpot(game.used, function(n) return io().random(1, n) end, game.common)
   if not p then return Over("No street views are installed") end
   game.used[p.id] = true
-  game.spot = p
+  game.spot = Gm.OnMap(p, io().base)
   if game.mode == "solo" then return Look() end
   game.phase = "propose"
   game.acks = {}
@@ -802,7 +819,7 @@ function Gm.OnMessage(msg, channel, sender)
     elseif kind == "P" and round and f[3] then
       game.round = round
       game.phase = "ready"
-      game.spot = D.byId[f[3]]
+      game.spot = Gm.OnMap(D.byId[f[3]], io().base)
       local reply = game.mode == "whisper" and "WHISPER" or game.channel
       io().send(Gm.Encode(game.spot and "O" or "M", game.id, round), reply, game.mode == "whisper" and game.host or nil)
       Changed()

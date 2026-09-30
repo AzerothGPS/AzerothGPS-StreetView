@@ -535,3 +535,36 @@ and nothing runs or automates the game. wow.export only reads the install's file
    Claude writes it; it built the pipeline).
 3. StreetView: `sv.cmd roads` and retired spots left out of the packs.
 4. The smoke test on the main PC, then updates run where the user likes.
+
+## 12. Cities (queued 2026-09-29, after the open-world run)
+
+The first run's planner (`harvester points`) reads only `ns.Roads`, the open-world road network.
+The capitals' streets are city models with their own grids and roads in `ns.RoadOverlays`
+(AzerothGPS `Data/Capitals.lua`: Stormwind City and Ironforge on 0; Orgrimmar, Thunder Bluff and
+Darnassus on 1), and Undercity is its own level (`Data/Cities.lua`, 10001, drawn in the Eastern
+Kingdoms' coordinates). So the capitals got almost nothing (measured 2026-09-29, rendered /
+shipped): Stormwind 0/0, Ironforge 0/0, Orgrimmar 2/0, Undercity 8/5 (the ruins above),
+Darnassus 38/10, Thunder Bluff 71/9 (most retired after the user's Mulgore road edits).
+
+- **Planner:** a city mode, `harvester points --cities [--only Orgrimmar]`, reading the capital
+  entries of `ns.RoadOverlays` (not the caves' entry, `o.cave`) and Undercity's `ns.Roads[10001]`,
+  with node heights (Ironforge and Undercity have floors over each other: dedupe on the same floor
+  only, as for instances). The overlay roads' points are packed (`caves.pack_points`): decode them
+  as AzerothGPS does.
+- **Spacing:** shipped every ~75 yd in cities (streets are short and turn often; 200 yd would give
+  Orgrimmar a handful). `pack.ship_points` takes a per-spot spacing: city spots carry
+  `city = "<name>"` in meta.json and ship at `city_ship_spacing_yd` (packs.json, 75).
+- **Size estimate (not measured):** 60-100 spots a city, ~400-500 in all, ~0.25-0.3 GB. With the
+  open world (~0.84 GB) and instances (~0.27 GB) the one addon is about 1.4 GB, under the 1.8 GB
+  budget. `sv.cmd build` prints the real projection.
+- **Render:** about 7-8 hours; after the open-world run, before or with the instances. The
+  capitals' lighting: their zone's Light rows, as in the open world (Stormwind, Ironforge's inside
+  and Undercity are interiors: check them against references first, like 10.7).
+- **Viewer:** Undercity spots open from its level's map (AzerothGPS shows city levels); the walking
+  arrows stay on the same level.
+- **Where in the Azeroth?:** cities are in the game (the user, 2026-09-29), Undercity's level
+  included: `Gm.PickSpot` takes levels under 20000 without a `kind`, and `Gm.OnMap` places a city
+  level's spot on its base continent, where guesses are made. Instances (20000+) and caves
+  (`kind = "cave"`) stay out.
+- `pack.pack_for`: the pack inside the viewer takes every level no other pack lists (10001 now,
+  instances later).
