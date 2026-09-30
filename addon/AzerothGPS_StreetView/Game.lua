@@ -15,7 +15,9 @@
 -- before joining (an open game's link is the asking: clicking it joins). The host picks the
 -- street views and paces the rounds; each player scores their own guess and tells the others.
 --   I:id:rounds:packs:secs invitation (host)          J:id:packs / D:id / B:id   join / decline / busy
---   W:id:secs              the lobby's seconds left (host, on each join)   U:id:why   (host) can't join:
+--   (J's 3rd field: the host's name as the joiner sees it; W's 3rd: the one who joined, as the host
+--   sees them: WoW Forever's names are "First Surname", and each side takes the others' spelling)
+--   W:id:secs:name         the lobby's seconds left (host, on each join)   U:id:why   (host) can't join:
 --                          full / started / over (an open game's J, whispered)
 --   K:id:name:packs        a player's packs (host)    (packs: Kalimdor/2026.09.29,EasternKingdoms/...)
 --   L:id:ver:part:parts:name,name,...   the players (host), split over as many messages as a raid's
@@ -409,9 +411,10 @@ Gm.io = {
     local API = _G.AzerothGPS
     return API and API.BaseContinent and API.BaseContinent(c) or c
   end,
-  me = function()
-    local n, r = UnitFullName("player")
-    r = (r and r ~= "") and r or (GetNormalizedRealmName and GetNormalizedRealmName()) or ""
+  me = function() -- (as the others see this player: "First Surname-Realm" in WoW Forever)
+    local n = Gm.UnitFullName("player")
+    local r = GetNormalizedRealmName and GetNormalizedRealmName() or ""
+    if r == "" and UnitFullName then r = select(2, UnitFullName("player")) or "" end
     return r ~= "" and (n .. "-" .. r) or n
   end,
   send = function(msg, chatType, target)
@@ -456,11 +459,48 @@ local function Now() return io().now() end
 local function Short(name) return (name or "?"):match("^([^-]+)") or name end
 Gm.Short = Short
 
+-- WoW Forever's players have a first name and a surname (the client's "regional unique names":
+-- UnitName gives both, the chat shows "First Surname"). A unit's name that way (else just the name).
+function Gm.UnitFullName(unit)
+  local n, second = UnitName(unit)
+  if not n then return nil end
+  if RegionalUniqueNamesEnabled and RegionalUniqueNamesEnabled() and second and second ~= "" then
+    local c = Constants and Constants.CharacterNameSeparatorConsts
+    return n .. (c and c.CHARACTERNAME_SURNAME_SEPARATOR or " ") .. second
+  end
+  return n
+end
+
+-- The same player's names however they're written (the first name alike: "Ann-Realm", "Ann Smith",
+-- "Ann-Smith-Realm"): what this player calls themselves and what the others see can differ, and
+-- each side tells the other (J, W) so everyone ends up with the same.
+function Gm.SameRoot(a, b)
+  a, b = tostring(a or ""):match("^[^%s%-]+"), tostring(b or ""):match("^[^%s%-]+")
+  return a ~= nil and b ~= nil and a:lower() == b:lower()
+end
+
 local function AddPlayer(name)
   if not game.players[name] then
     game.players[name] = { name = name, scores = {}, guesses = {} }
     game.order[#game.order + 1] = name
   end
+end
+
+-- A player's name as the others see it, instead of the one they had (their own or the host's).
+local function Rename(old, new)
+  if not new or new == "" or old == new or not game.players[old] or game.players[new] then return end
+  local pl = game.players[old]
+  pl.name = new
+  game.players[new], game.players[old] = pl, nil
+  for i, n in ipairs(game.order) do
+    if n == old then game.order[i] = new end
+  end
+  for _, t in ipairs({ game.packs, game.looks, game.answers or {}, game.acks or {} }) do
+    if t[old] ~= nil then t[new], t[old] = t[old], nil end
+  end
+  if game.me == old then game.me = new end
+  if game.host == old then game.host = new end
+  game.isHost = game.host == game.me
 end
 
 local function RemovePlayer(name)
@@ -801,7 +841,7 @@ function Gm.JoinLink(host, id, rounds)
   game.askedAt = Now()
   game.deadline = Now() + Gm.JOIN_SECONDS + 10
   game.heardHost = Now()
-  io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me])), "WHISPER", host)
+  io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me]), host), "WHISPER", host)
   io().hold(true)
   io().showMap()
   Changed()
@@ -1006,7 +1046,7 @@ function Gm.OnMessage(msg, channel, sender)
       game.startAt = heard + left
       game.deadline = game.startAt + 10 -- (no word from the host by then: it started without us)
       game.heardHost = Now()
-      io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me])), reply, to)
+      io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me]), sender), reply, to) -- (the host as seen here)
       io().hold(true)
       io().showMap()
       Changed()
@@ -1027,6 +1067,7 @@ function Gm.OnMessage(msg, channel, sender)
     elseif kind == "J" and game.open and #game.order >= Gm.MAX_PLAYERS and not game.players[sender] then
       io().send(Gm.Encode("U", game.id, "full"), "WHISPER", sender)
     elseif kind == "J" and game.phase == "invite" then
+      if f[3] and f[3] ~= game.me and Gm.SameRoot(f[3], game.me) then Rename(game.me, f[3]) end -- (as the others see us)
       AddPlayer(sender)
       game.answers[sender] = true
       game.packs[sender] = Gm.ParsePacks(f[2])
@@ -1037,9 +1078,9 @@ function Gm.OnMessage(msg, channel, sender)
           game.deadline = Now() + 3
           ToOthers("W", game.id, SecondsLeft())
         end
-        io().send(Gm.Encode("W", game.id, SecondsLeft()), "WHISPER", sender)
+        io().send(Gm.Encode("W", game.id, SecondsLeft(), sender), "WHISPER", sender)
       else
-        ToOthers("W", game.id, SecondsLeft())
+        ToOthers("W", game.id, SecondsLeft(), sender) -- (sender: the one who joined, as seen here)
       end
       Changed()
     elseif (kind == "D" or kind == "B") and game.phase == "invite" then
@@ -1052,9 +1093,16 @@ function Gm.OnMessage(msg, channel, sender)
       game.acks[sender] = kind == "M" and "missing" or true
     end
   else
+    -- (the host's name as it arrives, when it's written otherwise than the link or invitation had it)
+    if sender ~= game.host and game.phase == "joined" and (kind == "W" or kind == "U")
+      and Gm.SameRoot(sender, game.host) and not game.players[sender] then
+      Rename(game.host, sender)
+    end
     if sender ~= game.host and kind ~= "S" and kind ~= "Q" then return end -- (the host runs the game)
     if game.phase == "over" then return end -- (turned away or ended: a round starting doesn't bring it back)
     if kind == "W" and game.phase == "joined" then -- (the lobby's seconds left)
+      if f[3] and f[3] ~= game.me and not game.nameSet and Gm.SameRoot(f[3], game.me) then Rename(game.me, f[3]) end
+      if f[3] == game.me then game.nameSet = true end
       local left = tonumber(f[2])
       if left then
         game.startAt = Now() + left
@@ -1308,7 +1356,7 @@ local function ShowMenu(step)
     fly:Show()
   end
   if step == "whisper" then
-    local name = UnitIsPlayer and UnitIsPlayer("target") and not UnitIsUnit("target", "player") and GetUnitName("target", true)
+    local name = UnitIsPlayer and UnitIsPlayer("target") and not UnitIsUnit("target", "player") and Gm.UnitFullName("target")
     s.box:SetText(name or s.box:GetText() or "")
     s.box:SetFocus()
     s.box:HighlightText()

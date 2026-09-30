@@ -42,7 +42,7 @@ class LossyNet(T.Net):
                     continue
                 if self.loss and self.rng.random() < self.loss:
                     continue
-                p.G.OnMessage(msg, chat, sender)
+                p.G.OnMessage(msg, chat, self.seen(sender))
                 n += 1
         return n
 

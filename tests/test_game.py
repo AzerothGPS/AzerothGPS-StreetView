@@ -30,8 +30,9 @@ class Clock:
 
 
 class Player:
-    def __init__(self, name, clock, net, pack=PACK, group=None, answer=True):
+    def __init__(self, name, clock, net, pack=PACK, group=None, answer=True, seen_as=None):
         self.name, self.clock, self.net, self.answer = name, clock, net, answer
+        self.seen_as = seen_as or name  # (how the others' messages name this player: WoW Forever's "First Surname")
         self.lua = lupa.LuaRuntime()
         self.ns = self.lua.table()
         for f in ("Data.lua", "Game.lua"):
@@ -99,12 +100,17 @@ class Net:
     def __init__(self):
         self.players, self.queue, self.channels = {}, [], {}
 
+    def seen(self, sender):
+        """The sender's name as the others' messages carry it."""
+        p = self.players.get(sender)
+        return p.seen_as if p else sender
+
     def hears(self, name, sender, chat, target):
         """Whether `name` gets a message (party: everyone else; whisper: one; a channel: its members)."""
         if name == sender:
             return False
         if chat == "WHISPER":
-            return name == target
+            return name == target or self.seen(name) == target
         if chat == "CHANNEL":
             return name in self.channels.get(target, ()) and sender in self.channels.get(target, ())
         return True
@@ -117,7 +123,7 @@ class Net:
             for name, p in list(self.players.items()):
                 if not self.hears(name, sender, chat, target):
                     continue
-                p.G.OnMessage(msg, chat, sender)
+                p.G.OnMessage(msg, chat, self.seen(sender))
                 n += 1
         return n
 
@@ -849,6 +855,37 @@ def test_tied_numbers_show_decimals_only_when_tied(solo):
     assert show([(100, 99.96), (100, 99.92)]) == ["99.96", "99.92"]
     assert show([(0, 0), (0, 0)]) == ["0", "0"]
     assert show([(57, 56.5), (57, 56.5)]) == ["56.50", "56.50"]  # (a real tie: the same distance)
+
+
+def test_first_and_last_names_end_up_the_same_everywhere():
+    # (WoW Forever: the others see "Ann Smith-Realm" while Ann's own game may call her "Ann-Realm")
+    clock, net = Clock(), Net()
+    a = Player("Ann-Realm", clock, net, group="PARTY", seen_as="Ann Smith-Realm")
+    b = Player("Bob-Realm", clock, net, group="PARTY", seen_as="Bob Jones-Realm")
+    assert a.G.Start("party", 1)
+    run(net, clock, 2)
+    for p in (a, b):
+        assert p.game.phase == "look" and sorted(p.game.order.values()) == ["Ann Smith-Realm", "Bob Jones-Realm"], p.name
+    assert a.game.me == "Ann Smith-Realm" and a.game.isHost and b.game.me == "Bob Jones-Realm"
+    assert a.G.Short("Ann Smith-Realm") == "Ann Smith"
+    a.G.Guess(300, 300, 0)
+    b.G.Guess(300, 3300, 0)
+    run(net, clock, 31 + 11)
+    for p in (a, b):
+        assert p.game.phase == "over" and list(p.game.winners.values()) == ["Ann Smith-Realm"], p.name
+        assert all(v is not None for v in (p.game.players["Bob Jones-Realm"].scores[1],))
+
+
+def test_an_open_game_with_first_and_last_names():
+    clock, net = Clock(), Net()
+    a = Player("Ann-Realm", clock, net, seen_as="Ann Smith-Realm")
+    b = Player("Bob-Realm", clock, net, seen_as="Bob Jones-Realm")
+    a.G.Start("open", 1)
+    shown = b.G.Linkify(a.G.JoinText(), "Ann Smith")  # (the chat's author: first and last name)
+    assert b.G.OnLink(shown.split("|H")[1].split("|h")[0])
+    run(net, clock, 31)
+    for p in (a, b):
+        assert p.game.phase == "look" and sorted(p.game.order.values()) == ["Ann Smith-Realm", "Bob Jones-Realm"], p.name
 
 
 def test_no_developer_tools_ship():

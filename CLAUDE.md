@@ -82,6 +82,10 @@ version 3): the route and directions panel hide, double-clicks are guesses, and 
 sits in the directions' place; its X leaves and the route comes back. Players talk through addon
 messages (prefix `AGPSSV`, the protocol is at the top of Game.lua), invitations are always asked.
 The logic runs through `Gm.io`; `tests/test_game.py` plays whole games between simulated players.
+**Names (2026-09-30):** WoW Forever's players have a first name and a surname (the client's regional unique
+names: `UnitName` returns both; chat shows "First Surname"). `io.me` builds "First Surname-Realm" (`Gm.UnitFullName`), and
+as a fallback J carries the host's name as the joiner sees it and W the joiner's as the host sees it, so
+each side takes the others' spelling (`Gm.SameRoot` guards it: the same first name). The tests' `seen_as` covers it.
 
 **Broken pictures:** `pack.retake` holds spots back from the packs and lists them in
 `build/retake.json` for the capture PC to take again: broken renders (8+ of the 16 side tiles one flat
