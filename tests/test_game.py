@@ -564,6 +564,12 @@ def test_leaving_restores_the_map_as_it_was(solo):
     p.G.Start("solo", 1)
     p.G.Leave()
     assert p.looked[-1] == "follow"
+    # AzerothGPS saved the whole view (a continent or world map browsed): that, as it was
+    p.G.io.restore = lambda saved: p.looked.append(("restore", saved.map))
+    p.map_state = p.lua.eval('{ following = false, x = 1, y = 1, cont = 1, zoom = 9000, saved = { map = "Kalimdor" } }')
+    p.G.Start("solo", 1)
+    p.G.Leave()
+    assert p.looked[-1] == ("restore", "Kalimdor")
 
 
 def test_reported_and_unloadable_spots_are_never_picked(solo):

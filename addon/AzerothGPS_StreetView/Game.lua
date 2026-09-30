@@ -603,8 +603,12 @@ function Gm.Leave()
   game = nil
   io().close()
   io().hold(false)
-  -- back to the map as it was: following the player, or the view they had
-  if before and not before.following and before.x then
+  -- back to the map as it was: the whole view AzerothGPS saved (a continent or world map browsed
+  -- stays that map, not a terrain view of it; API version 8), else following the player, or the
+  -- view they had
+  if before and before.saved and io().restore then
+    io().restore(before.saved)
+  elseif before and not before.following and before.x then
     io().lookAt(before.cont, before.x, before.y, before.zoom)
   else
     io().follow()
@@ -1618,12 +1622,14 @@ function Gm.Init(figureButton)
   end
   -- the map as it is: following the player (its center on them), or where it looks
   io_.mapState = function()
+    local saved = API.SaveView and API.SaveView() -- (the whole view: restored by io_.restore)
     local x, y, c, zoom = io_.view()
-    if not x then return nil end
+    if not x then return saved and { saved = saved } or nil end
     local px, py, pc = API.PlayerWorld()
     local following = px ~= nil and API.BaseContinent(pc) == c and (px - x) ^ 2 + (py - y) ^ 2 < 25
-    return { following = following, x = x, y = y, cont = c, zoom = zoom }
+    return { following = following, x = x, y = y, cont = c, zoom = zoom, saved = saved }
   end
+  if API.RestoreView then io_.restore = function(saved) API.RestoreView(saved) end end
   io_.world = function(s) -- (the start of a round; a guess on another continent: the whole world)
     if API.ShowWorld then API.ShowWorld() elseif s and API.LookAt then API.LookAt(s.cont, s.x, s.y, 6000) end
   end
