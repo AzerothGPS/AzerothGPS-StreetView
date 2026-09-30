@@ -192,16 +192,18 @@ function Gm.OnMap(p, base)
   return q
 end
 
--- The players by total so far (ties by name): { { name, total, last, rounds }, ... }.
-function Gm.Standings(g)
+-- The players by total so far (ties by name): { { name, total, last, rounds }, ... }; `upto`: count
+-- only the rounds up to it (the round being played isn't shown before its result).
+function Gm.Standings(g, upto)
+  upto = upto or g.round
   local list = {}
   for _, name in ipairs(g.order) do
     local pl = g.players[name]
     local total, n = 0, 0
-    for r = 1, g.round do
+    for r = 1, upto do
       if pl.scores[r] then total, n = total + pl.scores[r], n + 1 end
     end
-    list[#list + 1] = { name = name, total = total, last = pl.scores[g.round], rounds = n }
+    list[#list + 1] = { name = name, total = total, last = pl.scores[upto], rounds = n }
   end
   table.sort(list, function(a, b)
     if a.total ~= b.total then return a.total > b.total end
@@ -1412,17 +1414,21 @@ function Gm.Refresh()
       rowsShown = 1
     end
   else
-    local list = Gm.Standings(game)
+    -- (until a round's result, its points stay hidden: the others only show that they guessed, and
+    -- the totals and the order are the earlier rounds')
+    local open = ph ~= "result" and ph ~= "over"
+    local list = Gm.Standings(game, open and math.max(0, game.round - 1) or nil)
     local showScores = game.round > 0
     for i, s in ipairs(list) do
       if i > ROWS then break end
       local row = panel.rows[i]
       local me = s.name == game.me
-      local done = s.last ~= nil
+      local cur = game.players[s.name] and game.players[s.name].scores[game.round]
+      local done = cur ~= nil
       local lastText = ""
       if showScores then
         if ph == "result" or ph == "over" or me then
-          lastText = done and (ScoreColor(s.last) .. "+" .. s.last .. "|r") or "|cff808080-|r"
+          lastText = done and (ScoreColor(cur) .. "+" .. cur .. "|r") or "|cff808080-|r"
         else
           lastText = done and "|cff40ff40guessed|r" or "|cff808080...|r"
         end

@@ -661,6 +661,21 @@ def test_a_players_marker_tooltip_names_them_with_their_scores():
     assert len(a.G.PlayerTip(a.game, "Nobody-Realm")) == 0
 
 
+def test_standings_can_leave_out_the_round_being_played():
+    (a, b), clock, net = party(2)
+    a.G.Start("party", 3)
+    run(net, clock, 2)
+    a.G.Guess(300, 300, 0)
+    b.G.Guess(300, 3300, 0)
+    run(net, clock, 31)  # (round 1's result)
+    run(net, clock, 11 + 2)
+    g = a.game
+    g.players["Bob-Realm"].scores[2] = 100  # (as if Bob's round 2 guess came in during the round)
+    shown = {s.name: s.total for s in a.G.Standings(g, g.round - 1).values()}
+    assert shown["Bob-Realm"] == scores(a, "Bob-Realm")[0]  # (only round 1 counts before round 2's result)
+    assert {s.name: s.total for s in a.G.Standings(g).values()}["Bob-Realm"] == shown["Bob-Realm"] + 100
+
+
 def test_no_developer_tools_ship():
     # (the demo, reporting pictures and the capture tool are in the private AzerothGPS_StreetView_Dev)
     shipped = "".join(f.read_text(encoding="utf-8") for f in ADDON.glob("*.lua"))
