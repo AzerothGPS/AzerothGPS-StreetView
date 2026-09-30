@@ -1555,17 +1555,13 @@ local function BuildPanel(parent)
     r.last:SetPoint("RIGHT", panel, "RIGHT", -64, 0)
     panel.rows[i] = r
   end
-  -- the scoreboard's "+" / "-": more players shown, or the top three again (the same buttons as
-  -- AzerothGPS's dungeon floor ones; on the row with the panel's other buttons)
-  local okT, toggle = pcall(CreateFrame, "Button", nil, panel, "UIPanelButtonTemplate")
-  if not okT or not toggle then toggle = Chip(panel, "+", 28) end
-  toggle:SetSize(28, 20)
-  toggle:SetText("+")
-  toggle:SetScript("OnClick", function()
+  -- the scoreboard's "+" / "-": more players shown, or the top three again (on the row with the
+  -- panel's other buttons)
+  local toggle = Chip(panel, "+", 22, function()
     panel.expanded = not panel.expanded
     Gm.Refresh()
   end)
-  toggle:SetScript("OnLeave", GameTooltip_Hide)
+  toggle:SetHeight(20)
   toggle:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:SetText(panel.expanded and ("Show the top " .. Gm.BOARD_ROWS) or ("Show up to " .. Gm.BOARD_ROWS_MAX .. " players"), 1, 1, 1)
@@ -1808,7 +1804,7 @@ function Gm.Refresh()
     -- "+": more of the players (up to Gm.BOARD_ROWS_MAX); "-": back to the top Gm.BOARD_ROWS
     local more = #list > Gm.BOARD_ROWS
     panel.boardToggle:SetShown(more)
-    if more then panel.boardToggle:SetText(panel.expanded and "-" or "+") end
+    if more then panel.boardToggle.label:SetText(panel.expanded and "-" or "+") end
   end
   if game.mode == "solo" then panel.boardToggle:Hide() end
   for i = 1, ROWS do
