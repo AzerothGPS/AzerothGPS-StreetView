@@ -44,6 +44,14 @@ Gm.BOARD_ROWS = 5 -- the scoreboard's players shown; more scroll (the mouse whee
 Gm.MENU_IDLE_SECONDS = 20 -- the game's menu, left alone this long (no choice, no mouse over it), closes
 Gm.JOIN_SECONDS = 30 -- the lobby: the game starts this long after the host starts it (the host can start
 -- it sooner; a party's starts as soon as everyone answered), counted down for every player who joined
+Gm.BOT_COUNT = 4 -- Solo > Against Bots: this many opponents (the user, 2026-09-30)
+-- ... named after 20 of the best-known characters of Classic-era Azeroth (no expansion names), 4 at random
+Gm.BOT_NAMES = { "Thrall", "Jaina Proudmoore", "Sylvanas Windrunner", "Cairne Bloodhoof", "Vol'jin",
+  "Magni Bronzebeard", "Tyrande Whisperwind", "Bolvar Fordragon", "Anduin Wrynn", "Leeroy Jenkins", "Hogger",
+  "Mankrik", "Edwin VanCleef", "Ragnaros", "Onyxia", "Nefarian", "Kel'Thuzad", "Fandral Staghelm", "Nat Pagle",
+  "Mathias Shaw" }
+-- ... how far off a bot's guess lands (yards), one skill each: some are good at this, some aren't
+Gm.BOT_SKILL_YD = { 60, 250, 700, 1600, 4000 }
 Gm.MAX_PLAYERS = 40 -- an open game (the link posted in chat) takes this many, then starts
 Gm.LINK_ANSWER_SECONDS = 10 -- a link clicked: no word from its host this long, the game is gone
 Gm.POST_COOLDOWN = 5 -- the link posted: again after this long (no spamming the channels)
@@ -535,9 +543,11 @@ local function LeaveChannel(g) if g and g.open and g.chanName and io().leaveChan
 local function ChanTarget() return game.open and game.chanName or nil end
 
 -- To everyone else in the game: the party's channel (an open game's own), or a whisper each.
+local BotsHear
 local function ToOthers(...)
   if game.mode == "solo" then return end
   local msg = Gm.Encode(...)
+  if game.bots then return BotsHear(msg) end -- (a game against bots: nothing leaves this client)
   if game.mode == "party" then
     io().send(msg, game.channel, ChanTarget())
   else
@@ -729,6 +739,7 @@ local function AllAnswered()
   local n = 0
   for _ in pairs(game.answers) do n = n + 1 end
   if game.mode == "whisper" then return n >= 1 end
+  if game.bots then return n >= Gm.BOT_COUNT end
   if game.open then return #game.order >= Gm.MAX_PLAYERS end -- (anyone may still click the link)
   return n >= io().groupSize() - 1
 end
@@ -741,9 +752,9 @@ function Gm.Start(mode, rounds, target)
     io().print("A game is already on.")
     return false
   end
-  local open = mode == "open"
-  if open then mode = "party" end
-  if mode == "party" and not open and not io().group() then
+  local open, bots = mode == "open", mode == "bots"
+  if open or bots then mode = "party" end
+  if mode == "party" and not open and not bots and not io().group() then
     io().print("You're not in a party.")
     return false
   end
@@ -768,7 +779,8 @@ function Gm.Start(mode, rounds, target)
   end
   NewGame(mode, rounds)
   game.before = io().mapState()
-  game.channel = mode == "party" and io().group() or nil
+  game.channel = mode == "party" and not bots and io().group() or nil
+  if bots then Gm.SeatBots() end
   if open then
     game.open, game.channel, game.chanName = true, "CHANNEL", Gm.ChannelName(game.id)
     JoinChannel(game.chanName)
@@ -788,6 +800,71 @@ function Gm.Start(mode, rounds, target)
   if not open then ToOthers("I", game.id, rounds, Gm.PackField(game.packs[game.me]), Gm.JOIN_SECONDS) end
   Changed()
   return true
+end
+
+-- Solo > Against Bots: a party game with Gm.BOT_COUNT opponents played inside this client, the
+-- host's own messages answered by the bots as players would (join, have the street view, place a
+-- guess a while into the round, send it when the time is up). Nothing goes over the network.
+function Gm.SeatBots()
+  local realm = io().me():match("%-(.+)$")
+  local pool = {}
+  for _, n in ipairs(Gm.BOT_NAMES) do pool[#pool + 1] = n end
+  game.bots, game.botQueue = {}, {}
+  for _ = 1, Gm.BOT_COUNT do
+    local name = table.remove(pool, io().random(1, #pool))
+    name = realm and (name .. "-" .. realm) or name
+    game.bots[name] = { skill = io().random(1, #Gm.BOT_SKILL_YD) }
+  end
+end
+
+-- A bot's answer, `delay` seconds from now (Gm.Tick delivers it).
+local function BotSays(name, delay, ...)
+  local q = game.botQueue
+  q[#q + 1] = { at = Now() + delay, from = name, msg = Gm.Encode(...) }
+end
+
+BotsHear = function(msg)
+  local kind, f = Gm.Decode(msg)
+  if not kind then return end
+  local id, R = f[1], function() return io().random() end
+  for name, bot in pairs(game.bots) do
+    if kind == "I" then
+      BotSays(name, 0.3 + R() * 1.5, "J", id, Gm.PackField(game.packs[game.me]))
+    elseif kind == "P" then
+      BotSays(name, 0.2 + R() * 0.8, "O", id, f[2])
+    elseif kind == "G" then
+      local round, s = tonumber(f[2]), game.spot
+      if round and s then
+        local d = Gm.BOT_SKILL_YD[bot.skill] * (0.3 + R() * 1.4)
+        local cont, x, y = s.cont, nil, nil
+        if R() < 0.08 then -- (sometimes nowhere near: another continent)
+          d = nil
+          cont = s.cont == 0 and 1 or 0
+          x, y = -8000 + R() * 16000, -4000 + R() * 8000
+        else
+          local a = R() * 2 * math.pi
+          x, y = s.x + d * math.cos(a), s.y + d * math.sin(a)
+        end
+        -- (placed a while into the round: "guessed"; where, only when the time is up, as a player's)
+        BotSays(name, 3 + R() * (Gm.LOOK_SECONDS - 13), "Y", id, round)
+        BotSays(name, Gm.LOOK_SECONDS + 0.2 + R() * 0.8, "S", id, round, Gm.Score(d), d and math.floor(d + 0.5) or "",
+          cont, math.floor(x + 0.5), math.floor(y + 0.5))
+      end
+    end
+  end
+end
+
+-- The bots' answers that are due.
+local function BotsTick()
+  local q, now, keep, due = game.botQueue, Now(), {}, {}
+  for _, m in ipairs(q) do
+    if m.at <= now then due[#due + 1] = m else keep[#keep + 1] = m end
+  end
+  game.botQueue = keep
+  for _, m in ipairs(due) do
+    if not game or not game.bots then return end
+    Gm.OnMessage(m.msg, "PARTY", m.from)
+  end
 end
 
 -- The lobby's seconds left (host), whole.
@@ -967,6 +1044,10 @@ end
 -- The clock: called often (the panel's driver; tests call it with their time).
 function Gm.Tick()
   if not game then return end
+  if game.bots and game.phase ~= "over" then
+    BotsTick()
+    if not game then return end
+  end
   local now = Now()
   if game.phase == "over" then -- (the final result's time is up: back to the map, and the route)
     if game.closeAt and now >= game.closeAt then Gm.Leave() end
@@ -1200,7 +1281,7 @@ end
 
 -- The party changed: whoever isn't in it any more has left the game.
 function Gm.OnRoster()
-  if not game or game.mode ~= "party" or game.open or game.phase == "over" then return end -- (an open game: no party)
+  if not game or game.mode ~= "party" or game.open or game.bots or game.phase == "over" then return end -- (no party)
   if not io().group() then return Over("You left the party") end
   for i = #game.order, 1, -1 do
     local name = game.order[i]
@@ -1431,8 +1512,8 @@ local function BuildMenu(parent)
     fly.steps[name] = s
     return s
   end
-  local solo = Chip(fly, "Solo", 44, function() fly.mode = "solo" ShowMenu("rounds") end)
-  Tip(solo, "Solo", "Play by yourself: your average round score at the end.")
+  local solo = Chip(fly, "Solo", 44, function() ShowMenu("solo") end)
+  Tip(solo, "Solo", "Play by yourself, or against bots.")
   local party = Chip(fly, "Party", 48, function()
     if not io().group() then return io().print("You're not in a party.") end
     fly.mode = "party"
@@ -1449,6 +1530,16 @@ local function BuildMenu(parent)
   local s1 = Step("mode", { solo, party, whisper, link })
   for _, c in ipairs({ solo, party, whisper, link }) do c:SetParent(s1) end
 
+  -- Solo: by yourself, or against Gm.BOT_COUNT bots
+  local back0 = Chip(fly, "<", 20, function() ShowMenu("mode") end)
+  local alone = Chip(fly, "Solo", 44, function() fly.mode = "solo" ShowMenu("rounds") end)
+  Tip(alone, "Solo", "Play by yourself: your average round score at the end.")
+  local vsBots = Chip(fly, "Against Bots", 88, function() fly.mode = "bots" ShowMenu("rounds") end)
+  Tip(vsBots, "Against Bots", "Play against " .. Gm.BOT_COUNT .. " bots named after famous characters of Azeroth, "
+    .. "on a scoreboard like a party game's. Some of them are good at this.")
+  local s0 = Step("solo", { back0, alone, vsBots })
+  for _, c in ipairs({ back0, alone, vsBots }) do c:SetParent(s0) end
+
   local function RoundChips(parent)
     local list = {}
     for _, n in ipairs(Gm.ROUNDS) do
@@ -1458,7 +1549,9 @@ local function BuildMenu(parent)
     end
     return list
   end
-  local back1 = Chip(fly, "<", 20, function() ShowMenu("mode") end)
+  local back1 = Chip(fly, "<", 20, function()
+    ShowMenu((fly.mode == "solo" or fly.mode == "bots") and "solo" or "mode")
+  end)
   local label = CreateFrame("Frame", nil, fly)
   label:SetSize(46, MENU_H - 6)
   local lt = label:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1723,6 +1816,7 @@ function Gm.Refresh()
         n, Gm.MAX_PLAYERS - 1)
     else
       status = game.mode == "whisper" and ("Waiting for " .. Short(game.target) .. " to answer...")
+        or game.bots and "Your opponents are taking their seats..."
         or string.format("Invited your party: %d joined so far.", n)
     end
   elseif ph == "joined" then

@@ -19,7 +19,9 @@ The first public release.
 ### Where in the Azeroth?
 - A guessing game on the map: see a street view, double-click the map where you think it is, score
   0 to 100 by how close you were (100 within 25 yards; nothing on another continent).
-- Solo, Party (party or raid), Whisper (one player) and Link: an open game joined from a link posted in
+- Solo (by yourself, or Against Bots: four opponents named after famous Classic characters such as
+  Thrall, Jaina Proudmoore and Hogger, played inside your own game), Party (party or raid), Whisper
+  (one player) and Link: an open game joined from a link posted in
   say, guild, your group or a chat channel, up to 40 players.
 - 1, 3 or 5 rounds of 30 seconds, a countdown on the picture, 10 seconds between rounds, and a
   30-second lobby that every player sees counting down.

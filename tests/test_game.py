@@ -921,6 +921,36 @@ def test_the_others_see_that_a_player_guessed_but_not_where():
     assert not (a.game.players["Ann-Realm"].placed or {}).get(1)
 
 
+def test_against_bots_plays_a_whole_game_without_the_network(solo):
+    p, clock, net = solo
+    assert p.G.Start("bots", 3)
+    g = p.game
+    assert g.bots and g.mode == "party" and not g.channel
+    run(net, clock, 3)
+    g = p.game
+    assert g.phase == "look" and len(g.order) == 1 + p.G.BOT_COUNT
+    bots = [n for n in g.order.values() if n != "Me-Realm"]
+    names = {n.split("-")[0] for n in bots}
+    assert len(names) == p.G.BOT_COUNT and names <= set(p.G.BOT_NAMES.values())
+    run(net, clock, 20)  # (the bots have placed their guesses, but where only shows when the time's up)
+    g = p.game
+    assert all(g.players[n].placed[1] and g.players[n].scores[1] is None for n in bots)
+    p.G.Guess(g.spot.x + 30, g.spot.y, g.spot.cont)
+    run(net, clock, 3 * 50)
+    g = p.game
+    assert g.phase == "over" and not g.reason and len(g.winners) >= 1
+    for n in list(g.order.values()):
+        assert all(g.players[n].scores[r] is not None for r in range(1, 4)), n
+    assert net.queue == []  # (nothing went onto the network)
+    p.G.Leave()
+
+
+def test_bot_names_are_twenty_and_distinct(solo):
+    p, _, _ = solo
+    names = list(p.G.BOT_NAMES.values())
+    assert len(names) == 20 and len(set(names)) == 20
+
+
 def test_no_developer_tools_ship():
     # (the demo, reporting pictures and the capture tool are in the private AzerothGPS_StreetView_Dev)
     shipped = "".join(f.read_text(encoding="utf-8") for f in ADDON.glob("*.lua"))

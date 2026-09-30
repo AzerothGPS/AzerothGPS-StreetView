@@ -27,7 +27,8 @@ up with no zone name or coordinates; look around, then double-click the map wher
 is. When the time is up the answer shows on the map with a dotted line from your guess, and the
 closer you were, the more points you get.
 
-- **Modes:** Solo, Party (everyone in your party or raid with StreetView is asked), Whisper (one
+- **Modes:** Solo (by yourself, or Against Bots: four opponents named after famous characters of
+  Classic Azeroth, played inside your own game), Party (everyone in your party or raid with StreetView is asked), Whisper (one
   player: your target, a typed name, or shift-click their name in chat) and Link (an open game: post
   its link in say, guild, your group or a numbered channel, and whoever clicks it joins, up to 40
   players on your realm and faction).

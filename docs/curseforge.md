@@ -47,7 +47,8 @@ then double-click the map where you think it is. The closer you are, the more po
 
 [image: GIF, a round from the street view to the answer's dotted line]
 
-- **Play solo, or with friends:** your party or raid, one player by whisper, or an **open game** anyone
+- **Play solo, against bots, or with friends:** four bots named after famous characters of Classic
+  Azeroth (Thrall, Jaina, Hogger, Leeroy...) when nobody is around, or your party or raid, one player by whisper, or an **open game** anyone
   can join from a link you post in chat, **up to 40 players**.
 - **1, 3 or 5 rounds**, 30 seconds each, with a countdown on the picture.
 - **Scores from 0 to 100** a round: 100 within 25 yards, and they drop fast, so knowing the zone isn't

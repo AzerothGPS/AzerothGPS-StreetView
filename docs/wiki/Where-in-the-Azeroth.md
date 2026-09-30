@@ -11,7 +11,7 @@ Click the **Where in the Azeroth?** button above the map's figure. A menu slides
 
 | Mode | Who plays |
 |---|---|
-| **Solo** | Just you. Your average round score counts. |
+| **Solo** | Then **Solo** (just you; your average round score counts) or **Against Bots** (four opponents named after famous characters of Classic Azeroth, on a party-style scoreboard; nothing is sent to anyone). |
 | **Party** | Everyone in your party or raid who has StreetView is asked to join. |
 | **Whisper** | One player: your target, a name you type, or shift-click their name in chat. |
 | **Link** | An open game: post its link in chat; whoever clicks it joins (up to 40). See [[Multiplayer]]. |
