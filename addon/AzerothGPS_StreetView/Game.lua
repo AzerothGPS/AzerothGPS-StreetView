@@ -39,6 +39,8 @@ Gm.MSG_MAX = 240 -- an addon message's length, with room to spare (the game's li
 Gm.HOST_SILENT_SECONDS = 75 -- no word from the host this long (they went offline): the game is over
 Gm.RESULT_SECONDS = 10 -- the round's result, before the next round (the user, 2026-09-29)
 Gm.OVER_SECONDS = 60 -- the final result stays this long, then the game closes and the map is the map again
+Gm.BOARD_ROWS = 3 -- the scoreboard's players at first ("-"); its "+" shows up to
+Gm.BOARD_ROWS_MAX = 8 -- ... this many (the user, 2026-09-30)
 Gm.MENU_IDLE_SECONDS = 20 -- the game's menu, left alone this long (no choice, no mouse over it), closes
 Gm.JOIN_SECONDS = 30 -- the lobby: the game starts this long after the host starts it (the host can start
 -- it sooner; a party's starts as soon as everyone answered), counted down for every player who joined
@@ -261,6 +263,16 @@ function Gm.Winners(list)
   for _, s in ipairs(list) do
     if s.total == top.total and math.abs(s.fine - top.fine) <= 1e-6 then out[#out + 1] = s.name end
   end
+  return out
+end
+
+-- The scoreboard's rows (ranks), from `n` players: the top Gm.BOARD_ROWS (the panel's "+": the top
+-- Gm.BOARD_ROWS_MAX), and this player's own rank (`mine`) after them when it's lower down.
+function Gm.BoardRows(n, mine, expanded)
+  local out = {}
+  local limit = math.min(n, expanded and Gm.BOARD_ROWS_MAX or Gm.BOARD_ROWS)
+  for i = 1, limit do out[i] = i end
+  if mine and mine > limit and mine <= n then out[#out + 1] = mine end
   return out
 end
 
@@ -1477,7 +1489,7 @@ local function BuildMenu(parent)
 end
 
 -- The panel: where the directions are, while a game is on.
-local ROWS = 8
+local ROWS = Gm.BOARD_ROWS_MAX + 1 -- (the rows' font strings: the most shown, and this player's own below them)
 
 local function BuildPanel(parent)
   panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
@@ -1543,6 +1555,19 @@ local function BuildPanel(parent)
     r.last:SetPoint("RIGHT", panel, "RIGHT", -64, 0)
     panel.rows[i] = r
   end
+  -- the scoreboard's "+" / "-": more players shown, or the top three again
+  local toggle = Chip(panel, "+", 22, function()
+    panel.expanded = not panel.expanded
+    Gm.Refresh()
+  end)
+  toggle:SetHeight(15)
+  toggle:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText(panel.expanded and ("Show the top " .. Gm.BOARD_ROWS) or ("Show up to " .. Gm.BOARD_ROWS_MAX .. " players"), 1, 1, 1)
+    GameTooltip:Show()
+  end)
+  toggle:Hide()
+  panel.boardToggle = toggle
   local ok, start = pcall(CreateFrame, "Button", nil, panel, "UIPanelButtonTemplate")
   if not ok or not start then start = Chip(panel, "Start now", 90) end
   start:SetSize(90, 20)
@@ -1707,7 +1732,7 @@ function Gm.Refresh()
   end
   panel.status:SetText(status or "")
   -- the players (solo: the rounds' scores)
-  local rowsShown = 0
+  local rowsShown, boardExtra = 0, 0
   local y = -8 - panel.title:GetStringHeight() - 4 - panel.status:GetStringHeight() - 6
   if game.mode == "solo" then
     local pl = game.players[game.me]
@@ -1742,9 +1767,15 @@ function Gm.Refresh()
       ts[i] = { s.total, s.fine }
     end
     local roundText, totalText = Gm.ShowTied(rs), Gm.ShowTied(ts)
+    if panel.boardGame ~= game.id then panel.boardGame, panel.expanded = game.id, false end -- (a new game: 3 again)
+    local mine
     for i, s in ipairs(list) do
-      if i > ROWS then break end
-      local row = panel.rows[i]
+      if s.name == game.me then mine = i end
+    end
+    local ranks = Gm.BoardRows(#list, mine, panel.expanded)
+    for k, i in ipairs(ranks) do
+      local s = list[i]
+      local row = panel.rows[k]
       local me = s.name == game.me
       local cur = game.players[s.name] and game.players[s.name].scores[game.round]
       local done = cur ~= nil
@@ -1762,14 +1793,24 @@ function Gm.Refresh()
       row.last:SetText(lastText)
       row.total:SetText(showScores and totalText[i] or "")
       row.name:ClearAllPoints()
-      row.name:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, y - (i - 1) * 14)
+      row.name:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, y - (k - 1) * 14)
       row.last:ClearAllPoints()
-      row.last:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -52, y - (i - 1) * 14)
+      row.last:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -52, y - (k - 1) * 14)
       row.total:ClearAllPoints()
-      row.total:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, y - (i - 1) * 14)
-      rowsShown = i
+      row.total:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, y - (k - 1) * 14)
+      rowsShown = k
+    end
+    -- "+": more of the players (up to Gm.BOARD_ROWS_MAX); "-": back to the top Gm.BOARD_ROWS
+    local more = #list > Gm.BOARD_ROWS
+    panel.boardToggle:SetShown(more)
+    if more then
+      panel.boardToggle.label:SetText(panel.expanded and "-" or "+")
+      panel.boardToggle:ClearAllPoints()
+      panel.boardToggle:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, y - rowsShown * 14 - 2)
+      boardExtra = 18
     end
   end
+  if game.mode == "solo" then panel.boardToggle:Hide() end
   for i = 1, ROWS do
     local row = panel.rows[i]
     local on = i <= rowsShown
@@ -1777,7 +1818,7 @@ function Gm.Refresh()
     row.last:SetShown(on)
     row.total:SetShown(on)
   end
-  local h = -y + rowsShown * 14 + 4
+  local h = -y + rowsShown * 14 + 4 + boardExtra
   panel.start:SetShown(game.isHost and ph == "invite" and #game.order > 1)
   if panel.start:IsShown() then
     panel.start:ClearAllPoints()
