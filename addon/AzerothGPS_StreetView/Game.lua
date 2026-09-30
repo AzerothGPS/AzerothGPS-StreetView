@@ -1555,12 +1555,17 @@ local function BuildPanel(parent)
     r.last:SetPoint("RIGHT", panel, "RIGHT", -64, 0)
     panel.rows[i] = r
   end
-  -- the scoreboard's "+" / "-": more players shown, or the top three again
-  local toggle = Chip(panel, "+", 22, function()
+  -- the scoreboard's "+" / "-": more players shown, or the top three again (the same buttons as
+  -- AzerothGPS's dungeon floor ones; on the row with the panel's other buttons)
+  local okT, toggle = pcall(CreateFrame, "Button", nil, panel, "UIPanelButtonTemplate")
+  if not okT or not toggle then toggle = Chip(panel, "+", 28) end
+  toggle:SetSize(28, 20)
+  toggle:SetText("+")
+  toggle:SetScript("OnClick", function()
     panel.expanded = not panel.expanded
     Gm.Refresh()
   end)
-  toggle:SetHeight(15)
+  toggle:SetScript("OnLeave", GameTooltip_Hide)
   toggle:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     GameTooltip:SetText(panel.expanded and ("Show the top " .. Gm.BOARD_ROWS) or ("Show up to " .. Gm.BOARD_ROWS_MAX .. " players"), 1, 1, 1)
@@ -1732,7 +1737,7 @@ function Gm.Refresh()
   end
   panel.status:SetText(status or "")
   -- the players (solo: the rounds' scores)
-  local rowsShown, boardExtra = 0, 0
+  local rowsShown = 0
   local y = -8 - panel.title:GetStringHeight() - 4 - panel.status:GetStringHeight() - 6
   if game.mode == "solo" then
     local pl = game.players[game.me]
@@ -1803,12 +1808,7 @@ function Gm.Refresh()
     -- "+": more of the players (up to Gm.BOARD_ROWS_MAX); "-": back to the top Gm.BOARD_ROWS
     local more = #list > Gm.BOARD_ROWS
     panel.boardToggle:SetShown(more)
-    if more then
-      panel.boardToggle.label:SetText(panel.expanded and "-" or "+")
-      panel.boardToggle:ClearAllPoints()
-      panel.boardToggle:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, y - rowsShown * 14 - 2)
-      boardExtra = 18
-    end
+    if more then panel.boardToggle:SetText(panel.expanded and "-" or "+") end
   end
   if game.mode == "solo" then panel.boardToggle:Hide() end
   for i = 1, ROWS do
@@ -1818,7 +1818,7 @@ function Gm.Refresh()
     row.last:SetShown(on)
     row.total:SetShown(on)
   end
-  local h = -y + rowsShown * 14 + 4 + boardExtra
+  local h = -y + rowsShown * 14 + 4
   panel.start:SetShown(game.isHost and ph == "invite" and #game.order > 1)
   if panel.start:IsShown() then
     panel.start:ClearAllPoints()
@@ -1849,7 +1849,7 @@ function Gm.Refresh()
   local reopen = (ph == "look" or ph == "wait" or ph == "result" or ph == "over") and game.spot ~= nil
     and not game.missing and not (ns.Viewer.Current() and ns.Viewer.Current().game)
   panel.reopen:SetShown(reopen)
-  local list, extra = { panel.submit, panel.reopen }, false
+  local list, extra = { panel.boardToggle, panel.submit, panel.reopen }, panel.boardToggle:IsShown()
   for _, e in ipairs(Gm.extraButtons) do
     local on = e.shown(game) and true or false
     e.button:SetShown(on)
