@@ -809,6 +809,48 @@ def test_join_codes_parse_only_real_rounds(solo):
     assert p.G.OnLink("garrmission:other") is False
 
 
+def test_fine_scores_break_ties_by_distance(solo):
+    p, _, _ = solo
+    G = p.G
+    assert G.Fine(100, 0) == 100 and G.Fine(100, 10) == 99.6 and G.Fine(100, 25) == 99.01
+    assert G.Fine(0, 20000) == 0 and G.Fine(0, None) == 0
+    prev = 101
+    for yd in range(0, 12000, 7):  # (the closer, the higher; never below the points under it)
+        sc = G.Score(yd)
+        f = G.Fine(sc, yd)
+        assert f <= prev + 1e-9 and (sc == 0 or sc - 1 < f <= sc), (yd, sc, f)
+        prev = f
+
+
+def test_the_same_points_go_to_the_closer_guess():
+    (a, b, c), clock, net = party(3)
+    a.G.Start("party", 1)
+    run(net, clock, 2)
+    s = a.game.spot
+    a.G.Guess(s.x + 20, s.y, s.cont)  # 100 points, 20 yd off
+    b.G.Guess(s.x + 5, s.y, s.cont)  # 100 points, 5 yd off: wins
+    c.G.Guess(s.x + 4000, s.y, s.cont)
+    run(net, clock, 31 + 11)
+    for p in (a, b, c):
+        g = p.game
+        assert g.phase == "over" and list(g.winners.values()) == ["Bob-Realm"] and g.tiebreak, p.name
+        st = list(p.G.Standings(g).values())
+        assert [s.name for s in st] == ["Bob-Realm", "Ann-Realm", "Cid-Realm"]
+        assert st[0].total == st[1].total == 100 and st[0].fine == 99.8 and st[1].fine == 99.21
+    tip = [l[1] for l in a.G.PlayerTip(a.game, "Bob-Realm").values()]
+    assert tip[1].startswith("Round 1: 99.8 points")
+    assert [l[1] for l in a.G.PlayerTip(a.game, "Cid-Realm").values()][1].startswith("Round 1: 7 points")
+
+
+def test_tied_numbers_show_decimals_only_when_tied(solo):
+    p, _, _ = solo
+    show = lambda rows: list(p.G.ShowTied(p.lua.table_from([p.lua.table_from(r) for r in rows])).values())
+    assert show([(100, 99.8), (100, 99.6), (92, 91.5)]) == ["99.8", "99.6", "92"]
+    assert show([(100, 99.96), (100, 99.92)]) == ["99.96", "99.92"]
+    assert show([(0, 0), (0, 0)]) == ["0", "0"]
+    assert show([(57, 56.5), (57, 56.5)]) == ["56.50", "56.50"]  # (a real tie: the same distance)
+
+
 def test_no_developer_tools_ship():
     # (the demo, reporting pictures and the capture tool are in the private AzerothGPS_StreetView_Dev)
     shipped = "".join(f.read_text(encoding="utf-8") for f in ADDON.glob("*.lua"))

@@ -37,6 +37,7 @@ Gm.MSG_MAX = 240 -- an addon message's length, with room to spare (the game's li
 Gm.HOST_SILENT_SECONDS = 75 -- no word from the host this long (they went offline): the game is over
 Gm.RESULT_SECONDS = 10 -- the round's result, before the next round (the user, 2026-09-29)
 Gm.OVER_SECONDS = 60 -- the final result stays this long, then the game closes and the map is the map again
+Gm.MENU_IDLE_SECONDS = 20 -- the game's menu, left alone this long (no choice, no mouse over it), closes
 Gm.JOIN_SECONDS = 30 -- the lobby: the game starts this long after the host starts it (the host can start
 -- it sooner; a party's starts as soon as everyone answered), counted down for every player who joined
 Gm.MAX_PLAYERS = 40 -- an open game (the link posted in chat) takes this many, then starts
@@ -200,33 +201,88 @@ function Gm.OnMap(p, base)
   return q
 end
 
--- The players by total so far (ties by name): { { name, total, last, rounds }, ... }; `upto`: count
--- only the rounds up to it (the round being played isn't shown before its result).
+-- Ties broken by distance (the user, 2026-09-30: as few ties as can be): a score to the hundredth,
+-- lower the farther into its points' band of yards the guess was, and always above the points below
+-- (100 points: 100 at 0 yd, 99.6 at 10 yd, 99.0 at 25 yd; 92 points: 92.0 to 91.01). The points stay
+-- whole; the fine score only orders players who'd tie and is shown only then (Gm.ShowTied). Every
+-- client works it out alike from the yards in S (whole yards).
+local function BandEdge(n) -- the yards up to which a guess earns at least n points (1-100)
+  if n >= 100 then return Gm.FULL_YD end
+  return Gm.FULL_YD + Gm.SCALE_YD * (-math.log(n / 100)) ^ (1 / Gm.SCORE_POWER)
+end
+function Gm.Fine(score, yards)
+  if not score or score <= 0 or not yards then return score or 0 end
+  yards = math.floor(yards + 0.5)
+  local lo = score >= 100 and 0 or BandEdge(score + 1)
+  local hi = BandEdge(score)
+  local pos = hi > lo and math.min(1, math.max(0, (yards - lo) / (hi - lo))) or 0
+  return math.floor((score - 0.99 * pos) * 100 + 0.5) / 100
+end
+
+-- A player's fine score for round r.
+function Gm.RoundFine(pl, r)
+  local sc, gs = pl.scores[r], pl.guesses[r]
+  return Gm.Fine(sc, gs and gs.yards)
+end
+
+-- The players by total so far: { { name, total, fine, last, lastFine, rounds }, ... }; a tie on the
+-- total goes to the closer guesses (`fine`: the total less the average of the rounds' fractions, so it
+-- stays between the total and the one below), then by name. `upto`: count only the rounds up to it
+-- (the round being played isn't shown before its result).
 function Gm.Standings(g, upto)
   upto = upto or g.round
   local list = {}
   for _, name in ipairs(g.order) do
     local pl = g.players[name]
-    local total, n = 0, 0
+    local total, fine, n = 0, 0, 0
     for r = 1, upto do
-      if pl.scores[r] then total, n = total + pl.scores[r], n + 1 end
+      if pl.scores[r] then
+        total, fine, n = total + pl.scores[r], fine + Gm.RoundFine(pl, r), n + 1
+      end
     end
-    list[#list + 1] = { name = name, total = total, last = pl.scores[upto], rounds = n }
+    list[#list + 1] = { name = name, total = total, fine = total - (total - fine) / math.max(1, n),
+      last = pl.scores[upto], lastFine = pl.scores[upto] and Gm.RoundFine(pl, upto) or nil, rounds = n }
   end
   table.sort(list, function(a, b)
     if a.total ~= b.total then return a.total > b.total end
+    if math.abs(a.fine - b.fine) > 1e-6 then return a.fine > b.fine end
     return a.name < b.name
   end)
   return list
 end
 
--- The names tied at the top (none when nobody scored).
+-- The names at the top (none when nobody scored): more than one only when even the distances tie.
 function Gm.Winners(list)
   local out = {}
-  local top = list[1] and list[1].total or 0
-  if top <= 0 then return out end
+  local top = list[1]
+  if not top or top.total <= 0 then return out end
   for _, s in ipairs(list) do
-    if s.total == top then out[#out + 1] = s.name end
+    if s.total == top.total and math.abs(s.fine - top.fine) <= 1e-6 then out[#out + 1] = s.name end
+  end
+  return out
+end
+
+-- How to show numbers side by side ({ { whole, fine }, ... } -> strings): whole, unless another shows
+-- the same, then with the decimals that tell them apart (one, else two).
+function Gm.ShowTied(list)
+  local out = {}
+  local function Count(fmt, i)
+    local k, mine = 0, fmt(list[i])
+    for j = 1, #list do
+      if fmt(list[j]) == mine then k = k + 1 end
+    end
+    return k, mine
+  end
+  local whole = function(e) return tostring(e[1]) end
+  local one = function(e) return string.format("%.1f", math.floor((e[2] or e[1]) * 10 + 1e-6) / 10) end
+  local two = function(e) return string.format("%.2f", e[2] or e[1]) end
+  for i = 1, #list do
+    local k, s = Count(whole, i)
+    if k > 1 and list[i][1] > 0 then
+      k, s = Count(one, i)
+      if k > 1 then k, s = Count(two, i) end
+    end
+    out[i] = s
   end
   return out
 end
@@ -314,15 +370,23 @@ function Gm.PlayerTip(g, name)
   local lines = { { (name == g.me and "You" or Gm.Short(name)), c[1], c[2], c[3] } }
   local r = g.round
   local sc, gs = pl.scores[r], pl.guesses[r]
+  -- (as the scoreboard shows them: with decimals where another player has the same)
+  local rounds, totals, me, st = {}, {}, nil, nil
+  for _, s in ipairs(Gm.Standings(g)) do
+    local other = g.players[s.name]
+    if other.scores[r] then rounds[#rounds + 1] = { other.scores[r], Gm.RoundFine(other, r) } end
+    totals[#totals + 1] = { s.total, s.fine }
+    if s.name == name then
+      me, st = #totals, other.scores[r] and #rounds or nil
+    end
+  end
   if sc then
     local yd = gs and gs.yards
-    lines[#lines + 1] = { string.format("Round %d: %d points%s", r, sc,
+    lines[#lines + 1] = { string.format("Round %d: %s points%s", r, Gm.ShowTied(rounds)[st] or tostring(sc),
       yd and (" (" .. Gm.Yards(yd) .. " yd off)") or (gs and gs.x and " (another continent)" or "")), 1, 1, 1 }
   end
   if r > 1 then
-    local total = 0
-    for i = 1, r do total = total + (pl.scores[i] or 0) end
-    lines[#lines + 1] = { string.format("Total: %d after %d rounds", total, r), 0.8, 0.8, 0.8 }
+    lines[#lines + 1] = { string.format("Total: %s after %d rounds", Gm.ShowTied(totals)[me], r), 0.8, 0.8, 0.8 }
   end
   return lines
 end
@@ -507,6 +571,7 @@ Over = function(reason)
   -- (the last round's street view stays up: the user, 2026-09-30; leaving closes it)
   local list = Gm.Standings(game)
   game.winners = Gm.Winners(list)
+  game.tiebreak = #game.winners == 1 and list[2] ~= nil and list[2].total == list[1].total
   if game.mode == "solo" then
     game.celebrate = not reason and Gm.Average(game) >= Gm.CELEBRATE_MIN
   else
@@ -1232,7 +1297,7 @@ end
 -- The menu: slides out to the left of the game button. Step 1: solo, party or whisper; step 2:
 -- how many rounds (whisper: and whose name).
 local function ShowMenu(step)
-  fly.step = step
+  fly.step, fly.idle = step, 0
   for _, s in pairs(fly.steps) do s:Hide() end
   local s = fly.steps[step]
   s:Show()
@@ -1344,8 +1409,14 @@ local function BuildMenu(parent)
   for _, c in ipairs(items3) do c:SetParent(s3) end
   s3.box = box
 
-  -- the slide: the width eases toward its target (0: closing)
+  -- the slide: the width eases toward its target (0: closing); left open with nothing chosen and
+  -- the mouse elsewhere for Gm.MENU_IDLE_SECONDS, it closes by itself (typing a name counts as using it)
   fly:SetScript("OnUpdate", function(self, dt)
+    if self.target > 0 then
+      local busy = self:IsMouseOver() or gameButton:IsMouseOver() or box:HasFocus()
+      self.idle = busy and 0 or (self.idle or 0) + dt
+      if self.idle >= Gm.MENU_IDLE_SECONDS then HideMenu() end
+    end
     local w = self.w + (self.target - self.w) * math.min(1, dt * MENU_EASE)
     if math.abs(self.target - w) < 0.5 then w = self.target end
     self.w = w
@@ -1566,6 +1637,7 @@ function Gm.Refresh()
         status = "No one scored."
       elseif #w == 1 then
         status = (w[1] == game.me and "|cffffd100You win!|r" or ("|cffffd100" .. Short(w[1]) .. " wins!|r"))
+          .. (game.tiebreak and " |cff9d9d9d(same points: the closer guesses win)|r" or "")
       else
         local names = {}
         for _, n in ipairs(w) do names[#names + 1] = Short(n) end
@@ -1615,6 +1687,14 @@ function Gm.Refresh()
     local open = ph ~= "result" and ph ~= "over"
     local list = Gm.Standings(game, open and math.max(0, game.round - 1) or nil)
     local showScores = game.round > 0
+    -- (the same points shown with decimals: the closer guess higher)
+    local rs, ts = {}, {}
+    for i, s in ipairs(list) do
+      local pl = game.players[s.name]
+      rs[i] = pl.scores[game.round] and { pl.scores[game.round], Gm.RoundFine(pl, game.round) } or { -1 - i }
+      ts[i] = { s.total, s.fine }
+    end
+    local roundText, totalText = Gm.ShowTied(rs), Gm.ShowTied(ts)
     for i, s in ipairs(list) do
       if i > ROWS then break end
       local row = panel.rows[i]
@@ -1624,7 +1704,8 @@ function Gm.Refresh()
       local lastText = ""
       if showScores then
         if ph == "result" or ph == "over" or me then
-          lastText = done and (ScoreColor(cur) .. "+" .. cur .. "|r") or "|cff808080-|r"
+          lastText = done and (ScoreColor(cur) .. "+" .. ((ph == "result" or ph == "over") and roundText[i] or cur) .. "|r")
+            or "|cff808080-|r"
         else
           lastText = done and "|cff40ff40guessed|r" or "|cff808080...|r"
         end
@@ -1632,7 +1713,7 @@ function Gm.Refresh()
       row.name:SetText(string.format("%d. %s%s|r%s", i, Gm.ColorCode(Gm.PlayerColor(game, s.name)), Short(s.name),
         me and " |cff9d9d9d(you)|r" or ""))
       row.last:SetText(lastText)
-      row.total:SetText(showScores and tostring(s.total) or "")
+      row.total:SetText(showScores and totalText[i] or "")
       row.name:ClearAllPoints()
       row.name:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, y - (i - 1) * 14)
       row.last:ClearAllPoints()

@@ -74,6 +74,9 @@ only open-world and city spots are used, never instances or caves (the user, 202
 `kind`, which the harvester's meta.json sets and the Index carries, or a level of 20000+ is skipped); street views come only from the map packs every player has (they're exchanged on joining; the
 panel lists who lacks which, or has an older one). `Gm.Score` gives 0-100 (full within 25 yd, then
 `floor(100 * e^(-((yd - 25) / 1700) ^ 1.1))`: 92 at 200 yd, 78 at 500, 58 at 1,000, 30 at 2,000, 7 at 4,000 (tightened 2026-09-30);
+ties go to the closer guess: `Gm.Fine` gives a score to the hundredth from where in its points' band of yards
+the guess was (100 points: 99.8 at 5 yd, 99.2 at 20), shown only where players would tie (`Gm.ShowTied`), and
+`Gm.Standings`/`Gm.Winners` order by it after the whole points (2026-09-30);
 the celebration needs an average round score of 75: the player's solo, the winner's otherwise). While a game is on the map is held (`AzerothGPS.HoldMap`, API
 version 3): the route and directions panel hide, double-clicks are guesses, and the game's panel
 sits in the directions' place; its X leaves and the route comes back. Players talk through addon
