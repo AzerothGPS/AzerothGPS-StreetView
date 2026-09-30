@@ -738,12 +738,12 @@ end
 -- The lobby's seconds left (host), whole.
 local function SecondsLeft() return math.max(0, math.ceil(game.deadline - Now())) end
 
--- An open game's invitation, as posted in chat: plain text (chat can't carry an addon's own links);
--- players with StreetView see its code as a link to click (Gm.Linkify), the rest read it.
+-- An open game's invitation, as posted in chat: just its code (chat can't carry an addon's own
+-- links); players with StreetView see it as the link to click (Gm.Linkify). (The user, 2026-09-30:
+-- no more text around it.)
 function Gm.JoinText(g)
   g = g or game
-  return string.format("Where in the Azeroth? (AzerothGPS StreetView): join my game, %s: AGPSSV-%s-%d",
-    g.rounds == 1 and "1 round" or (g.rounds .. " rounds"), g.id, g.rounds)
+  return string.format("AGPSSV-%s-%d", g.id, g.rounds)
 end
 
 -- The game's id and rounds in a chat line with its code, else nil.

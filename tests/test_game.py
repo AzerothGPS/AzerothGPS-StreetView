@@ -733,7 +733,7 @@ def test_an_open_game_is_joined_from_its_link_in_chat():
     assert a.G.PostLink("SAY")
     assert not a.G.PostLink("GUILD")  # (not again so soon)
     text, chat, _ = a.posted[0]
-    assert chat == "SAY" and f"AGPSSV-{g.id}-1" in text
+    assert chat == "SAY" and text == f"AGPSSV-{g.id}-1"  # (just the code: the link, for the players who can click it)
     shown = b.G.Linkify(text, "P00")  # (chat gives the author without the realm on the same realm)
     assert "|Hgarrmission:agpssv:" + g.id + ":1:P00|h" in shown and "AGPSSV-" not in shown
     link = shown.split("|H")[1].split("|h")[0]
