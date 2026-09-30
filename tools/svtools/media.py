@@ -141,6 +141,18 @@ GUESS_ORCS = ["guess.gif", "guess_maghar_brown.gif", "guess_olive_drab.gif", "gu
               "guess_forest_green.gif"]
 
 
+PORTRAIT_BG = (33, 19, 10)  # the game window's title bar brown (sampled from a screenshot, 2026-09-30)
+
+
+def on_disk(art: Image.Image, color: tuple[int, int, int]) -> Image.Image:
+    """`art` over a filled disk as wide as it (smooth-edged: drawn 4x and scaled down)."""
+    size = art.size[0]
+    big = Image.new("RGBA", (size * 4, size * 4), (0, 0, 0, 0))
+    ImageDraw.Draw(big).ellipse((0, 0, size * 4 - 1, size * 4 - 1), fill=color + (255,))
+    disk = big.convert("RGBa").resize((size, size), Image.LANCZOS).convert("RGBA")
+    return Image.alpha_composite(disk, art)
+
+
 def make(media: Path) -> None:
     """Media/: Figure.tga (64x64, the map's drag figure: assets/figure.png, else drawn here),
     Logo.tga and Portrait.tga (128x128, assets/logo.png; the portrait with a margin) and Probe.jpg. TGAs are uncompressed 32-bit, like
@@ -153,7 +165,9 @@ def make(media: Path) -> None:
     arrow().save(media / "Arrow.tga")  # the viewer's way-to-go chevrons
     if (assets / "logo.png").exists():
         fit(assets / "logo.png", 128).save(media / "Logo.tga")  # the addon list icon
-        fit(assets / "logo.png", 128, 0.76).save(media / "Portrait.tga")  # the viewer's portrait: small enough that its round frame shows all of "StreetView"
+        # the viewer's portrait: small enough that its round frame shows all of "StreetView", on a
+        # disk of the title bar's brown (else the picture shows through around the logo)
+        on_disk(fit(assets / "logo.png", 128, 0.76), PORTRAIT_BG).save(media / "Portrait.tga")
     # Street Guess's guesses on the map: the user's orc animations, one per player (Game.lua Gm.ORCS)
     for i, name in enumerate(GUESS_ORCS, 1):
         if (assets / name).exists():
