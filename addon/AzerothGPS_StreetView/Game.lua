@@ -1552,6 +1552,11 @@ local function BuildPanel(parent)
     GameTooltip:Show()
   end)
   close:SetScript("OnLeave", GameTooltip_Hide)
+  -- the countdowns between the rounds (next round, the game starting, closing): a line of their
+  -- own under the title
+  panel.sub = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  panel.sub:SetPoint("TOPLEFT", panel.title, "BOTTOMLEFT", 0, -3)
+  panel.sub:SetJustifyH("LEFT")
   panel.status = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   panel.status:SetPoint("TOPLEFT", panel.title, "BOTTOMLEFT", 0, -4)
   panel.status:SetPoint("RIGHT", -8, 0)
@@ -1678,6 +1683,22 @@ local function PanelLeft()
   return 4
 end
 
+-- The countdown line under the title (nil: none now).
+local function SubText()
+  local ph = game.phase
+  if ph == "result" and game.deadline and game.round < game.rounds then
+    return "|cff9d9d9dnext round in|r |cffffffff" .. Clock(game.deadline - Now()) .. "|r"
+  elseif ph == "over" and game.closeAt then
+    return "|cff9d9d9dcloses in " .. Clock(game.closeAt - Now()) .. "|r"
+  elseif ph == "invite" or ph == "joined" then -- (the lobby: when the game starts, the same for everyone)
+    local at = ph == "invite" and game.deadline or game.startAt
+    if at then
+      local left = at - Now()
+      return "|cff9d9d9dstarts in|r " .. (left <= 5 and "|cffff5050" or "|cffffffff") .. Clock(left) .. "|r"
+    end
+  end
+end
+
 -- Redraw the panel from the game's state.
 function Gm.Refresh()
   if not panel then return end
@@ -1752,9 +1773,16 @@ function Gm.Refresh()
       .. table.concat(lacks, "\n") .. "|r"
   end
   panel.status:SetText(status or "")
+  local sub = SubText()
+  panel.sub:SetText(sub or "")
+  panel.sub:SetShown(sub ~= nil)
+  panel.status:ClearAllPoints()
+  panel.status:SetPoint("TOPLEFT", sub and panel.sub or panel.title, "BOTTOMLEFT", 0, sub and -3 or -4)
+  panel.status:SetPoint("RIGHT", -8, 0)
   -- the players (solo: the rounds' scores)
   local rowsShown = 0
   local y = -8 - panel.title:GetStringHeight() - 4 - panel.status:GetStringHeight() - 6
+    - (sub and (math.max(panel.sub:GetStringHeight(), 12) + 3) or 0)
   if game.mode == "solo" then
     local pl = game.players[game.me]
     if pl and game.round > 0 then
@@ -1913,13 +1941,12 @@ function Gm.RefreshTimer()
     return
   end
   local ph = game.phase
-  if ph == "result" and game.deadline and game.round < game.rounds then -- (the next round, counted down)
-    panel.timer:SetText("|cff9d9d9dnext round in " .. Clock(game.deadline - Now()) .. "|r")
-    if V and V.SetTimer then V.SetTimer(nil) end
-    return
-  end
-  if ph == "over" and game.closeAt then -- (closing by itself)
-    panel.timer:SetText("|cff9d9d9dcloses in " .. Clock(game.closeAt - Now()) .. "|r")
+  local sub = SubText()
+  local wasSub = panel.sub:IsShown()
+  panel.sub:SetText(sub or "")
+  if (sub ~= nil) ~= wasSub then return Gm.Refresh() end -- (the line comes or goes: the panel's laid out again)
+  if (ph == "result" and game.round < game.rounds) or (ph == "over" and game.closeAt) then
+    panel.timer:SetText("")
     if V and V.SetTimer then V.SetTimer(nil) end
     return
   end
@@ -1929,16 +1956,13 @@ function Gm.RefreshTimer()
   end
   if ph == "invite" or ph == "joined" then -- (the lobby: when the game starts, the same for everyone)
     local at = ph == "invite" and game.deadline or game.startAt
+    panel.timer:SetText("")
     if at then
-      local left = at - Now()
-      panel.timer:SetText("|cff9d9d9dstarts in|r " .. (left <= 5 and "|cffff5050" or "|cffffffff") .. Clock(left) .. "|r")
       if game.postedAt and ph == "invite" and Now() - game.postedAt >= Gm.POST_COOLDOWN and panel.postLabel:IsShown()
         and not game.postReady then
         game.postReady = true -- (the post buttons bright again)
         Gm.Refresh()
       end
-    else
-      panel.timer:SetText("")
     end
     if V and V.SetTimer then V.SetTimer(nil) end
   elseif ph == "look" and game.deadline then
