@@ -184,7 +184,7 @@ def test_solo_game_runs_its_rounds_and_averages(solo):
     p.G.Guess(310, 300, 0)  # ... and moved: the last one counts
     assert p.game.phase == "look" and p.game.pending.x == 310 and p.closed == 0  # (it waits for the timer)
     run(net, clock, 26)  # the 30 seconds are up: 10 yd off, all the points
-    assert p.game.phase == "result" and scores(p, "Me-Realm") == [100] and p.closed >= 1
+    assert p.game.phase == "result" and scores(p, "Me-Realm") == [100] and p.closed == 0  # (the street view stays up)
     assert p.looked  # the map shows the guess and the spot
     run(net, clock, 11)  # (past the 10 s result)
     assert p.game.round == 2 and p.game.phase == "look" and p.shown[-1] == "0-900-900"
@@ -453,7 +453,7 @@ def test_solo_can_submit_before_the_time_runs_out(solo):
     run(net, clock, 3)
     p.G.Guess(s.x, s.y, s.cont)
     p.G.SubmitNow()
-    assert p.game.phase == "result" and scores(p, "Me-Realm") == [100] and p.closed >= 1
+    assert p.game.phase == "result" and scores(p, "Me-Realm") == [100] and p.closed == 0  # (the street view stays up)
 
 
 def test_party_players_cant_submit_early():
@@ -588,3 +588,20 @@ def test_city_level_spots_are_placed_on_their_continent(solo):
     assert uc.cont == 0 and uc.id == "10001-1600-240" and uc.x == 1600 and uc.pack == "k"
     same = p.lua.eval('function(G) local q = { cont = 1, x = 5, y = 5 } return G.OnMap(q, function(c) return 0 end) == q end')(p.G)
     assert same  # (spots on a continent are used as they are)
+
+
+def test_the_street_view_stays_up_after_the_round_until_leaving(solo):
+    p, clock, net = solo
+    p.G.Start("solo", 2)
+    s = p.game.spot
+    p.G.Guess(s.x + 50, s.y, s.cont)
+    run(net, clock, 31)
+    assert p.game.phase == "result" and p.closed == 0  # (still showing the round's street view)
+    run(net, clock, 11)
+    assert p.game.round == 2 and len(p.shown) == 2  # (the next round's replaces it)
+    run(net, clock, 31 + 11)
+    assert p.game.phase == "over" and p.closed == 0  # (the last one stays too)
+    p.G.ShowAgain()
+    assert p.shown[-1] == p.shown[1]  # (and can be shown again from the panel)
+    p.G.Leave()
+    assert p.closed == 1

@@ -433,7 +433,7 @@ Over = function(reason)
   game.phase = "over"
   game.reason = reason
   game.closeAt = Now() + Gm.OVER_SECONDS
-  io().close()
+  -- (the last round's street view stays up: the user, 2026-09-30; leaving closes it)
   local list = Gm.Standings(game)
   game.winners = Gm.Winners(list)
   if game.mode == "solo" then
@@ -500,7 +500,7 @@ local function Scored(g)
 end
 
 Result = function()
-  io().close()
+  -- (the round's street view stays up until the next one replaces it: the user, 2026-09-30)
   game.phase = "result"
   game.deadline = Now() + Gm.RESULT_SECONDS
   if not game.guess then -- (the host ended the round before this player's time was up)
@@ -640,7 +640,9 @@ end
 
 -- The round's street view again (closed during the round).
 function Gm.ShowAgain()
-  if game and game.phase == "look" and game.spot then io().open(game.spot, game.heading) end
+  if game and game.spot and not game.missing and game.phase ~= "invite" and game.phase ~= "joined" then
+    io().open(game.spot, game.heading)
+  end
 end
 
 -- A broken picture: reported (kept in the saved settings: `sv.cmd pull` holds it back from the
@@ -665,7 +667,6 @@ end
 -- Solo: the guess placed is final now (no waiting for the timer).
 function Gm.SubmitNow()
   if not game or game.mode ~= "solo" or game.phase ~= "look" or not game.pending then return end
-  io().close()
   Submit()
 end
 
@@ -687,7 +688,6 @@ function Gm.Tick()
   end
   local ph = game.phase
   if ph == "look" and now >= game.deadline then -- the time is up: the guess placed counts
-    io().close()
     Submit()
   end
   if ph == "joined" and now >= game.deadline then
@@ -1400,7 +1400,8 @@ function Gm.Refresh()
     h = h + 24
   end
   panel.submit:SetShown(game.mode == "solo" and ph == "look" and game.pending ~= nil)
-  local reopen = ph == "look" and not game.missing and not (ns.Viewer.Current() and ns.Viewer.Current().game)
+  local reopen = (ph == "look" or ph == "wait" or ph == "result" or ph == "over") and game.spot ~= nil
+    and not game.missing and not (ns.Viewer.Current() and ns.Viewer.Current().game)
   panel.reopen:SetShown(reopen)
   -- (a developer's tool: /sv dev. A player's report would only hide the spot on their own machine)
   local report = ns.db and ns.db.dev and (ph == "result" or ph == "over" or ph == "wait") and game.spot ~= nil
@@ -1443,7 +1444,7 @@ function Gm.RefreshTimer()
     if V and V.SetTimer then V.SetTimer(nil) end
     return
   end
-  if ph == "look" and panel.reopen then
+  if (ph == "look" or ph == "wait" or ph == "result" or ph == "over") and panel.reopen then
     local want = not game.missing and not (V and V.Current() and V.Current().game)
     if want ~= panel.reopen:IsShown() then Gm.Refresh() end
   end
