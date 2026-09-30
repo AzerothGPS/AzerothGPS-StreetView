@@ -28,7 +28,7 @@ local D = ns.Data
 
 Gm.PREFIX = "AGPSSV"
 Gm.LOOK_SECONDS = 30 -- the street view shows this long: the time to guess
-Gm.RESULT_SECONDS = 7 -- the round's result, before the next round
+Gm.RESULT_SECONDS = 10 -- the round's result, before the next round (the user, 2026-09-29)
 Gm.OVER_SECONDS = 60 -- the final result stays this long, then the game closes and the map is the map again
 Gm.JOIN_SECONDS = 20 -- the host waits this long for answers to an invitation
 Gm.PROPOSE_SECONDS = 3 -- ... and this long for the players to say they have the next street view
