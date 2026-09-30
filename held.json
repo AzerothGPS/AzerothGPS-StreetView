@@ -14,5 +14,25 @@
  "0--8945-771": {
   "reason": "rendered under Stormwind City: the camera stood on the terrain below the city model (the city hangs upside down overhead, no sky); 2026-09-30 spot-check",
   "at": 1790748323
+ },
+ "0--8713-521": {
+  "reason": "rendered under Stormwind City (camera on the terrain below the city model); found by the capture PC's sky scan 2026-09-30",
+  "at": 1790750394
+ },
+ "0--8848-931": {
+  "reason": "rendered under Stormwind City (camera on the terrain below the city model); found by the capture PC's sky scan 2026-09-30",
+  "at": 1790750394
+ },
+ "1-9665-2600": {
+  "reason": "rendered under a Darnassus terrace (capture PC, 2026-09-30)",
+  "at": 1790750394
+ },
+ "1-9716-2513": {
+  "reason": "rendered under a Darnassus terrace (capture PC, 2026-09-30)",
+  "at": 1790750394
+ },
+ "1--997-275": {
+  "reason": "rendered under Thunder Bluff's shaman mesa (capture PC, 2026-09-30)",
+  "at": 1790750394
  }
 }
