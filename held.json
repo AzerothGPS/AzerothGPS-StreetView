@@ -34,5 +34,9 @@
  "1--997-275": {
   "reason": "rendered under Thunder Bluff's shaman mesa (capture PC, 2026-09-30)",
   "at": 1790750394
+ },
+ "0--8749-1082": {
+  "reason": "Stormwind (placement fix OK, on the city floor) but large solid-black patches on the ground (missing floor material?); 2026-09-30 spot-check",
+  "at": 1790753092
  }
 }
