@@ -103,7 +103,7 @@ SlashCmdList.AZEROTHGPSSTREETVIEW = function(msg)
       Print("No street views reported now.")
     elseif ns.db.reported and ns.db.reported[rest] then
       ns.db.reported[rest] = nil
-      Print("Street view " .. rest .. " is no longer reported.")
+      Print("Street View " .. rest .. " is no longer reported.")
     else
       Print("Not reported: " .. tostring(rest) .. " (/sv reports lists them)")
     end

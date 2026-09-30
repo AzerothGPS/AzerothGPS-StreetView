@@ -117,7 +117,7 @@ end
 local function Refresh()
   if not run then return end
   local step = C.SEQUENCE[run.i]
-  lines[1]:SetText(string.format("Street view capture  -  shot %d of %d", run.i, #C.SEQUENCE))
+  lines[1]:SetText(string.format("Street View capture  -  shot %d of %d", run.i, #C.SEQUENCE))
   if step.view == "nadir" then
     lines[2]:SetText("Camera: hold the right mouse button and look all the way down")
   else

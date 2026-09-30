@@ -632,10 +632,10 @@ function Gm.Report()
   ns.db.reported = ns.db.reported or {}
   if ns.db.reported[s.id] then -- (clicked again: a mistake, undone)
     ns.db.reported[s.id] = nil
-    io().print("Street view " .. s.id .. " is no longer reported.")
+    io().print("Street View " .. s.id .. " is no longer reported.")
   else
     ns.db.reported[s.id] = time and time() or 1
-    io().print("Street view " .. s.id .. " reported: left out from now on and taken again. Click again to undo.")
+    io().print("Street View " .. s.id .. " reported: left out from now on and taken again. Click again to undo.")
   end
   Changed()
 end
@@ -1201,9 +1201,9 @@ local function BuildPanel(parent)
   panel.submit = submit
   -- this round's street view closed during the round: open it again
   local ok3, reopen = pcall(CreateFrame, "Button", nil, panel, "UIPanelButtonTemplate")
-  if not ok3 or not reopen then reopen = Chip(panel, "Show street view", 120) end
+  if not ok3 or not reopen then reopen = Chip(panel, "Show Street View", 120) end
   reopen:SetSize(120, 20)
-  reopen:SetText("Show street view")
+  reopen:SetText("Show Street View")
   reopen:SetScript("OnClick", function() Gm.ShowAgain() end)
   reopen:Hide()
   panel.reopen = reopen
@@ -1270,7 +1270,7 @@ function Gm.Refresh()
   elseif ph == "propose" or ph == "ready" then
     status = "Getting the next street view ready..."
   elseif ph == "look" then
-    status = game.missing and "|cffff8080You don't have this street view (update your StreetView packs): guess anyway!|r"
+    status = game.missing and "|cffff8080You don't have this street view (update AzerothGPS StreetView): guess anyway!|r"
       or (game.pending and (game.mode == "solo" and "Guess placed. |cffffd100Double-click|r again to move it, or submit it."
           or "Guess placed. |cffffd100Double-click|r again to move it; it counts when the time runs out.")
         or "Where is this? |cffffd100Double-click the map|r where you think it is.")
