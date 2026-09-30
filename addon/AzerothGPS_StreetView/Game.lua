@@ -266,12 +266,16 @@ function Gm.Winners(list)
   return out
 end
 
--- The scoreboard's rows (ranks), from `n` players scrolled down by `offset`: Gm.BOARD_ROWS of them;
--- and the offset kept in range.
-function Gm.BoardRows(n, offset)
+-- The scoreboard's rows (ranks), from `n` players scrolled down by `offset`: Gm.BOARD_ROWS of them,
+-- and this player's own rank (`mine`) pinned under them when it isn't among them; and the offset
+-- kept in range.
+function Gm.BoardRows(n, offset, mine)
   offset = math.max(0, math.min(offset or 0, n - Gm.BOARD_ROWS))
   local out = {}
   for i = offset + 1, math.min(n, offset + Gm.BOARD_ROWS) do out[#out + 1] = i end
+  if mine and mine >= 1 and mine <= n and (mine <= offset or mine > offset + Gm.BOARD_ROWS) then
+    out[#out + 1] = mine
+  end
   return out, offset
 end
 
@@ -1500,7 +1504,7 @@ local function BuildMenu(parent)
 end
 
 -- The panel: where the directions are, while a game is on.
-local ROWS = Gm.BOARD_ROWS -- (the rows' font strings)
+local ROWS = Gm.BOARD_ROWS + 1 -- (the rows' font strings: the ones shown, and this player's own pinned below)
 
 local function BuildPanel(parent)
   panel = CreateFrame("Frame", nil, parent, "BackdropTemplate")
@@ -1785,8 +1789,11 @@ function Gm.Refresh()
     end
     local roundText, totalText = Gm.ShowTied(rs), Gm.ShowTied(ts)
     if panel.boardGame ~= game.id then panel.boardGame, panel.scroll = game.id, 0 end -- (a new game: the top)
-    local ranks
-    ranks, panel.scroll = Gm.BoardRows(#list, panel.scroll)
+    local ranks, mine
+    for i, s in ipairs(list) do
+      if s.name == game.me then mine = i end
+    end
+    ranks, panel.scroll = Gm.BoardRows(#list, panel.scroll, mine)
     for k, i in ipairs(ranks) do
       local s = list[i]
       local row = panel.rows[k]
@@ -1795,7 +1802,8 @@ function Gm.Refresh()
       local done = cur ~= nil
       local lastText = ""
       if showScores then
-        if ph == "result" or ph == "over" or me then
+        -- (this player's own points once their guess is in; "guessed" before, as for the others)
+        if ph == "result" or ph == "over" or (me and done) then
           lastText = done and (ScoreColor(cur) .. "+" .. ((ph == "result" or ph == "over") and roundText[i] or cur) .. "|r")
             or "|cff808080-|r"
         else
@@ -1820,7 +1828,7 @@ function Gm.Refresh()
     local board = panel.board
     board:SetShown(#list > Gm.BOARD_ROWS)
     if board:IsShown() then
-      local top, rowsH = y + 2, rowsShown * 14
+      local top, rowsH = y + 2, math.min(rowsShown, Gm.BOARD_ROWS) * 14 -- (not the pinned row)
       board:ClearAllPoints()
       board:SetPoint("TOPLEFT", panel, "TOPLEFT", 4, top)
       board:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, top)

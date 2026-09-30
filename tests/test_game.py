@@ -899,6 +899,12 @@ def test_the_scoreboard_shows_five_and_scrolls(solo):
     assert rows(12, 3) == ([4, 5, 6, 7, 8], 3)
     assert rows(12, 99) == ([8, 9, 10, 11, 12], 7)  # (scrolled past the end: the last five)
     assert rows(12, -4) == ([1, 2, 3, 4, 5], 0)
+    # this player's own row, pinned under the five when it isn't among them
+    rows3 = lambda n, offset, mine: (lambda r: (list(r[0].values()), r[1]))(p.G.BoardRows(n, offset, mine))
+    assert rows3(12, 0, 3) == ([1, 2, 3, 4, 5], 0)
+    assert rows3(12, 0, 9) == ([1, 2, 3, 4, 5, 9], 0)
+    assert rows3(12, 6, 2) == ([7, 8, 9, 10, 11, 2], 6)
+    assert rows3(4, 0, 4) == ([1, 2, 3, 4], 0)
 
 
 def test_the_others_see_that_a_player_guessed_but_not_where():
