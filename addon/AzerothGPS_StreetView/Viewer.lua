@@ -33,6 +33,10 @@ local frame, chrome, view, img, missing, title, info, preload, ahead, timerBox, 
 -- Where in the Azeroth?'s logo over the title bar while a game shows (Media/GameLogo.tga, square:
 -- the logo fills its width, about 3/4 of its height): this wide, in the top-left corner
 local GAME_LOGO = 141 -- (176 less 20%: the user, 2026-09-30)
+-- ... drawn from Media/GameLogo<px>.tga, the logo pre-scaled to px pixels (svtools/media.py
+-- GAME_LOGO_PX): the size nearest its real pixels on this screen is shown 1:1, not a big picture
+-- shrunk by the graphics card
+local GAME_LOGO_PX = { 96, 112, 128, 144, 160, 176, 192, 208, 224, 256, 288 }
 local tiles = {} -- panorama tile textures by col * 100 + row
 local cells = {} -- cube view cell textures
 local ghosts = {} -- ... a second copy, zoomed a little further, faint: the blur of a move up the road
@@ -275,10 +279,11 @@ function V.Build()
   -- (the top-left corner, where the portrait is otherwise: the user, 2026-09-30; sticking out a
   -- little past the left edge, as the portrait does)
   gameLogo:SetPoint("CENTER", frame, "TOPLEFT", GAME_LOGO * 0.42, chrome and CHROME_TITLE / 2 or -(PAD + TITLE_H / 2))
+  -- (the size and picture: FitGameLogo, when a game shows)
   gameLogo:SetFrameLevel(frame:GetFrameLevel() + 30)
   local logoTex = gameLogo:CreateTexture(nil, "ARTWORK")
   logoTex:SetAllPoints()
-  logoTex:SetTexture(MEDIA .. "GameLogo")
+  gameLogo.tex = logoTex
   MoveHandle(gameLogo)
   gameLogo:Hide()
   -- hidden, tiny textures: the views next to this one load ahead of time
@@ -576,9 +581,30 @@ local function TopLevel(f, best)
   return best
 end
 
+-- The logo's picture for this screen: the pre-scaled size nearest the pixels GAME_LOGO UI units
+-- cover, shown at exactly that many pixels.
+local function FitGameLogo()
+  local ppu = 1 -- screen pixels per UI unit of the viewer
+  if GetPhysicalScreenSize then
+    local _, h = GetPhysicalScreenSize()
+    if h and h > 0 then ppu = h / 768 * frame:GetEffectiveScale() end
+  end
+  local want, px = GAME_LOGO * ppu, GAME_LOGO_PX[1]
+  for _, s in ipairs(GAME_LOGO_PX) do
+    if math.abs(s - want) < math.abs(px - want) then px = s end
+  end
+  local pot = 1
+  while pot < px do pot = pot * 2 end
+  gameLogo.tex:SetTexture(MEDIA .. "GameLogo" .. px)
+  gameLogo.tex:SetTexCoord(0, px / pot, 0, px / pot)
+  if gameLogo.tex.SetSnapToPixelGrid then gameLogo.tex:SetSnapToPixelGrid(true) end
+  gameLogo:SetSize(px / ppu, px / ppu)
+end
+
 function V.GameLook(on)
   if not frame then return end
   if on then -- (over the title bar: above every part of the game frame)
+    FitGameLogo()
     gameLogo:SetFrameStrata(frame:GetFrameStrata())
     gameLogo:SetFrameLevel(math.min(9000, TopLevel(chrome or frame) + 5))
   end

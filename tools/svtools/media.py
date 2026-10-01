@@ -153,16 +153,20 @@ def on_disk(art: Image.Image, color: tuple[int, int, int]) -> Image.Image:
     return Image.alpha_composite(disk, art)
 
 
-GAME_LOGO_SIZE = 512  # GameLogo.tga: a square power of two; the logo fills its width
-GAME_LOGO_PLATE = 9  # ... on a plate of the title bar's brown cut to its outline this many pixels out
+GAME_LOGO_MASTER = 1024  # the logo drawn this big first, then scaled to each size below
+GAME_LOGO_PLATE = 18  # ... on a plate of the title bar's brown cut to its outline this many pixels out (at 1024)
 GAME_LOGO_RIM = (92, 66, 30)  # ... edged in a dark gold line, like the frame's trim
+# GameLogo<px>.tga: the logo exactly px pixels square (top-left of a power-of-two canvas), so the viewer
+# shows it 1:1 on screen, picking the size nearest its real pixels (Viewer.lua GAME_LOGO_PX; the user,
+# 2026-09-30: one 512 picture shrunk on screen looked poorly scaled)
+GAME_LOGO_PX = [96, 112, 128, 144, 160, 176, 192, 208, 224, 256, 288]
 
 
 def game_logo(src: Path) -> Image.Image:
     """Where in the Azeroth?'s logo (assets/where-in-the-azeroth.png) on a brown plate that follows its
-    outline (the logo dilated GAME_LOGO_PLATE px, edged 2 px in GAME_LOGO_RIM), centered on a square
-    canvas: shown over the viewer's title bar during a game (the user, 2026-09-30)."""
-    size, pad = GAME_LOGO_SIZE, GAME_LOGO_PLATE + 4
+    outline (the logo dilated GAME_LOGO_PLATE px, edged in GAME_LOGO_RIM), centered on a square
+    GAME_LOGO_MASTER canvas: shown over the viewer's title bar during a game (the user, 2026-09-30)."""
+    size, pad = GAME_LOGO_MASTER, GAME_LOGO_PLATE + 8
     im = Image.open(src).convert("RGBA")
     im = im.crop(im.getchannel("A").getbbox())
     w = size - 2 * pad
@@ -172,14 +176,26 @@ def game_logo(src: Path) -> Image.Image:
     top = (size - h) // 2
     canvas.paste(art, (pad, top))
     alpha = canvas.getchannel("A").point(lambda a: 255 if a > 40 else 0)
-    plate = alpha.filter(ImageFilter.MaxFilter(2 * GAME_LOGO_PLATE + 1)).filter(ImageFilter.GaussianBlur(1.2))
-    rim = alpha.filter(ImageFilter.MaxFilter(2 * GAME_LOGO_PLATE + 5)).filter(ImageFilter.GaussianBlur(1.2))
+    plate = alpha.filter(ImageFilter.MaxFilter(2 * GAME_LOGO_PLATE + 1)).filter(ImageFilter.GaussianBlur(2))
+    rim = alpha.filter(ImageFilter.MaxFilter(2 * GAME_LOGO_PLATE + 9)).filter(ImageFilter.GaussianBlur(2))
     out = Image.new("RGBA", (size, size), GAME_LOGO_RIM + (0,))
     out.putalpha(rim)
     brown = Image.new("RGBA", (size, size), PORTRAIT_BG + (0,))
     brown.putalpha(plate)
     out = Image.alpha_composite(out, brown)
     return Image.alpha_composite(out, canvas)
+
+
+def game_logo_px(master: Image.Image, px: int) -> Image.Image:
+    """The logo `px` pixels square (premultiplied Lanczos from the master) in the top-left corner of
+    the smallest power-of-two canvas that holds it."""
+    small = master.convert("RGBa").resize((px, px), Image.LANCZOS).convert("RGBA")
+    pot = 1
+    while pot < px:
+        pot *= 2
+    canvas = Image.new("RGBA", (pot, pot), (0, 0, 0, 0))
+    canvas.paste(small, (0, 0))
+    return canvas
 
 
 def make(media: Path) -> None:
@@ -198,7 +214,12 @@ def make(media: Path) -> None:
         # disk of the title bar's brown (else the picture shows through around the logo)
         on_disk(fit(assets / "logo.png", 128, 0.76), PORTRAIT_BG).save(media / "Portrait.tga")
     if (assets / "where-in-the-azeroth.png").exists():
-        game_logo(assets / "where-in-the-azeroth.png").save(media / "GameLogo.tga")  # the game's logo on the viewer
+        master = game_logo(assets / "where-in-the-azeroth.png")  # the game's logo on the viewer, in sizes
+        for px in GAME_LOGO_PX:
+            game_logo_px(master, px).save(media / f"GameLogo{px}.tga")
+        old = media / "GameLogo.tga"
+        if old.exists():
+            old.unlink()
     # Street Guess's guesses on the map: the user's orc animations, one per player (Game.lua Gm.ORCS)
     for i, name in enumerate(GUESS_ORCS, 1):
         if (assets / name).exists():
@@ -208,4 +229,4 @@ def make(media: Path) -> None:
     old = media / "Guess.tga"
     if old.exists():
         old.unlink()
-    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, GameLogo.tga, Arrow.tga, Guess1-{len(GUESS_ORCS)}.tga, GameIcon.tga and Probe.jpg in {media}")
+    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, GameLogo<px>.tga, Arrow.tga, Guess1-{len(GUESS_ORCS)}.tga, GameIcon.tga and Probe.jpg in {media}")
