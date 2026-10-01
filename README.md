@@ -33,7 +33,7 @@ closer you were, the more points you get.
   its link in say, guild, your group or a numbered channel, and whoever clicks it joins, up to 40
   players on your realm and faction).
 - **Rounds:** 1, 3 or 5. Each street view shows for 30 seconds, its top-right corner showing the level,
-  the round, the time left, what the round is worth and your place; the
+  the round, the time left, what the round is worth and the player list (- folds it to the time left); the
   guess placed when the time runs out counts (double-click again to move it). 10 seconds between
   rounds, counted down under the title.
 - **Levels:** the host or solo player picks Normal (the terrain map), Heroic (the world map, every

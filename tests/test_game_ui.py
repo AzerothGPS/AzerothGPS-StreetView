@@ -71,19 +71,34 @@ AzerothGPS = { version = 11,
 """
 
 
-@pytest.fixture
-def ui():
-    clock, net = Clock(), Net()
-    p = Player("Me-Realm", clock, net)
+def with_windows(p):
+    """Player p with the viewer and the map's panel built (the game's io opens the real viewer): its panel."""
     lua = p.lua
     lua.execute(FRAMES)
     p.ns.db = lua.eval("{ viewer = {} }")
     load = lua.eval("function(src, name) return assert(load(src, '@' .. name)) end")
     load((ADDON / "Viewer.lua").read_text(encoding="utf-8"), "Viewer.lua")("AzerothGPS_StreetView", p.ns)
-    p.G.Init(lua.eval("CreateFrame('Button')"))  # (the map's panel; the game's io opens the real viewer)
+    p.G.Init(lua.eval("CreateFrame('Button')"))
     panels = []
     p.G.OnPanel(lambda pn: panels.append(pn))
-    return p, clock, net, panels[0], lua
+    return panels[0]
+
+
+@pytest.fixture
+def ui():
+    clock, net = Clock(), Net()
+    p = Player("Me-Realm", clock, net)
+    return p, clock, net, with_windows(p), p.lua
+
+
+def shown_rows(rows):
+    """The shown rows of a list (the corner box's or the panel's) as plain text."""
+    out = []
+    for i in range(1, len(rows) + 1):
+        r = rows[i]
+        if r.name._shown:
+            out.append((plain(r.name._text), plain(r.last._text), plain(r.total._text)))
+    return out
 
 
 def corner_box(lua):
@@ -108,17 +123,53 @@ def test_the_street_view_has_the_games_details_and_the_map_little(ui):
     p.G.RefreshTimer()  # (the driver's tick, ten times a second in the game)
     assert p.game.phase == "result" and plain(box.big._text) == "+100" and plain(panel.timer._text) == ""
     assert plain(box.lines[3]._text) == "next round in 0:09" and not box.lines[4]._shown
-    assert panel.rows[1].name._shown and plain(panel.rows[1].total._text) == "Average 100"
-    # the street view closed: its box goes and Show Street View comes; opened again, the other way round
+    # the scores: in the street view's box while it's up, not on the map
+    assert shown_rows(box.rows) == [("Round score: 100", "", "Average 100")] and shown_rows(panel.rows) == []
+    # the street view closed: its box goes, the scores and Show Street View come to the map; opened again,
+    # the other way round
     p.ns.Viewer.CloseGame()
     p.G.RefreshTimer()
     assert not box._shown and panel.reopen._shown
+    assert shown_rows(panel.rows) == [("Round score: 100", "", "Average 100")]
     p.G.ShowAgain()
     p.G.RefreshTimer()
-    assert box._shown and not panel.reopen._shown
+    assert box._shown and not panel.reopen._shown and shown_rows(panel.rows) == []
     run(net, clock, 10)
+    p.G.RefreshTimer()
     assert p.game.round == 2 and plain(box.head._text) == "Heroic  Round 2 of 3"
-    assert plain(panel.rows[1].total._text) == "Average 100"  # (not halved by the round being played)
+    assert shown_rows(box.rows) == [("Round scores: 100, -", "", "Average 100")]  # (not halved by this round)
+    # "-" folds the box to the time left, "+" opens it again; kept for the next street views
+    box.fold._scripts["OnClick"](box.fold)
+    assert plain(box.fold.label._text) == "+" and box.big._shown and plain(box.big._text) == "0:29"
+    assert not box.head._shown and not box.lines[1]._shown and shown_rows(box.rows) == []
+    run(net, clock, 31 + 10)
+    p.G.RefreshTimer()
+    assert p.game.round == 3 and not box.head._shown and box.big._shown
+    box.fold._scripts["OnClick"](box.fold)
+    assert plain(box.fold.label._text) == "-" and box.head._shown and box.lines[1]._shown
+    assert len(shown_rows(box.rows)) == 1
+
+
+def test_a_big_games_list_scrolls_in_the_street_view():
+    clock, net = Clock(), Net()
+    names = ("Ann", "Bob", "Cid", "Dan", "Eve", "Fay", "Gus")
+    ps = [Player(n + "-Realm", clock, net, group="PARTY") for n in names]
+    panel = with_windows(ps[0])
+    lua = ps[0].lua
+    assert ps[0].G.Start("party", 1)
+    assert [r[0] for r in shown_rows(panel.rows)] == ["1. Ann (you)"]  # (the lobby: the list on the map)
+    net.deliver()
+    net.deliver()
+    run(net, clock, 1)
+    ps[0].G.RefreshTimer()
+    box = corner_box(lua)
+    assert ps[0].game.phase == "look" and box._shown and shown_rows(panel.rows) == []
+    assert [r[0] for r in shown_rows(box.rows)] == ["1. Ann (you)", "2. Bob", "3. Cid", "4. Dan", "5. Eve"]
+    assert box.list._shown and plain(box.lines[2]._text) == "0 of 7 guessed"
+    ps[0].ns.Viewer.OnHudWheel(-1)  # (the wheel down over the list)
+    assert [r[0] for r in shown_rows(box.rows)] == ["2. Bob", "3. Cid", "4. Dan", "5. Eve", "6. Fay", "1. Ann (you)"]
+    ps[0].ns.Viewer.OnHudWheel(-5)  # (no farther than the end)
+    assert [r[0] for r in shown_rows(box.rows)][0] == "3. Cid" and panel.scroll == 2
 
 
 def test_a_game_without_street_views_ends_on_the_panel(ui):

@@ -75,10 +75,13 @@ A street view pops up for 30 s (no zone name or coordinates, no walking on, not 
 time the player double-clicks the map to place a guess (again to move it), and the one placed when the time
 runs out counts. **The game's details are in the street view's top-right corner** (the user, 2026-10-01: the
 level and worth on the map panel's title ran under its timer): a box with the level and round, the time
-left large, the round's worth, who has guessed and the player's place; in a result the points and the yards,
-at the end the winner (`Gm.Hud` gives its text, `V.SetHud` draws it, tests/test_game_ui.py on a frame mock).
-The map's panel keeps to little: the round and the time left on its title (`Gm.PanelTitle`; the lobby and the
-end: the game's name and level), one line about the guess, the scoreboard;
+left large, the round's worth; in a result the points and the yards, at the end "You win!" or "Placed 4th"
+and the winner; and under them the player list (`Gm.Board`: places, who guessed, the points, the totals; the
+mouse wheel scrolls past 5, the player's own row pinned; solo, the rounds' scores). Its "-" folds it to the
+time left, "+" opens it (kept in `ns.db.viewer.hudFolded`). `Gm.Hud` gives its text, `V.SetHud` draws it,
+tests/test_game_ui.py on a frame mock. The map's panel keeps to little: the round and the time left on its
+title (`Gm.PanelTitle`; the lobby and the end: the game's name and level), one line about the guess, and the
+player list only while the street view doesn't show the game (the lobby, or closed);
 only open-world and city spots are used, never instances or caves (the user, 2026-09-29: cities are in, Undercity's level too, placed on its continent by `Gm.OnMap`; any spot with a
 `kind`, which the harvester's meta.json sets and the Index carries, or a level of 20000+ is skipped); street views come only from the map packs every player has (they're exchanged on joining; the
 panel lists who lacks which, or has an older one). **A round's worth** (the user, 2026-10-01): 100 at a spot

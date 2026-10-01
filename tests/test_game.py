@@ -280,7 +280,15 @@ def test_the_street_views_corner_box_has_the_games_details():
     assert plain(p.G.PanelTitle(p.game)) == "Where in the Azeroth?  Heroic"
 
 
-def test_the_corner_box_shows_who_guessed_and_each_players_place():
+def board(p, offset=0):
+    """The player list as plain text: [(name, the round's, total), ...]."""
+    b = p.G.Hud(p.game, p.clock.t, offset).board
+    rows = [b.rows[i] for i in range(1, len(b.rows) + 1)]
+    return [(plain(r.name), plain(r.last), plain(r.total)) for r in rows]
+
+
+def test_the_corner_box_has_the_player_list():
+    # the user, 2026-10-01: the player list in the street view's corner too
     (a, b, c), clock, net = party(3)
     assert a.G.Start("party", 1, None, "mythic")
     assert plain(a.G.PanelTitle(a.game)) == "Where in the Azeroth?  Mythic"  # (the lobby)
@@ -289,34 +297,56 @@ def test_the_corner_box_shows_who_guessed_and_each_players_place():
     run(net, clock, 1)
     assert a.game.phase == "look" and c.game.phase == "look"
     assert hud(a)[0] == "Mythic  Round 1 of 1" and hud(b)[0] == "Mythic  Round 1 of 1"
-    assert hud(a)[2] == ["worth up to 100", "0 of 3 guessed"]
+    assert hud(a)[2] == ["worth up to 100"]  # (who guessed: the list shows it)
+    assert board(a) == [("1. Ann (you)", "...", "0"), ("2. Bob", "...", "0"), ("3. Cid", "...", "0")]
     b.G.Guess(300, 800, 0)  # 500 yd off (the others learn that Bob guessed, not where)
     net.deliver()
-    assert hud(a)[2][1] == "1 of 3 guessed"
+    assert board(a)[1] == ("2. Bob", "guessed", "0")
     a.G.Guess(300, 310, 0)  # 10 yd off
-    assert hud(a)[2][1] == "2 of 3 guessed"
+    assert board(a)[0] == ("1. Ann (you)", "guessed", "0")
     run(net, clock, 32)  # (Cid doesn't guess)
     assert a.game.phase == "result" and b.game.phase == "result" and c.game.phase == "result"
-    assert hud(a)[1:] == ("+100", ["10 yards away (of 100)", "You: 1st of 3, 100 points"])
-    assert hud(b)[1:] == ("+78", ["500 yards away (of 100)", "You: 2nd of 3, 78 points"])
-    assert hud(c)[1:] == ("0", ["No guess in time", "You: 3rd of 3, 0 points"])
+    assert hud(a)[1:] == ("+100", ["10 yards away (of 100)"])
+    assert hud(c)[1:] == ("0", ["No guess in time"])
+    assert board(b) == [("1. Ann", "+100", "100"), ("2. Bob (you)", "+78", "78"), ("3. Cid", "+0", "0")]
     run(net, clock, 11)
     assert a.game.phase == "over" and b.game.phase == "over"
-    assert hud(a)[1] == "You win!" and hud(a)[2][0] == "Your total: 100"
-    assert hud(b)[1] == "2nd of 3" and hud(b)[2][:2] == ["Ann wins", "Your total: 78"]
-    assert hud(c)[1] == "3rd of 3" and hud(c)[2][-1].startswith("closes in")
+    assert hud(a)[1] == "You win!" and hud(a)[2][0].startswith("closes in")
+    # ("Placed 2nd": the user, 2026-10-01)
+    assert hud(b)[1] == "Placed 2nd" and hud(b)[2][0] == "Ann wins"
+    assert hud(c)[1] == "Placed 3rd" and hud(c)[2][-1].startswith("closes in")
+
+
+def test_a_big_game_counts_who_guessed_and_pins_your_row():
+    clock, net = Clock(), Net()
+    names = ("Ann", "Bob", "Cid", "Dan", "Eve", "Fay", "Gus")
+    ps = [Player(n + "-Realm", clock, net, group="PARTY") for n in names]
+    ps[0].G.Start("party", 1)
+    net.deliver()
+    net.deliver()
+    run(net, clock, 1)
+    g = ps[6]
+    assert g.game.phase == "look" and hud(g)[2] == ["worth up to 100", "0 of 7 guessed"]  # (more than the list shows)
+    rows = board(g)
+    assert [r[0] for r in rows] == ["1. Ann", "2. Bob", "3. Cid", "4. Dan", "5. Eve", "7. Gus (you)"]  # (pinned)
+    assert [r[0] for r in board(g, 9)] == ["3. Cid", "4. Dan", "5. Eve", "6. Fay", "7. Gus (you)"]  # (kept in range)
 
 
 def test_ordinals_and_tied_places(solo):
     p, _, _ = solo
     assert [p.G.Ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 40, 101, 111)] == [
         "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "40th", "101st", "111th"]
-    (a, b), clock, net = party(2)
+    (a, b, c), clock, net = party(3)
     a.G.Start("party", 1)
     net.deliver()
     net.deliver()
-    run(net, clock, 32)  # (neither guesses: 0 each)
-    assert hud(a)[2][-1] == "You: tied 1st of 2, 0 points"
+    run(net, clock, 1)
+    a.G.Guess(300, 310, 0)
+    b.G.Guess(300, 800, 0)  # Bob and Cid both 500 yd off: the same points, the same distance
+    c.G.Guess(300, -200, 0)
+    run(net, clock, 32 + 11)
+    assert b.game.phase == "over" and tuple(b.G.Place(b.game)) == (2, 3, 78, True)
+    assert hud(b)[1] == "Tied for 2nd" and hud(c)[1] == "Tied for 2nd" and hud(a)[1] == "You win!"
 
 
 def test_messages_round_trip(solo):

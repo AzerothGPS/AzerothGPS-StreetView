@@ -31,6 +31,7 @@ local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "le
 
 local frame, chrome, view, img, missing, title, info, preload, ahead, hud, gameLogo, badge
 local HUD_PAD, HUD_LINES, HUD_MIN_W = 8, 4, 110 -- the game's corner box: its inset, lines under the time, least width
+local HUD_FOLD, HUD_ROW = 16, 14 -- ... its fold button's size; the player list's rows
 -- Where in the Azeroth?'s logo over the title bar while a game shows (Media/GameLogo.tga, square:
 -- the logo fills its width, about 3/4 of its height): this wide, in the top-left corner
 local GAME_LOGO = 141 -- (176 less 20%: the user, 2026-09-30)
@@ -282,6 +283,50 @@ function V.Build()
     hud.lines[i] = hud:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     hud.lines[i]:SetJustifyH("RIGHT")
   end
+  hud.rows = {} -- (the player list's rows: made as they're needed)
+  -- the list's mouse wheel (more players than it shows: it scrolls them) and its bar at the right
+  local list = CreateFrame("Frame", nil, hud)
+  list:SetScript("OnMouseWheel", function(_, delta) if V.OnHudWheel then V.OnHudWheel(delta) end end)
+  list:Hide()
+  local track = list:CreateTexture(nil, "ARTWORK")
+  track:SetColorTexture(1, 1, 1, 0.1)
+  track:SetWidth(3)
+  track:SetPoint("TOPRIGHT")
+  track:SetPoint("BOTTOMRIGHT")
+  list.thumb = list:CreateTexture(nil, "OVERLAY")
+  list.thumb:SetColorTexture(1, 0.82, 0, 0.7)
+  list.thumb:SetWidth(3)
+  hud.list = list
+  -- "-" folds the box to the time left (or the round's points), "+" opens it (the user, 2026-10-01: for a
+  -- better view); kept between games
+  local fold = CreateFrame("Button", nil, hud)
+  fold:SetSize(HUD_FOLD, HUD_FOLD)
+  fold:SetPoint("TOPLEFT", 4, -4)
+  local edge = fold:CreateTexture(nil, "BACKGROUND")
+  edge:SetAllPoints()
+  edge:SetColorTexture(1, 0.82, 0, 0.55)
+  local fill = fold:CreateTexture(nil, "BORDER")
+  fill:SetPoint("TOPLEFT", 1, -1)
+  fill:SetPoint("BOTTOMRIGHT", -1, 1)
+  fill:SetColorTexture(0.1, 0.08, 0.03, 0.95)
+  local lit = fold:CreateTexture(nil, "HIGHLIGHT")
+  lit:SetAllPoints()
+  lit:SetColorTexture(1, 1, 1, 0.15)
+  fold.label = fold:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  fold.label:SetPoint("CENTER", 0, 1)
+  fold:SetScript("OnClick", function()
+    ns.db.viewer.hudFolded = not ns.db.viewer.hudFolded or nil
+    V.SetHud(hud.last, true)
+  end)
+  fold:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:SetText(ns.db.viewer.hudFolded and "Show the details" or "Hide the details", 1, 1, 1)
+    GameTooltip:AddLine(ns.db.viewer.hudFolded and "The round, what it's worth and the players."
+      or "Only the time left stays, for a better view.", nil, nil, nil, true)
+    GameTooltip:Show()
+  end)
+  fold:SetScript("OnLeave", GameTooltip_Hide)
+  hud.fold = fold
   hud:Hide()
   -- the corner logo on its brown plate, half above the title bar, in place of the round portrait:
   -- the game's during a game, StreetView's otherwise (the user, 2026-09-30; V.GameLook)
@@ -657,29 +702,61 @@ function V.Hide()
   if frame then frame:Hide() end
 end
 
--- Where in the Azeroth?'s corner box (h: Gm.Hud's { head, big, lines }; nil: none). Called ten times a
--- second: laid out again only when its text changes.
-function V.SetHud(h)
+-- A row of the corner box's player list: the name at the left, the round's points and the total at the right.
+local function HudRow(k)
+  local row = hud.rows[k]
+  if row then return row end
+  row = {}
+  for _, part in ipairs({ "name", "last", "total" }) do
+    row[part] = hud:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row[part]:SetJustifyH(part == "name" and "LEFT" or "RIGHT")
+  end
+  hud.rows[k] = row
+  return row
+end
+
+-- Where in the Azeroth?'s corner box (h: Gm.Hud's { head, big, lines, board }; nil: none). Called ten times a
+-- second: laid out again only when what it shows changes (`force`: anyway). Folded ("-"): only the time
+-- left, or the round's points, beside "+".
+function V.SetHud(h, force)
   if not hud then return end
   if not (h and cur and cur.game) then
-    hud.key = nil
+    hud.key, hud.last = nil, nil
     return hud:Hide()
   end
-  local lines = h.lines or {}
-  local key = (h.head or "") .. "\1" .. (h.big or "") .. "\1" .. table.concat(lines, "\1")
-  if key == hud.key and hud:IsShown() then return end
+  hud.last = h
+  local folded = ns.db.viewer.hudFolded and true or false
+  local lines, board = h.lines or {}, h.board or { rows = {}, n = 0, offset = 0, window = 0 }
+  local parts = { h.head or "", h.big or "", tostring(folded), board.n, board.offset }
+  for _, s in ipairs(lines) do parts[#parts + 1] = s end
+  for _, r in ipairs(board.rows) do parts[#parts + 1] = r.name .. "\2" .. r.last .. "\2" .. r.total end
+  local key = table.concat(parts, "\1")
+  if key == hud.key and hud:IsShown() and not force then return end
   hud.key = key
-  hud.head:SetText(h.head or "")
-  local above, height, width = hud.head, HUD_PAD + hud.head:GetStringHeight(), hud.head:GetStringWidth()
+  hud.fold.label:SetText(folded and "+" or "-")
+  -- (the first line leaves room for the fold button at its left)
+  local above, height, width = nil, HUD_PAD, 0
+  local showHead = not folded or not h.big
+  hud.head:SetShown(showHead)
+  if showHead then
+    hud.head:SetText(h.head or "")
+    above, height, width = hud.head, HUD_PAD + hud.head:GetStringHeight(), hud.head:GetStringWidth() + HUD_FOLD + 6
+  end
   hud.big:SetShown(h.big ~= nil)
   if h.big then
     hud.big:SetText(h.big)
     hud.big:ClearAllPoints()
-    hud.big:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -2)
-    above, height, width = hud.big, height + 2 + hud.big:GetStringHeight(), math.max(width, hud.big:GetStringWidth())
+    if above then
+      hud.big:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -2)
+      height = height + 2
+    else
+      hud.big:SetPoint("TOPRIGHT", -HUD_PAD, -HUD_PAD)
+    end
+    width = math.max(width, hud.big:GetStringWidth() + (above and 0 or HUD_FOLD + 6))
+    above, height = hud.big, height + hud.big:GetStringHeight()
   end
   for i, s in ipairs(hud.lines) do
-    local text = lines[i]
+    local text = not folded and lines[i] or nil
     s:SetShown(text ~= nil)
     if text then
       s:SetText(text)
@@ -688,7 +765,55 @@ function V.SetHud(h)
       above, height, width = s, height + 3 + s:GetStringHeight(), math.max(width, s:GetStringWidth())
     end
   end
-  hud:SetSize(math.max(HUD_MIN_W, width + 2 * HUD_PAD), height + HUD_PAD + 1)
+  -- the player list: the names at the left, the round's points and the totals in columns at the right
+  local rows = folded and {} or board.rows
+  local scrolls = #rows > 0 and board.n > board.window
+  local bar = scrolls and 6 or 0
+  local nameW, lastW, totalW = 0, 0, 0
+  for k, r in ipairs(rows) do
+    local row = HudRow(k)
+    row.name:SetText(r.name)
+    row.last:SetText(r.last)
+    row.total:SetText(r.total)
+    nameW = math.max(nameW, row.name:GetStringWidth())
+    lastW = math.max(lastW, row.last:GetStringWidth())
+    totalW = math.max(totalW, row.total:GetStringWidth())
+  end
+  local top = height + 6
+  for k, row in ipairs(hud.rows) do
+    local r = rows[k]
+    local on = r ~= nil
+    row.name:SetShown(on)
+    row.last:SetShown(on)
+    row.total:SetShown(on)
+    if on then
+      local y = -(top + (k - 1) * HUD_ROW + (r.pinned and 3 or 0)) -- (this player's own, pinned: a little apart)
+      row.name:ClearAllPoints()
+      row.name:SetPoint("TOPLEFT", hud, "TOPLEFT", HUD_PAD, y)
+      row.total:ClearAllPoints()
+      row.total:SetPoint("TOPRIGHT", hud, "TOPRIGHT", -HUD_PAD - bar, y)
+      row.last:ClearAllPoints()
+      row.last:SetPoint("TOPRIGHT", hud, "TOPRIGHT", -HUD_PAD - bar - totalW - 10, y)
+      height = top + k * HUD_ROW + (r.pinned and 3 or 0)
+    end
+  end
+  if #rows > 0 then width = math.max(width, nameW + 12 + lastW + 10 + totalW + bar) end
+  -- (more players than it shows: the mouse wheel over it scrolls, the bar shows where)
+  local list = hud.list
+  list:SetShown(scrolls)
+  list:EnableMouseWheel(scrolls)
+  if scrolls then
+    local rowsH = board.window * HUD_ROW
+    list:ClearAllPoints()
+    list:SetPoint("TOPLEFT", hud, "TOPLEFT", 2, -top + 1)
+    list:SetPoint("TOPRIGHT", hud, "TOPRIGHT", -HUD_PAD + 2, -top + 1)
+    list:SetHeight(rowsH)
+    local th = math.max(8, rowsH * board.window / board.n)
+    list.thumb:ClearAllPoints()
+    list.thumb:SetPoint("TOPRIGHT", list, "TOPRIGHT", 0, -(rowsH - th) * board.offset / math.max(1, board.n - board.window))
+    list.thumb:SetHeight(th)
+  end
+  hud:SetSize(math.max(folded and 0 or HUD_MIN_W, width + 2 * HUD_PAD), height + HUD_PAD + 1)
   hud:Show()
 end
 

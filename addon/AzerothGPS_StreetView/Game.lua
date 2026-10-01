@@ -518,21 +518,77 @@ function Gm.Place(g, upto)
   return place, #list, me.total, tied
 end
 
--- This player's standing after `upto` rounds, one line (nil before any): solo, the points of what the
--- rounds were worth; else the place among the players.
-function Gm.Standing(g, upto)
+-- Solo: the points after `upto` rounds of what they were worth, one line (nil before any).
+function Gm.SoloTotal(g, upto)
   if not upto or upto < 1 then return nil end
-  if g.mode == "solo" then
-    local pl, got, could = g.players[g.me], 0, 0
-    for r = 1, upto do
-      got, could = got + (pl and pl.scores[r] or 0), could + Gm.RoundWorth(g, r)
-    end
-    return string.format("|cff9d9d9dTotal|r %s%d|r |cff9d9d9dof %d|r", Gm.ScoreColor(got, could), got, could)
+  local pl, got, could = g.players[g.me], 0, 0
+  for r = 1, upto do
+    got, could = got + (pl and pl.scores[r] or 0), could + Gm.RoundWorth(g, r)
   end
-  local place, n, total, tied = Gm.Place(g, upto)
-  if not place then return nil end
-  return string.format("|cff9d9d9dYou:|r |cffffffff%s%s of %d|r, |cffffd100%d|r |cff9d9d9dpoints|r",
-    tied and "tied " or "", Gm.Ordinal(place), n, total)
+  return string.format("|cff9d9d9dTotal|r %s%d|r |cff9d9d9dof %d|r", Gm.ScoreColor(got, could), got, could)
+end
+
+-- The player list (the user, 2026-10-01: in the street view's corner box while it shows the game, else on
+-- the map's panel): { rows = { { name, last, total, pinned }, ... }, n = players, offset = the scroll kept in
+-- range, window = the rows scrolled through }. Gm.BOARD_ROWS of them from `offset`, and this player's own
+-- pinned under them when it isn't among them. Until a round's result its points stay hidden: the others
+-- only show that they guessed, and the totals and the order are the earlier rounds'. Solo: one row, the
+-- rounds' scores and their average (none before the first score).
+function Gm.Board(g, offset)
+  local out = { rows = {}, n = 0, offset = 0, window = 0 }
+  local ph = g.phase
+  if g.mode == "solo" then
+    local pl = g.players[g.me]
+    if pl and pl.scores[1] then
+      local parts, sum, n = {}, 0, 0
+      for r = 1, g.round do
+        local sc = pl.scores[r]
+        parts[#parts + 1] = sc and (Gm.ScoreColor(sc, Gm.RoundWorth(g, r)) .. sc .. "|r") or "|cff808080-|r"
+        if sc then sum, n = sum + sc, n + 1 end
+      end
+      -- (each round's score, not rounds left: the user read "Rounds: 0" as that; the average of the rounds
+      -- scored so far, not the one being played)
+      out.rows[1] = { name = (#parts > 1 and "Round scores: " or "Round score: ") .. table.concat(parts, ", "),
+        last = "", total = ph == "over" and "" or string.format("Average %d", math.floor(sum / n + 0.5)) }
+      out.n, out.window = 1, 1
+    end
+    return out
+  end
+  local open = ph ~= "result" and ph ~= "over"
+  local list = Gm.Standings(g, open and math.max(0, g.round - 1) or nil)
+  local showScores = g.round > 0
+  -- (the same points shown with decimals: the closer guess higher)
+  local rs, ts, mine = {}, {}, nil
+  for i, s in ipairs(list) do
+    local pl = g.players[s.name]
+    rs[i] = pl.scores[g.round] and { pl.scores[g.round], Gm.RoundFine(pl, g.round, Gm.RoundWorth(g, g.round)) }
+      or { -1 - i }
+    ts[i] = { s.total, s.fine }
+    if s.name == g.me then mine = i end
+  end
+  local roundText, totalText = Gm.ShowTied(rs), Gm.ShowTied(ts)
+  local ranks
+  ranks, out.offset = Gm.BoardRows(#list, offset, mine)
+  out.n, out.window = #list, math.min(#list - out.offset, Gm.BOARD_ROWS)
+  for k, i in ipairs(ranks) do
+    local s = list[i]
+    local pl = g.players[s.name]
+    local me = s.name == g.me
+    local cur = pl.scores[g.round]
+    local last = ""
+    if showScores then
+      -- (this player's own points once their guess is in; "guessed" before, as for the others)
+      if ph == "result" or ph == "over" or (me and cur) then
+        last = cur and (Gm.ScoreColor(cur, Gm.RoundWorth(g, g.round)) .. "+"
+          .. ((ph == "result" or ph == "over") and roundText[i] or cur) .. "|r") or "|cff808080-|r"
+      else
+        last = (cur or (pl.placed and pl.placed[g.round])) and "|cff40ff40guessed|r" or "|cff808080...|r"
+      end
+    end
+    out.rows[k] = { name = string.format("%d. %s%s|r%s", i, Gm.ColorCode(Gm.PlayerColor(g, s.name)), Gm.Short(s.name),
+      me and " |cff9d9d9d(you)|r" or ""), last = last, total = showScores and totalText[i] or "", pinned = k > out.window }
+  end
+  return out
 end
 
 -- The map panel's top line (the user, 2026-10-01: the map keeps to little, the street view's corner
@@ -546,8 +602,9 @@ function Gm.PanelTitle(g)
 end
 
 -- The box in the street view's top-right corner during a game (the user, 2026-10-01): { head = the level
--- and the round, big = the time left or the round's points (nil: none), lines = { ... } }.
-function Gm.Hud(g, now)
+-- and the round, big = the time left or the round's points (nil: none), lines = { ... }, board = the player
+-- list (Gm.Board from `offset`) }. The list shows each player's place, guess and total: the lines don't.
+function Gm.Hud(g, now, offset)
   if not g then return nil end
   local lv = Gm.Level(g.level)
   local head = Gm.LEVEL_COLORS[lv] .. Gm.LEVEL_NAMES[lv] .. "|r"
@@ -557,7 +614,7 @@ function Gm.Hud(g, now)
   if ph == "look" then
     big = g.deadline and Gm.TimeLeft(g.deadline - now) or nil
     Add(string.format("|cff9d9d9dworth up to|r |cffffd100%d|r", Gm.RoundWorth(g, g.round)))
-    if not solo then -- (who has placed a guess: not where)
+    if not solo and #g.order > Gm.BOARD_ROWS then -- (who has placed a guess, not where: more than the list shows)
       local n = 0
       for _, name in ipairs(g.order) do
         local pl = g.players[name]
@@ -565,7 +622,7 @@ function Gm.Hud(g, now)
       end
       Add(string.format("|cffffffff%d of %d|r |cff9d9d9dguessed|r", n, #g.order))
     end
-    Add(Gm.Standing(g, g.round - 1))
+    if solo then Add(Gm.SoloTotal(g, g.round - 1)) end
   elseif ph == "wait" or ph == "result" then
     local gs, worth = g.guess, Gm.RoundWorth(g, g.round)
     if gs then
@@ -576,7 +633,7 @@ function Gm.Hud(g, now)
     if ph == "wait" then
       Add("|cff9d9d9dWaiting for the others...|r")
     else
-      Add(Gm.Standing(g, g.round))
+      if solo then Add(Gm.SoloTotal(g, g.round)) end
       if g.deadline and g.round < g.rounds then
         Add("|cff9d9d9dnext round in|r |cffffffff" .. Gm.Clock(g.deadline - now) .. "|r")
       end
@@ -588,26 +645,26 @@ function Gm.Hud(g, now)
       Add("|cffff8080" .. g.reason .. "|r")
     elseif solo then
       big = g.celebrate and "|cffffd100Well done!|r" or "|cffffffffGame over|r"
-      Add(Gm.Standing(g, g.round))
+      Add(Gm.SoloTotal(g, g.round))
       Add(string.format("|cff9d9d9dAverage round score|r %s%d|r", Gm.ScoreColor(Gm.Percent(g, g.me)), Gm.Average(g)))
     else
       local w = g.winners or {}
       local mine = false
       for _, n in ipairs(w) do mine = mine or n == g.me end
-      local place, n, total = Gm.Place(g)
+      local place, _, _, tied = Gm.Place(g)
       if #w == 0 then
         big = "|cffffffffNo one scored|r"
       elseif mine then
         big = #w == 1 and "|cffffd100You win!|r" or "|cffffd100A tie for 1st!|r"
       else
-        big = place and string.format("|cffffffff%s of %d|r", Gm.Ordinal(place), n) or nil
+        -- ("Placed 4th": the user, 2026-10-01; the list under it has the players)
+        big = place and string.format("|cffffffff%s %s|r", tied and "Tied for" or "Placed", Gm.Ordinal(place)) or nil
         Add(#w == 1 and ("|cffffd100" .. Gm.Short(w[1]) .. " wins|r") or "|cffffd100A tie for 1st|r")
       end
-      if place and #w > 0 then Add(string.format("|cff9d9d9dYour total:|r |cffffd100%d|r", total)) end
     end
     if g.closeAt then Add("|cff9d9d9dcloses in " .. Gm.Clock(g.closeAt - now) .. "|r") end
   end
-  return { head = head, big = big, lines = lines }
+  return { head = head, big = big, lines = lines, board = Gm.Board(g, offset) }
 end
 
 ---------------------------------------------------------------------------------------------
@@ -2028,6 +2085,18 @@ local function ReopenWanted()
     and not game.missing and not (V and V.Current() and V.Current().game) and true or false
 end
 
+-- Where the player list shows: in the street view's corner box while it shows the game, else here.
+local function ListOnMap()
+  local V = ns.Viewer
+  return not (V and V.Current() and V.Current().game)
+end
+
+-- The list's scroll, the same wherever it shows (a new game: the top).
+local function BoardScroll()
+  if panel.boardGame ~= game.id then panel.boardGame, panel.scroll = game.id, 0 end
+  return panel.scroll or 0
+end
+
 -- Redraw the panel from the game's state.
 function Gm.Refresh()
   if not panel then return end
@@ -2108,74 +2177,20 @@ function Gm.Refresh()
   panel.status:ClearAllPoints()
   panel.status:SetPoint("TOPLEFT", sub and panel.sub or panel.title, "BOTTOMLEFT", 0, sub and -3 or -4)
   panel.status:SetPoint("RIGHT", -8, 0)
-  -- the players (solo: the rounds' scores)
+  -- the player list (solo: the rounds' scores): in the street view's corner box while it shows the game,
+  -- here otherwise (the lobby, or the street view closed)
   local rowsShown = 0
   local y = -8 - panel.title:GetStringHeight() - 4 - panel.status:GetStringHeight() - 6
     - (sub and (math.max(panel.sub:GetStringHeight(), 12) + 3) or 0)
-  if game.mode == "solo" then
-    local pl = game.players[game.me]
-    if pl and pl.scores[1] then -- (nothing before the first round's score)
-      local parts, sum, n = {}, 0, 0
-      for r = 1, game.round do
-        local sc = pl.scores[r]
-        parts[#parts + 1] = sc and (ScoreColor(sc, Gm.RoundWorth(game, r)) .. sc .. "|r") or "|cff808080-|r"
-        if sc then sum, n = sum + sc, n + 1 end
-      end
-      local row = panel.rows[1]
-      -- (each round's score, not rounds left: the user read "Rounds: 0" as that)
-      row.name:SetText((#parts > 1 and "Round scores: " or "Round score: ") .. table.concat(parts, ", "))
-      row.last:SetText("")
-      -- (the rounds scored so far: not the one being played)
-      row.total:SetText(ph == "over" and "" or string.format("Average %d", math.floor(sum / n + 0.5)))
-      row.name:ClearAllPoints()
-      row.name:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, y)
-      row.total:ClearAllPoints()
-      row.total:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, y)
-      rowsShown = 1
-    end
-  else
-    -- (until a round's result, its points stay hidden: the others only show that they guessed, and
-    -- the totals and the order are the earlier rounds')
-    local open = ph ~= "result" and ph ~= "over"
-    local list = Gm.Standings(game, open and math.max(0, game.round - 1) or nil)
-    local showScores = game.round > 0
-    -- (the same points shown with decimals: the closer guess higher)
-    local rs, ts = {}, {}
-    for i, s in ipairs(list) do
-      local pl = game.players[s.name]
-      rs[i] = pl.scores[game.round]
-        and { pl.scores[game.round], Gm.RoundFine(pl, game.round, Gm.RoundWorth(game, game.round)) } or { -1 - i }
-      ts[i] = { s.total, s.fine }
-    end
-    local roundText, totalText = Gm.ShowTied(rs), Gm.ShowTied(ts)
-    if panel.boardGame ~= game.id then panel.boardGame, panel.scroll = game.id, 0 end -- (a new game: the top)
-    local ranks, mine
-    for i, s in ipairs(list) do
-      if s.name == game.me then mine = i end
-    end
-    ranks, panel.scroll = Gm.BoardRows(#list, panel.scroll, mine)
-    for k, i in ipairs(ranks) do
-      local s = list[i]
+  panel.listOnMap = ListOnMap()
+  local b = panel.listOnMap and Gm.Board(game, BoardScroll()) or nil
+  if b then
+    panel.scroll = b.offset
+    for k, r in ipairs(b.rows) do
       local row = panel.rows[k]
-      local me = s.name == game.me
-      local cur = game.players[s.name] and game.players[s.name].scores[game.round]
-      local done = cur ~= nil
-      local lastText = ""
-      if showScores then
-        -- (this player's own points once their guess is in; "guessed" before, as for the others)
-        if ph == "result" or ph == "over" or (me and done) then
-          lastText = done and (ScoreColor(cur, Gm.RoundWorth(game, game.round)) .. "+" .. ((ph == "result" or ph == "over") and roundText[i] or cur) .. "|r")
-            or "|cff808080-|r"
-        else
-          local pl = game.players[s.name]
-          local placed = pl and pl.placed and pl.placed[game.round]
-          lastText = (done or placed) and "|cff40ff40guessed|r" or "|cff808080...|r"
-        end
-      end
-      row.name:SetText(string.format("%d. %s%s|r%s", i, Gm.ColorCode(Gm.PlayerColor(game, s.name)), Short(s.name),
-        me and " |cff9d9d9d(you)|r" or ""))
-      row.last:SetText(lastText)
-      row.total:SetText(showScores and totalText[i] or "")
+      row.name:SetText(r.name)
+      row.last:SetText(r.last)
+      row.total:SetText(r.total)
       row.name:ClearAllPoints()
       row.name:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, y - (k - 1) * 14)
       row.last:ClearAllPoints()
@@ -2184,23 +2199,21 @@ function Gm.Refresh()
       row.total:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, y - (k - 1) * 14)
       rowsShown = k
     end
-    -- more than it shows: the wheel scrolls, and the bar shows where
-    local board = panel.board
-    board:SetShown(#list > Gm.BOARD_ROWS)
-    if board:IsShown() then
-      local top, rowsH = y + 2, math.min(rowsShown, Gm.BOARD_ROWS) * 14 -- (not the pinned row)
-      board:ClearAllPoints()
-      board:SetPoint("TOPLEFT", panel, "TOPLEFT", 4, top)
-      board:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, top)
-      board:SetHeight(rowsH)
-      local th = math.max(8, rowsH * Gm.BOARD_ROWS / #list)
-      board.thumb:ClearAllPoints()
-      board.thumb:SetPoint("TOPRIGHT", board, "TOPRIGHT", 0,
-        -(rowsH - th) * panel.scroll / math.max(1, #list - Gm.BOARD_ROWS))
-      board.thumb:SetHeight(th)
-    end
   end
-  if game.mode == "solo" then panel.board:Hide() end
+  -- more than it shows: the wheel scrolls, and the bar shows where
+  local board = panel.board
+  board:SetShown(b ~= nil and b.n > Gm.BOARD_ROWS)
+  if board:IsShown() then
+    local top, rowsH = y + 2, b.window * 14 -- (not the pinned row)
+    board:ClearAllPoints()
+    board:SetPoint("TOPLEFT", panel, "TOPLEFT", 4, top)
+    board:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, top)
+    board:SetHeight(rowsH)
+    local th = math.max(8, rowsH * Gm.BOARD_ROWS / b.n)
+    board.thumb:ClearAllPoints()
+    board.thumb:SetPoint("TOPRIGHT", board, "TOPRIGHT", 0, -(rowsH - th) * b.offset / math.max(1, b.n - Gm.BOARD_ROWS))
+    board.thumb:SetHeight(th)
+  end
   for i = 1, ROWS do
     local row = panel.rows[i]
     local on = i <= rowsShown
@@ -2277,7 +2290,13 @@ function Gm.RefreshTimer()
   local wasSub = panel.sub:IsShown()
   panel.sub:SetText(sub or "")
   if (sub ~= nil) ~= wasSub then return Gm.Refresh() end -- (the line comes or goes: the panel's laid out again)
-  if V and V.SetHud then V.SetHud(Gm.Hud(game, Now())) end
+  -- (the street view opened or closed: the player list moves)
+  if ListOnMap() ~= panel.listOnMap then return Gm.Refresh() end
+  if V and V.SetHud then
+    local h = Gm.Hud(game, Now(), BoardScroll())
+    if not panel.listOnMap then panel.scroll = h.board.offset end
+    V.SetHud(h)
+  end
   if panel.reopen and ReopenWanted() ~= panel.reopen:IsShown() then return Gm.Refresh() end
   if ph == "invite" and game.deadline and game.postedAt and Now() - game.postedAt >= Gm.POST_COOLDOWN
     and panel.postLabel:IsShown() and not game.postReady then
@@ -2468,6 +2487,12 @@ function Gm.Init(figureButton)
   BuildMenu(parent)
   BuildPanel(parent)
 
+  -- (the mouse wheel over the player list in the street view's corner box scrolls it)
+  ns.Viewer.OnHudWheel = function(delta)
+    if not game then return end
+    panel.scroll = BoardScroll() - delta
+    Gm.RefreshTimer()
+  end
   local io_ = Gm.io
   io_.open = function(p, heading) ns.Viewer.Open(p, heading, true) end
   io_.close = function() ns.Viewer.CloseGame() end

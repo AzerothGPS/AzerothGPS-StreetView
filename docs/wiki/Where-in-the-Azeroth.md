@@ -35,7 +35,9 @@ needs AzerothGPS 1.1 or newer; with an older one the map isn't locked.)
 ## A round
 
 1. A street view opens. Its top-right corner shows the level, the round, the **30-second** countdown,
-   what the round is worth, your place so far and, with other players, how many have guessed.
+   what the round is worth and the players: their places, who has guessed, and the totals (the mouse
+   wheel scrolls a long list; your own row always shows). Its **-** button folds it down to the time
+   left for a better view, **+** opens it again.
 2. Look around (drag, mouse wheel).
 3. **Double-click the map** to place your guess. Double-click again to move it; the one placed when the
    time runs out counts. Solo, you can **Submit guess** early.
@@ -44,8 +46,9 @@ needs AzerothGPS 1.1 or newer; with an older one the map isn't locked.)
 5. **10 seconds** later the next round starts ("next round in" counts down under the title).
 
 The street view stays up after the round so you can look again, its corner showing your points and
-place; **Show Street View** reopens it if you closed it. The panel on the map keeps to the round, the time
-left, your guess and the scoreboard.
+everyone's; at the end, "You win!" or where you placed ("Placed 4th"). **Show Street View** reopens it if
+you closed it. The panel on the map keeps to the round, the time left and your guess; the player list
+shows there only while the street view is closed (and in the lobby, before the first round).
 
 ## Scoring
 

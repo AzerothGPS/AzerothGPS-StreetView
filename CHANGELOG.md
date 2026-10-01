@@ -29,7 +29,8 @@ The first public release.
 - 1, 3 or 5 rounds of 30 seconds, 10 seconds between rounds, and a 30-second lobby that every player
   sees counting down.
 - The street view's top-right corner shows the level, the round, the time left, what the round is worth
-  and your place (then your points); the panel on the map keeps to the round, the time and the scoreboard.
+  and the player list (then the points, and where you placed); its - button folds it to the time left.
+  The panel on the map keeps to the round, the time and your guess.
 - A scoreboard of five players that scrolls, your own row pinned; "guessed" shows during the round,
   points only with its result. Ties go to the closer guess, shown with decimals.
 - The answer is drawn with a dotted line from each guess; hover a player's marker for their name and
