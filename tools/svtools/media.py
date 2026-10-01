@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 FILL = (255, 196, 36, 255)
 EDGE = (70, 44, 0, 255)
@@ -153,6 +153,35 @@ def on_disk(art: Image.Image, color: tuple[int, int, int]) -> Image.Image:
     return Image.alpha_composite(disk, art)
 
 
+GAME_LOGO_SIZE = 512  # GameLogo.tga: a square power of two; the logo fills its width
+GAME_LOGO_PLATE = 9  # ... on a plate of the title bar's brown cut to its outline this many pixels out
+GAME_LOGO_RIM = (92, 66, 30)  # ... edged in a dark gold line, like the frame's trim
+
+
+def game_logo(src: Path) -> Image.Image:
+    """Where in the Azeroth?'s logo (assets/where-in-the-azeroth.png) on a brown plate that follows its
+    outline (the logo dilated GAME_LOGO_PLATE px, edged 2 px in GAME_LOGO_RIM), centered on a square
+    canvas: shown over the viewer's title bar during a game (the user, 2026-09-30)."""
+    size, pad = GAME_LOGO_SIZE, GAME_LOGO_PLATE + 4
+    im = Image.open(src).convert("RGBA")
+    im = im.crop(im.getchannel("A").getbbox())
+    w = size - 2 * pad
+    h = round(im.height * w / im.width)
+    art = im.convert("RGBa").resize((w, h), Image.LANCZOS).convert("RGBA")
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    top = (size - h) // 2
+    canvas.paste(art, (pad, top))
+    alpha = canvas.getchannel("A").point(lambda a: 255 if a > 40 else 0)
+    plate = alpha.filter(ImageFilter.MaxFilter(2 * GAME_LOGO_PLATE + 1)).filter(ImageFilter.GaussianBlur(1.2))
+    rim = alpha.filter(ImageFilter.MaxFilter(2 * GAME_LOGO_PLATE + 5)).filter(ImageFilter.GaussianBlur(1.2))
+    out = Image.new("RGBA", (size, size), GAME_LOGO_RIM + (0,))
+    out.putalpha(rim)
+    brown = Image.new("RGBA", (size, size), PORTRAIT_BG + (0,))
+    brown.putalpha(plate)
+    out = Image.alpha_composite(out, brown)
+    return Image.alpha_composite(out, canvas)
+
+
 def make(media: Path) -> None:
     """Media/: Figure.tga (64x64, the map's drag figure: assets/figure.png, else drawn here),
     Logo.tga and Portrait.tga (128x128, assets/logo.png; the portrait with a margin) and Probe.jpg. TGAs are uncompressed 32-bit, like
@@ -168,6 +197,8 @@ def make(media: Path) -> None:
         # the viewer's portrait: small enough that its round frame shows all of "StreetView", on a
         # disk of the title bar's brown (else the picture shows through around the logo)
         on_disk(fit(assets / "logo.png", 128, 0.76), PORTRAIT_BG).save(media / "Portrait.tga")
+    if (assets / "where-in-the-azeroth.png").exists():
+        game_logo(assets / "where-in-the-azeroth.png").save(media / "GameLogo.tga")  # the game's logo on the viewer
     # Street Guess's guesses on the map: the user's orc animations, one per player (Game.lua Gm.ORCS)
     for i, name in enumerate(GUESS_ORCS, 1):
         if (assets / name).exists():
@@ -177,4 +208,4 @@ def make(media: Path) -> None:
     old = media / "Guess.tga"
     if old.exists():
         old.unlink()
-    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, Arrow.tga, Guess1-{len(GUESS_ORCS)}.tga, GameIcon.tga and Probe.jpg in {media}")
+    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, GameLogo.tga, Arrow.tga, Guess1-{len(GUESS_ORCS)}.tga, GameIcon.tga and Probe.jpg in {media}")

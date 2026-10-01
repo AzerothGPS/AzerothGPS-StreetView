@@ -29,7 +29,11 @@ local GRID_COLS, GRID_ROWS = 24, 12 -- cube views: the window is drawn as this m
 local MAX_LAT = 85 -- cube views: how far up or down you can look
 local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "level", [45] = "looking up", [90] = "straight up" }
 
-local frame, chrome, view, img, missing, title, info, preload, ahead, timerBox
+local frame, chrome, view, img, missing, title, info, preload, ahead, timerBox, gameLogo, badge
+-- Where in the Azeroth?'s logo over the title bar while a game shows (Media/GameLogo.tga, square:
+-- the logo fills its width, about 3/4 of its height): this wide, centered on the title bar
+local GAME_LOGO = 176
+local GAME_LOGO_BELOW = GAME_LOGO * 0.375 -- (how far the logo reaches down from the title bar's middle)
 local tiles = {} -- panorama tile textures by col * 100 + row
 local cells = {} -- cube view cell textures
 local ghosts = {} -- ... a second copy, zoomed a little further, faint: the blur of a move up the road
@@ -129,7 +133,7 @@ local function PlainTitle()
   bar:SetPoint("TOPRIGHT", -PAD - 22, -PAD)
   bar:SetHeight(TITLE_H - 2)
   MoveHandle(bar)
-  local badge = CreateFrame("Frame", nil, frame)
+  badge = CreateFrame("Frame", nil, frame)
   badge:SetSize(56, 56)
   badge:SetPoint("CENTER", frame, "TOPLEFT", 12, -10)
   badge:SetFrameLevel(frame:GetFrameLevel() + 10)
@@ -265,6 +269,17 @@ function V.Build()
   timerBox.text = timerBox:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   timerBox.text:SetPoint("CENTER")
   timerBox:Hide()
+  -- the game's logo: centered on the title bar, half above it, on its brown plate (the user,
+  -- 2026-09-30); the corner portrait goes while it shows (V.GameLook)
+  gameLogo = CreateFrame("Frame", nil, frame)
+  gameLogo:SetSize(GAME_LOGO, GAME_LOGO)
+  gameLogo:SetPoint("CENTER", frame, "TOP", 0, chrome and CHROME_TITLE / 2 or -(PAD + TITLE_H / 2))
+  gameLogo:SetFrameLevel(frame:GetFrameLevel() + 30)
+  local logoTex = gameLogo:CreateTexture(nil, "ARTWORK")
+  logoTex:SetAllPoints()
+  logoTex:SetTexture(MEDIA .. "GameLogo")
+  MoveHandle(gameLogo)
+  gameLogo:Hide()
   -- hidden, tiny textures: the views next to this one load ahead of time
   preload = {}
   for i = 1, 4 do
@@ -314,7 +329,7 @@ end
 
 -- The title: the spot's zone and map coordinates (a game's street view: neither).
 local function Title(p)
-  if cur and cur.game then return SetTitle("Where in the Azeroth?") end
+  if cur and cur.game then return SetTitle("") end -- (the game's logo sits on the title bar)
   local API = _G.AzerothGPS
   local where = p.zone or "?"
   local mapID, zone, u, v
@@ -548,6 +563,25 @@ end
 
 -- Open point p looking toward `heading` (radians, counter-clockwise from north; default its
 -- first view), level. game: Street Guess's view (no place name, no walking on, not on the map).
+-- A game's look (on) or the viewer's own: the logo on the title bar, no corner portrait, the
+-- countdown under the logo.
+function V.GameLook(on)
+  if not frame then return end
+  gameLogo:SetShown(on)
+  if chrome then
+    if chrome.SetBorder then
+      pcall(chrome.SetBorder, chrome, on and "ButtonFrameTemplateNoPortrait" or "PortraitFrameTemplate")
+    end
+    local portrait = chrome.GetPortrait and chrome:GetPortrait() or (chrome.PortraitContainer and chrome.PortraitContainer.portrait)
+    if portrait then portrait:SetShown(not on) end
+  elseif badge then
+    badge:SetShown(not on)
+  end
+  local below = chrome and (GAME_LOGO_BELOW - CHROME_TITLE / 2) or (GAME_LOGO_BELOW - TITLE_H / 2)
+  timerBox:ClearAllPoints()
+  timerBox:SetPoint("TOP", 0, on and -(math.max(0, below) + 6) or -6)
+end
+
 function V.Open(p, heading, game)
   if not frame then V.Build() end
   if D.HasCube(p) then
@@ -564,6 +598,7 @@ function V.Open(p, heading, game)
   cur.dirs = not game and D.Directions(p, API and API.Roads and API.Roads(p.cont)) or nil
   if ahead.SetEnabled then ahead:SetEnabled(not game) end -- (hidden: V.GoAhead stays for the arrows)
   lastMarkHeading = nil
+  V.GameLook(game and true or false)
   frame:Show()
   V.Refresh()
 end
