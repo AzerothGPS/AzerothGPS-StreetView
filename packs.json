@@ -3,6 +3,8 @@
   "budget_bytes": 1800000000,
   "spacing_yd": 100,
   "ship_spacing_yd": 200,
+  "city_ship_spacing_yd": 75,
+  "about_city": "City spots (the capitals' own streets, meta.json 'city'; PLAN.md part 12) ship every ~75 yd: pack.ship_points thins them after the road spots, never displacing a shipped road spot.",
   "master": {
     "tile": 1024,
     "pole": 512,

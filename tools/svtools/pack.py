@@ -342,7 +342,7 @@ def import_harvest(folder: Path, build: Path, log=print) -> dict:
         points[pid] = {
             "id": pid, "cont": meta["cont"], "x": meta["x"], "y": meta["y"], "z": meta.get("z") or 0,
             "facing": meta.get("facing") or 0, "zone": meta.get("zone") or "", "mapID": meta.get("mapID"),
-            "kind": meta.get("kind"),
+            "kind": meta.get("kind"), "city": meta.get("city"),
             "date": meta.get("captured", ""), "build": meta.get("client_build", ""), "poses": [],
             "cube": meta["cube"], "source": "harvester", "imported_at": int(time.time()),
         }
@@ -459,20 +459,17 @@ def retake(build: Path, points: dict, reported: dict[str, int] | None = None,
     return out
 
 
-def ship_points(points: list[dict], spacing: float | None, pinned: set[str] | None = None) -> list[dict]:
-    """The spots shipped at about `spacing` yards apart (packs.json ship_spacing_yd): the master keeps
-    every rendered spot (100 yd), the packs take a thinned set. Greedy in a fixed order (continent,
-    x, y): a spot is kept unless a kept one is within 0.75 * spacing (so neighbors along a road end up
-    ~0.75-1.5 spacing apart, ~0.9 on average). None or 0: every spot. `pinned` (landmarks.json's
-    spots) are added on top of that pick and change nothing else in it: a landmark never makes other
-    spots give way or shifts the chain along its road (so nothing already rendered has to be redone).
-    Keep in step with the harvester's ship.py (a test there checks they agree)."""
-    if not spacing:
-        return list(points)
-    pinned = pinned or set()
-    mind = 0.75 * spacing
+def _order(p: dict):
+    return (int(p["cont"]), float(p["x"]), float(p["y"]), p["id"])
+
+
+def _thin(points: list[dict], mind: float, seed: list[dict] = ()) -> list[dict]:
+    """Greedy in `_order`: a spot is kept unless a kept one (or one in `seed`) is within `mind`."""
     keep, grid = [], {}
-    for p in sorted(points, key=lambda p: (int(p["cont"]), float(p["x"]), float(p["y"]), p["id"])):  # (unchanged)
+    for q in seed:
+        c, x, y = int(q["cont"]), float(q["x"]), float(q["y"])
+        grid.setdefault((c, int(x // mind), int(y // mind)), []).append((x, y))
+    for p in sorted(points, key=_order):
         c, x, y = int(p["cont"]), float(p["x"]), float(p["y"])
         k = (c, int(x // mind), int(y // mind))
         near = False
@@ -484,19 +481,42 @@ def ship_points(points: list[dict], spacing: float | None, pinned: set[str] | No
         if not near:
             keep.append(p)
             grid.setdefault(k, []).append((x, y))
-    kept = {p["id"] for p in keep}
-    keep += sorted((p for p in points if p["id"] in pinned and p["id"] not in kept),
-                   key=lambda p: (int(p["cont"]), float(p["x"]), float(p["y"]), p["id"]))
     return keep
 
 
-def shipped(points: list[dict], spacing: float | None, pinned: set[str], marked: set[str]) -> list[dict]:
-    """The spots that ship: `ship_points` over the road spots (the landmarks among them pinned), and
-    the `marked` landmark spots (landmarks.json entries with a z: picked standing points, not road
-    spots) added on top. Marked spots stay out of the greedy: in it they made 15 shipped spots give
-    way (2026-10-01). Same as the harvester's ship.shipped_ids."""
+def ship_points(points: list[dict], spacing: float | None, pinned: set[str] | None = None,
+                city_spacing: float | None = None) -> list[dict]:
+    """The spots shipped at about `spacing` yards apart (packs.json ship_spacing_yd): the master keeps
+    every rendered spot (100 yd), the packs take a thinned set. Greedy in a fixed order (continent,
+    x, y): a spot is kept unless a kept one is within 0.75 * spacing (so neighbors along a road end up
+    ~0.75-1.5 spacing apart, ~0.9 on average). None or 0: every spot.
+    City spots (a `city`, the capitals' own streets: PLAN.md part 12) ship denser, `city_spacing`
+    (packs.json city_ship_spacing_yd): a second greedy after the roads', its grid seeded with the road
+    spots kept, so a city spot next to a shipped road spot is skipped and no road spot ever gives way.
+    Without `city_spacing` they're ordinary spots. `pinned` (landmarks.json's spots) are added on top
+    of that pick and change nothing else in it: a landmark never makes other spots give way or shifts
+    the chain along its road (so nothing already rendered has to be redone).
+    Keep in step with the harvester's ship.py (a test there checks they agree)."""
+    if not spacing:
+        return list(points)
+    pinned = pinned or set()
+    road = [p for p in points if not (city_spacing and p.get("city"))]
+    keep = _thin(road, 0.75 * spacing)  # (unchanged)
+    if city_spacing:
+        keep += _thin([p for p in points if p.get("city")], 0.75 * city_spacing, seed=keep)
+    kept = {p["id"] for p in keep}
+    keep += sorted((p for p in points if p["id"] in pinned and p["id"] not in kept), key=_order)
+    return keep
+
+
+def shipped(points: list[dict], spacing: float | None, pinned: set[str], marked: set[str],
+            city_spacing: float | None = None) -> list[dict]:
+    """The spots that ship: `ship_points` over the road and city spots (the landmarks among them
+    pinned), and the `marked` landmark spots (landmarks.json entries with a z: picked standing points,
+    not road spots) added on top. Marked spots stay out of the greedy: in it they made 15 shipped
+    spots give way (2026-10-01). Same as the harvester's ship.shipped_ids."""
     road = [p for p in points if p["id"] not in marked]
-    return ship_points(road, spacing, pinned) + [p for p in points if p["id"] in marked]
+    return ship_points(road, spacing, pinned, city_spacing) + [p for p in points if p["id"] in marked]
 
 
 def build_packs(build: Path, version: str | None = None, cfg: dict | None = None,
@@ -526,7 +546,8 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
         mine = [p for p in points.values() if pack_for(cfg, p) is pk and (manual or not is_manual(p))
                 and p["id"] not in held and p["id"] not in retired and (p.get("zone") or is_manual(p))]
         from . import landmarks
-        mine = shipped(mine, cfg.get("ship_spacing_yd"), landmarks.pinned_ids(), landmarks.marked_ids())
+        mine = shipped(mine, cfg.get("ship_spacing_yd"), landmarks.pinned_ids(), landmarks.marked_ids(),
+                       cfg.get("city_ship_spacing_yd"))
         out = root / pk["name"]
         images = out / "Images"
         images.mkdir(parents=True, exist_ok=True)

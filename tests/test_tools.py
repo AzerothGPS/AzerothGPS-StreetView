@@ -502,6 +502,23 @@ def test_landmarks_always_ship_on_top_of_the_thinned_pick():
     assert {p["id"] for p in ship_points(road, 200, set())} == plain
 
 
+def test_city_spots_ship_denser_after_the_roads():
+    from svtools.pack import ship_points
+    road = [{"id": f"1-{x}-0", "cont": 1, "x": x, "y": 0} for x in range(0, 2001, 100)]
+    city = [{"id": f"1-{x}-300", "cont": 1, "x": x, "y": 300, "city": "Orgrimmar"} for x in range(0, 601, 25)]
+    city.append({"id": "1-200-20", "cont": 1, "x": 200, "y": 20, "city": "Orgrimmar"})  # (next to a road spot)
+    plain = {p["id"] for p in ship_points(road, 200)}
+    got = {p["id"] for p in ship_points(road + city, 200, None, 75)}
+    assert plain <= got  # (no road spot gives way)
+    kept_city = sorted((p for p in road + city if p["id"] in got and p.get("city")), key=lambda p: p["x"])
+    assert "1-200-20" not in got  # (a shipped road spot is right there)
+    assert [p["x"] for p in kept_city] == [0, 75, 150, 225, 300, 375, 450, 525, 600]  # (~75 yd apart)
+    # without a city spacing (or without city spots) nothing changes
+    assert {p["id"] for p in ship_points(road, 200, None, 75)} == plain
+    assert ([p["id"] for p in ship_points(road + city, 200)]
+            == [p["id"] for p in ship_points([dict(p, city=None) for p in road + city], 200)])
+
+
 def test_picked_landmarks_stay_out_of_the_thinning():
     # 2026-10-01: 12 picked landmarks (off the roads, with a z) went into the greedy as ordinary
     # spots and 15 shipped road spots gave way, 9 in a chain across Tanaris
