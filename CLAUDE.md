@@ -76,7 +76,9 @@ time the player double-clicks the map to place a guess (again to move it), and t
 runs out counts. **The game's details are in the street view's top-right corner** (the user, 2026-10-01: the
 level and worth on the map panel's title ran under its timer): a box with the level and round, the time
 left large, the round's worth; in a result the points and the yards, at the end "You win!" or "Placed 4th"
-and the winner; and under them the player list (`Gm.Board`: places, who guessed, the points, the totals; the
+(no line saying who won: the winner's name in the list rolls, a wave of size and the celebration's colors
+through its letters, `V.AnimateHud`; the celebration's glow around the box as around the map's panel,
+`Gm.CelebrateColor`); and under them the player list (`Gm.Board`: places, who guessed, the points, the totals; the
 mouse wheel scrolls past 5, the player's own row pinned; solo, the rounds' scores). Its "-" folds it to the
 time left, "+" opens it (kept in `ns.db.viewer.hudFolded`). `Gm.Hud` gives its text, `V.SetHud` draws it,
 tests/test_game_ui.py on a frame mock. The map's panel keeps to little: the round and the time left on its

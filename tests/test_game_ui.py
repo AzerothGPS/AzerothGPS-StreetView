@@ -172,6 +172,37 @@ def test_a_big_games_list_scrolls_in_the_street_view():
     assert [r[0] for r in shown_rows(box.rows)][0] == "3. Cid" and panel.scroll == 2
 
 
+def test_the_winners_name_rolls_and_the_box_glows():
+    # the user, 2026-10-01: the victory glow on the street view's box too, and the winner's name in first
+    # place rolling (size and color) instead of a line saying who won
+    clock, net = Clock(), Net()
+    ann = Player("Ann-Realm", clock, net, group="PARTY")
+    Player("Bob-Realm", clock, net, group="PARTY")
+    panel = with_windows(ann)
+    lua = ann.lua
+    ann.G.Start("party", 1)
+    net.deliver()
+    net.deliver()
+    run(net, clock, 1)
+    ann.G.Guess(300, 310, 0)  # 10 yd off: all of it, the celebration
+    run(net, clock, 32 + 11)
+    ann.G.RefreshTimer()
+    box = corner_box(lua)
+    assert ann.game.phase == "over" and ann.game.celebrate
+    assert box.glow._shown and box.wash._shown and panel.glow._shown  # (the box glows as the panel does)
+    assert box._scripts["OnUpdate"] is not None  # (in motion)
+    wave = box.waves[1]
+    letters = [wave.letters[i] for i in range(1, wave.n + 1)]
+    assert plain(box.rows[1].name._text) == "1." and "".join(str(l._text) for l in letters) == "Ann"
+    assert plain(wave.you._text) == "(you)" and box.rows[2].name._shown and not (len(box.waves) > 1 and box.waves[2].on)
+    assert plain(box.big._text) == "You win!" and [plain(box.lines[1]._text)][0].startswith("closes in")
+    for t in (0.0, 0.3, 1.7):  # (a few frames of the motion: no errors)
+        ann.ns.Viewer.AnimateHud(t)
+    # folded: the glow stays, the list (and its rolling name) goes
+    box.fold._scripts["OnClick"](box.fold)
+    assert box.glow._shown and not wave.on and not letters[0]._shown
+
+
 def test_a_game_without_street_views_ends_on_the_panel(ui):
     p, clock, net, panel, lua = ui
     p.G.Usable = lambda pt: False

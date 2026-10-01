@@ -32,6 +32,7 @@ local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "le
 local frame, chrome, view, img, missing, title, info, preload, ahead, hud, gameLogo, badge
 local HUD_PAD, HUD_LINES, HUD_MIN_W = 8, 4, 110 -- the game's corner box: its inset, lines under the time, least width
 local HUD_FOLD, HUD_ROW = 16, 14 -- ... its fold button's size; the player list's rows
+local HUD_WAVE = 4 -- ... a winner's name rolling: a letter at the wave's crest this much bigger (font pixels)
 -- Where in the Azeroth?'s logo over the title bar while a game shows (Media/GameLogo.tga, square:
 -- the logo fills its width, about 3/4 of its height): this wide, in the top-left corner
 local GAME_LOGO = 141 -- (176 less 20%: the user, 2026-09-30)
@@ -327,6 +328,19 @@ function V.Build()
   end)
   fold:SetScript("OnLeave", GameTooltip_Hide)
   hud.fold = fold
+  -- the celebration (as the map's panel): a soft glow around the box, its colors drifting (V.AnimateHud)
+  local glow = CreateFrame("Frame", nil, hud, "BackdropTemplate")
+  glow:SetPoint("TOPLEFT", -3, 3)
+  glow:SetPoint("BOTTOMRIGHT", 3, -3)
+  glow:SetFrameLevel(math.max(0, hud:GetFrameLevel() - 1))
+  if glow.SetBackdrop then glow:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 3 }) end
+  glow:Hide()
+  hud.glow = glow
+  hud.wash = hud:CreateTexture(nil, "BORDER")
+  hud.wash:SetAllPoints()
+  hud.wash:SetColorTexture(1, 1, 1, 0)
+  hud.wash:Hide()
+  hud.waves = {} -- (the winners' names, a letter each: made as they're needed)
   hud:Hide()
   -- the corner logo on its brown plate, half above the title bar, in place of the round portrait:
   -- the game's during a game, StreetView's otherwise (the user, 2026-09-30; V.GameLook)
@@ -715,7 +729,83 @@ local function HudRow(k)
   return row
 end
 
--- Where in the Azeroth?'s corner box (h: Gm.Hud's { head, big, lines, board }; nil: none). Called ten times a
+-- A winner's name in the corner box's list, a font string per letter (UTF-8 characters), rolling: a wave runs
+-- through it, each letter growing and taking the celebration's colors in turn (V.AnimateHud). After the
+-- row's rank ("1."), then "(you)" after it when it's this player.
+local function HudWave(k)
+  local w = hud.waves[k]
+  if not w then
+    w = { letters = {} }
+    w.you = hud:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    hud.waves[k] = w
+  end
+  return w
+end
+
+local function SetWave(w, row, r)
+  local font, size, flags = row.name:GetFont()
+  w.font, w.size, w.flags, w.anchor = font, math.floor((size or 10) + 0.5), flags, row.name
+  local n = 0
+  for ch in tostring(r.who):gmatch("[\1-\127\194-\244][\128-\191]*") do
+    n = n + 1
+    local l = w.letters[n]
+    if not l then
+      l = hud:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      w.letters[n] = l
+    end
+    l:SetText(ch)
+    l.px = nil
+    l:Show()
+  end
+  for i = n + 1, #w.letters do w.letters[i]:Hide() end
+  w.n = n
+  w.you:SetText(r.you and "|cff9d9d9d(you)|r" or "")
+  w.you:Show()
+  w.on = true
+end
+
+local function HideWave(w)
+  w.on = false
+  for _, l in ipairs(w.letters) do l:Hide() end
+  w.you:Hide()
+end
+
+-- The corner box's motion (its OnUpdate while it has any): the glow's colors, the winners' names rolling.
+function V.AnimateHud(t)
+  local h = hud and hud.last
+  if not h then return end
+  local colors = h.colors
+  if hud.glow:IsShown() and colors then
+    local r, g, b, pulse = colors(t)
+    if hud.glow.SetBackdropBorderColor then hud.glow:SetBackdropBorderColor(r, g, b, pulse) end
+    hud.wash:SetColorTexture(r, g, b, 0.08 + 0.05 * math.sin(t * 2.4))
+  end
+  for _, w in ipairs(hud.waves) do
+    if w.on then
+      local x = 4
+      for i = 1, w.n do
+        local l = w.letters[i]
+        local bump = math.max(0, math.sin(t * 5 - i * 0.55)) ^ 2 -- (the wave: one crest rolling along)
+        local px = w.size + math.floor(HUD_WAVE * bump + 0.5)
+        if l.px ~= px and w.font then
+          l:SetFont(w.font, px, w.flags)
+          l.px = px
+        end
+        if colors then
+          local r, g, b = colors(t * 2 - i * 0.6)
+          l:SetTextColor(r, g, b)
+        end
+        l:ClearAllPoints()
+        l:SetPoint("BOTTOMLEFT", w.anchor, "BOTTOMRIGHT", x, 0) -- (on the row's baseline: letters grow upward)
+        x = x + l:GetStringWidth()
+      end
+      w.you:ClearAllPoints()
+      w.you:SetPoint("BOTTOMLEFT", w.anchor, "BOTTOMRIGHT", x + 4, 0)
+    end
+  end
+end
+
+-- Where in the Azeroth?'s corner box (h: Gm.Hud's { head, big, lines, board, celebrate, colors }; nil: none). Called ten times a
 -- second: laid out again only when what it shows changes (`force`: anyway). Folded ("-"): only the time
 -- left, or the round's points, beside "+".
 function V.SetHud(h, force)
@@ -727,9 +817,11 @@ function V.SetHud(h, force)
   hud.last = h
   local folded = ns.db.viewer.hudFolded and true or false
   local lines, board = h.lines or {}, h.board or { rows = {}, n = 0, offset = 0, window = 0 }
-  local parts = { h.head or "", h.big or "", tostring(folded), board.n, board.offset }
+  local parts = { h.head or "", h.big or "", tostring(folded), board.n, board.offset, tostring(h.celebrate) }
   for _, s in ipairs(lines) do parts[#parts + 1] = s end
-  for _, r in ipairs(board.rows) do parts[#parts + 1] = r.name .. "\2" .. r.last .. "\2" .. r.total end
+  for _, r in ipairs(board.rows) do
+    parts[#parts + 1] = r.name .. "\2" .. r.last .. "\2" .. r.total .. "\2" .. tostring(r.winner)
+  end
   local key = table.concat(parts, "\1")
   if key == hud.key and hud:IsShown() and not force then return end
   hud.key = key
@@ -770,15 +862,25 @@ function V.SetHud(h, force)
   local scrolls = #rows > 0 and board.n > board.window
   local bar = scrolls and 6 or 0
   local nameW, lastW, totalW = 0, 0, 0
+  local rolling = false
   for k, r in ipairs(rows) do
     local row = HudRow(k)
     row.name:SetText(r.name)
     row.last:SetText(r.last)
     row.total:SetText(r.total)
-    nameW = math.max(nameW, row.name:GetStringWidth())
+    -- (a winner's name rolls: measured whole, with room for the wave's crest, then drawn a letter each)
+    nameW = math.max(nameW, row.name:GetStringWidth() + (r.winner and HUD_WAVE * 3 or 0))
     lastW = math.max(lastW, row.last:GetStringWidth())
     totalW = math.max(totalW, row.total:GetStringWidth())
+    if r.winner then
+      row.name:SetText(r.rank)
+      SetWave(HudWave(k), row, r)
+      rolling = true
+    elseif hud.waves[k] then
+      HideWave(hud.waves[k])
+    end
   end
+  for k = #rows + 1, #hud.waves do HideWave(hud.waves[k]) end
   local top = height + 6
   for k, row in ipairs(hud.rows) do
     local r = rows[k]
@@ -814,6 +916,15 @@ function V.SetHud(h, force)
     list.thumb:SetHeight(th)
   end
   hud:SetSize(math.max(folded and 0 or HUD_MIN_W, width + 2 * HUD_PAD), height + HUD_PAD + 1)
+  -- the celebration's glow, as on the map's panel; the motion only while there's some
+  hud.glow:SetShown(h.celebrate == true)
+  hud.wash:SetShown(h.celebrate == true)
+  if h.celebrate or rolling then
+    hud:SetScript("OnUpdate", function() V.AnimateHud(GetTime()) end)
+    V.AnimateHud(GetTime and GetTime() or 0) -- (the letters placed now, not a frame later)
+  else
+    hud:SetScript("OnUpdate", nil)
+  end
   hud:Show()
 end
 

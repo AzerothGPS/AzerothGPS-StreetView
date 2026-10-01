@@ -483,6 +483,19 @@ function Gm.TimeLeft(sec)
   return (sec <= 5 and "|cffff5050" or "|cffffd100") .. Gm.Clock(sec) .. "|r"
 end
 
+-- The celebration's colors, drifting from one to the next, and a pulse (0.2-0.9) at time t: r, g, b, pulse.
+-- The glow around the panel and the street view's corner box, and the winner's name rolling through them.
+Gm.CELEBRATE = { { 1, 0.85, 0.35 }, { 0.45, 0.95, 0.85 }, { 1, 0.6, 0.85 }, { 0.6, 0.75, 1 } }
+function Gm.CelebrateColor(t)
+  local c = Gm.CELEBRATE
+  local n = #c
+  local f = (t * 0.35) % n
+  local i = math.floor(f)
+  local k = f - i
+  local a, b = c[i + 1], c[(i + 1) % n + 1]
+  return a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k, a[3] + (b[3] - a[3]) * k, 0.55 + 0.35 * math.sin(t * 2.4)
+end
+
 -- A score's color by its share of what it could have been (`worth`: 100 when not given).
 function Gm.ScoreColor(n, worth)
   if not n then return "|cff808080" end
@@ -567,6 +580,11 @@ function Gm.Board(g, offset)
     if s.name == g.me then mine = i end
   end
   local roundText, totalText = Gm.ShowTied(rs), Gm.ShowTied(ts)
+  -- (the game over: the winners' rows, their names rolling in the street view's box)
+  local won = {}
+  if ph == "over" then
+    for _, n in ipairs(g.winners or {}) do won[n] = true end
+  end
   local ranks
   ranks, out.offset = Gm.BoardRows(#list, offset, mine)
   out.n, out.window = #list, math.min(#list - out.offset, Gm.BOARD_ROWS)
@@ -586,7 +604,8 @@ function Gm.Board(g, offset)
       end
     end
     out.rows[k] = { name = string.format("%d. %s%s|r%s", i, Gm.ColorCode(Gm.PlayerColor(g, s.name)), Gm.Short(s.name),
-      me and " |cff9d9d9d(you)|r" or ""), last = last, total = showScores and totalText[i] or "", pinned = k > out.window }
+      me and " |cff9d9d9d(you)|r" or ""), last = last, total = showScores and totalText[i] or "", pinned = k > out.window,
+      winner = won[s.name] or nil, rank = i .. ".", who = Gm.Short(s.name), you = me }
   end
   return out
 end
@@ -657,14 +676,15 @@ function Gm.Hud(g, now, offset)
       elseif mine then
         big = #w == 1 and "|cffffd100You win!|r" or "|cffffd100A tie for 1st!|r"
       else
-        -- ("Placed 4th": the user, 2026-10-01; the list under it has the players)
+        -- ("Placed 4th": the user, 2026-10-01; who won: their name rolls in the list, no line saying so)
         big = place and string.format("|cffffffff%s %s|r", tied and "Tied for" or "Placed", Gm.Ordinal(place)) or nil
-        Add(#w == 1 and ("|cffffd100" .. Gm.Short(w[1]) .. " wins|r") or "|cffffd100A tie for 1st|r")
       end
     end
     if g.closeAt then Add("|cff9d9d9dcloses in " .. Gm.Clock(g.closeAt - now) .. "|r") end
   end
-  return { head = head, big = big, lines = lines, board = Gm.Board(g, offset) }
+  -- (celebrate: the box glows as the panel does; colors: the glow's and the winner's name's)
+  return { head = head, big = big, lines = lines, board = Gm.Board(g, offset), celebrate = g.celebrate == true,
+    colors = Gm.CelebrateColor }
 end
 
 ---------------------------------------------------------------------------------------------
@@ -1680,7 +1700,6 @@ end
 
 local API, gameButton, fly, panel
 local MENU_H, MENU_EASE = 26, 14
-local CELEBRATE = { { 1, 0.85, 0.35 }, { 0.45, 0.95, 0.85 }, { 1, 0.6, 0.85 }, { 0.6, 0.75, 1 } }
 
 local Clock = Gm.Clock
 
@@ -2307,15 +2326,9 @@ function Gm.RefreshTimer()
   panel.timer:SetText(ph == "look" and game.deadline and Gm.TimeLeft(game.deadline - Now()) or "")
 end
 
--- The drift of the celebration's colors.
+-- The celebration's glow on the panel (the street view's corner box glows the same: V.SetHud).
 local function Celebrate(t)
-  local n = #CELEBRATE
-  local f = (t * 0.35) % n
-  local i = math.floor(f)
-  local k = f - i
-  local a, b = CELEBRATE[i + 1], CELEBRATE[(i + 1) % n + 1]
-  local r, g, bl = a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k, a[3] + (b[3] - a[3]) * k
-  local pulse = 0.55 + 0.35 * math.sin(t * 2.4)
+  local r, g, bl, pulse = Gm.CelebrateColor(t)
   if panel.glow.SetBackdropBorderColor then panel.glow:SetBackdropBorderColor(r, g, bl, pulse) end
   panel.wash:SetColorTexture(r, g, bl, 0.08 + 0.05 * math.sin(t * 2.4))
 end
@@ -2619,7 +2632,7 @@ function Gm.Init(figureButton)
     end
     if game and game.pan then Gm.Animate() end
     if game and game.reveal and Now() - game.reveal.t0 <= Gm.REVEAL_SECONDS + 0.1 then API.Redraw() end
-    if game and game.celebrate and panel:IsShown() then Celebrate(t) end
+    if game and game.celebrate and panel:IsShown() then Celebrate(GetTime()) end -- (in step with the corner box's)
   end)
   return gameButton
 end

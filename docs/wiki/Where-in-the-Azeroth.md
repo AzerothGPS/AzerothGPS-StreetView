@@ -46,7 +46,8 @@ needs AzerothGPS 1.1 or newer; with an older one the map isn't locked.)
 5. **10 seconds** later the next round starts ("next round in" counts down under the title).
 
 The street view stays up after the round so you can look again, its corner showing your points and
-everyone's; at the end, "You win!" or where you placed ("Placed 4th"). **Show Street View** reopens it if
+everyone's; at the end, "You win!" or where you placed ("Placed 4th"), and the winner's name rolls in the
+list. **Show Street View** reopens it if
 you closed it. The panel on the map keeps to the round, the time left and your guess; the player list
 shows there only while the street view is closed (and in the lobby, before the first round).
 
@@ -74,7 +75,8 @@ Being in the right zone isn't enough for full marks: the points fall quickly pas
 decimals, for example 99.8 for a guess 5 yards off and 99.6 for one 10 yards off. The same goes for
 the totals.
 
-Scoring 75% or more of what the rounds were worth earns a celebration at the end.
+Scoring 75% or more of what the rounds were worth earns a celebration at the end: a glow of drifting colors
+around the street view's corner and the map's panel.
 
 ## What you'll see
 

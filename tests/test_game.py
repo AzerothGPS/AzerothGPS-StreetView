@@ -312,9 +312,27 @@ def test_the_corner_box_has_the_player_list():
     run(net, clock, 11)
     assert a.game.phase == "over" and b.game.phase == "over"
     assert hud(a)[1] == "You win!" and hud(a)[2][0].startswith("closes in")
-    # ("Placed 2nd": the user, 2026-10-01)
-    assert hud(b)[1] == "Placed 2nd" and hud(b)[2][0] == "Ann wins"
-    assert hud(c)[1] == "Placed 3rd" and hud(c)[2][-1].startswith("closes in")
+    # ("Placed 2nd", and no line saying who won: their name rolls in the list. The user, 2026-10-01)
+    assert hud(b)[1] == "Placed 2nd" and len(hud(b)[2]) == 1 and hud(b)[2][0].startswith("closes in")
+    assert hud(c)[1] == "Placed 3rd"
+    rows = b.G.Hud(b.game, clock.t).board.rows
+    assert (rows[1].winner, rows[1].rank, rows[1].who, rows[1].you) == (True, "1.", "Ann", False)
+    assert rows[2].winner is None and rows[2].you is True
+    h = a.G.Hud(a.game, clock.t)
+    assert h.celebrate is True and len(a.G.CelebrateColor(1.5)) == 4  # (Ann's 100 of 100: the box glows)
+
+
+def test_the_winners_rows_only_at_the_end():
+    (a, b), clock, net = party(2)
+    a.G.Start("party", 1)
+    net.deliver()
+    net.deliver()
+    run(net, clock, 1)
+    a.G.Guess(300, 310, 0)
+    run(net, clock, 32)
+    assert a.game.phase == "result" and a.G.Hud(a.game, clock.t).board.rows[1].winner is None  # (the round's result)
+    run(net, clock, 11)
+    assert a.game.phase == "over" and a.G.Hud(a.game, clock.t).board.rows[1].winner is True
 
 
 def test_a_big_game_counts_who_guessed_and_pins_your_row():
