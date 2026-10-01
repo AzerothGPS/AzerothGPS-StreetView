@@ -51,8 +51,8 @@ then double-click the map where you think it is. The closer you are, the more po
   Azeroth (Thrall, Jaina, Hogger, Leeroy...) when nobody is around, or your party or raid, one player by whisper, or an **open game** anyone
   can join from a link you post in chat, **up to 40 players**.
 - **1, 3 or 5 rounds**, 30 seconds each, with a countdown on the picture.
-- **Scores from 0 to 100** a round: 100 within 25 yards, and they drop fast, so knowing the zone isn't
-  enough. The closer guess wins a tie.
+- **Up to 100 points** a round by a town or landmark, **up to 200** for a road far from any: all of it
+  within 25 yards, and it drops fast, so knowing the zone isn't enough. The closer guess wins a tie.
 - **A live scoreboard** that shows who has guessed, never where, until the round's result. Hover the
   markers on the map to see who guessed what.
 - **Fair:** the map hides your route, dungeons and transports while you play; only open-world and city

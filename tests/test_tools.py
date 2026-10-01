@@ -502,6 +502,34 @@ def test_landmarks_always_ship_on_top_of_the_thinned_pick():
     assert {p["id"] for p in ship_points(road, 200, set())} == plain
 
 
+def test_a_spots_worth_grows_with_its_distance_from_points_of_interest(tmp_path):
+    import json
+    from svtools import worth
+    pois_lua = tmp_path / "Pois.lua"
+    pois_lua.write_text('local _, ns = ...\nns.Pois = {\n  [0] = {\n'
+                        '    {1,0.0,0.0,"Flight, Zone",2,"A"}, {2,5000.0,0.0,"A Mine",0}, {3,-3000.0,0.0,"A Lake",12},\n'
+                        '  },\n  [2991] = {\n    {3,100.0,100.0,"Only Labels Here",9},\n  },\n}\n', encoding="utf-8")
+    lm = tmp_path / "landmarks.json"
+    lm.write_text(json.dumps({"landmarks": [
+        {"name": "Somewhere", "status": "spot", "id": "1-0-0", "cont": 1, "x": 0, "y": 0},
+        {"name": "Under", "status": "mark", "near": {"cont": 10001, "x": 1600, "y": 240}}]}), encoding="utf-8")
+    pois = worth.load_pois(pois_lua, lm)
+    assert sorted(pois[0]) == [(0.0, 0.0), (1600.0, 240.0), (5000.0, 0.0)]  # (labels left out; Undercity on 0)
+    assert pois[2991] == [(100.0, 100.0)]  # (a map with labels only: they count)
+    W = lambda c, x, y, **kw: worth.worth(pois, {"cont": c, "x": x, "y": y, **kw})
+    assert W(0, 50, 0) == 100 and W(0, 100, 0) == 100  # (by a point of interest)
+    assert W(0, 550, 0) == 150 and W(0, 3300, 0) == 200  # (halfway: 150; far from all: 200)
+    assert W(0, -3000, 0) == 200  # (the lake's label doesn't count)
+    assert W(1, 1000, 0) == 200 and W(1, 400, 0) == 135  # (round to 5s)
+    assert W(10001, 1650, 240) == 100  # (Undercity's level by its base continent)
+    assert W(0, 3300, 0, kind="cave") == 100 and W(20036, 1, 1) == 100  # (never in the game anyway)
+    assert worth.worth({}, {"cont": 0, "x": 1, "y": 1}) == 100  # (no AzerothGPS checkout: 100)
+    line = pack.index_lua([{"id": "0-1-1", "cont": 0, "x": 1, "y": 1, "facing": 0, "poses": [], "worth": 165}], "v")
+    assert "worth = 165," in line
+    assert pack.id_matches("0--8606-846-f2", 0, -8606.0, 845.7) and pack.id_matches("10001-1599-217", 10001, 1598.9, 217.3)
+    assert not pack.id_matches("0--8606-846-x2", 0, -8606.0, 845.7)
+
+
 def test_city_spots_ship_denser_after_the_roads():
     from svtools.pack import ship_points
     road = [{"id": f"1-{x}-0", "cont": 1, "x": x, "y": 0} for x in range(0, 2001, 100)]

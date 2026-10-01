@@ -171,6 +171,64 @@ def test_score_is_easy_at_first_and_hard_at_the_end(solo):
     assert band(1, 40) > 10 * band(90, 100)
 
 
+WORTH_PACK = PACK.replace('{ id = "0-300-300", cont = 0, x = 300, y = 300 }',
+                          '{ id = "0-300-300", cont = 0, x = 300, y = 300, worth = 200 }')
+
+
+def test_a_rounds_worth_scales_its_points(solo):
+    # the user, 2026-10-01: 100 by a point of interest, up to 200 far from any
+    p, _, _ = solo
+    G = p.G
+    S = G.Score
+    assert S(0, 160) == 160 and S(25, 200) == 200 and S(26, 200) == 199
+    assert S(500, 200) == 156 and S(1000, 200) == 116 and S(None, 200) == 0
+    assert S(500) == S(500, 100) == 78  # (no worth given: 100, as before)
+    prev = 201
+    for yd in range(0, 20000, 50):
+        assert S(yd, 200) <= prev
+        prev = S(yd, 200)
+    assert G.Worth(None) == 100 and G.Worth(p.lua.eval("{ worth = 150 }")) == 150
+    assert G.Worth(p.lua.eval("{ worth = 500 }")) == 200 and G.Worth(p.lua.eval("{ worth = 20 }")) == 100
+    # ties still break by distance, inside the round's own bands
+    for yd in range(0, 6000, 37):
+        sc = S(yd, 180)
+        f = G.Fine(sc, yd, 180)
+        assert sc - 1 < f <= sc or sc == 0
+    assert G.Fine(180, 0, 180) == 180 and G.Fine(180, 25, 180) == 179.01
+
+
+def test_the_host_sends_the_worth_and_everyone_scores_by_it():
+    clock, net = Clock(), Net()
+    a = Player("Ann-Realm", clock, net, group="PARTY", pack=WORTH_PACK)
+    b = Player("Bob-Realm", clock, net, group="PARTY",  # (an older Index: no worth there)
+               pack=PACK)
+    assert a.G.Start("party", 1)
+    net.deliver()
+    net.deliver()
+    run(net, clock, 1)
+    assert a.game.phase == "look" and b.game.phase == "look"
+    assert a.game.worths[1] == 200 and b.game.worths[1] == 200  # (the host's: everyone scores alike)
+    a.G.Guess(300, 400, 0)  # 100 yd off
+    b.G.Guess(300, 1300, 0)  # 1,000 yd off
+    run(net, clock, 32)
+    assert a.game.players["Bob-Realm"].scores[1] == b.G.Score(1000, 200) == 116
+    assert b.game.players["Ann-Realm"].scores[1] == a.G.Score(100, 200)
+
+
+def test_the_celebration_is_by_the_share_of_the_worth(solo):
+    clock, net = Clock(), Net()
+    p = Player("Me-Realm", clock, net, pack=WORTH_PACK)
+    p.G.Start("solo", 1)
+    p.G.Guess(300, 1300, 0)  # 1,000 yd off a 200 spot: 116 points, over 75, but 58% of what it was worth
+    run(net, clock, 31 + 11)
+    assert p.game.phase == "over" and p.G.Average(p.game) == 116 and not p.game.celebrate
+    q = Player("You-Realm", clock, net, pack=WORTH_PACK)
+    q.G.Start("solo", 1)
+    q.G.Guess(300, 400, 0)  # 100 yd off: 96%
+    run(net, clock, 31 + 11)
+    assert q.game.celebrate and 96 <= q.G.Percent(q.game, "You-Realm") < 97
+
+
 def test_messages_round_trip(solo):
     p, _, _ = solo
     msg = p.G.Encode("S", "123", 2, 57, 1234, 1, -500, 300)

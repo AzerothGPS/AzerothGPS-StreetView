@@ -79,8 +79,9 @@ def point_id(cont: int, x: float, y: float) -> str:
 def id_matches(pid: str, cont: int, x: float, y: float) -> bool:
     """Whether a spot's id names its place. The id comes from the exact position and the
     meta's x/y may be rounded to 0.1 yd, so a coordinate on a .5 can round either way:
-    allow up to 0.55 yd each way."""
-    m = re.fullmatch(r"(-?\d+)-(-?\d+)-(-?\d+)", pid or "")
+    allow up to 0.55 yd each way. A spot on a floor over another's, where that one has the id
+    already (cities, instances), ends in "-f<floor>" (the harvester's planner, 2026-10-01)."""
+    m = re.fullmatch(r"(-?\d+)-(-?\d+)-(-?\d+)(?:-f\d+)?", pid or "")
     return bool(m) and int(m[1]) == int(cont) and abs(int(m[2]) - x) <= 0.55 and abs(int(m[3]) - y) <= 0.55
 
 
@@ -139,10 +140,12 @@ def index_lua(points: list[dict], version: str, name: str = LEGACY_PACK) -> str:
         cube_lua = f' cube = {{ pad = {cube["pad"]} }},' if cube else ""
         kind = p.get("kind")  # (cave or instance spots: never in Where in the Azeroth?)
         kind_lua = f' kind = {lua_str(kind)},' if kind else ""
+        # (the most a round there scores in Where in the Azeroth?: svtools/worth.py; the game takes 100 without)
+        worth_lua = f' worth = {int(p["worth"])},' if p.get("worth") and not kind else ""
         lines.append(
             f'    {{ id = {lua_str(p["id"])}, cont = {int(p["cont"])}, x = {p["x"]:.1f}, y = {p["y"]:.1f}, '
             f'z = {p.get("z") or 0:.1f}, facing = {p["facing"]:.4f}, zone = {lua_str(p.get("zone") or "")}, '
-            f'poses = {{ {poses} }},{cube_lua}{kind_lua} }},'
+            f'poses = {{ {poses} }},{cube_lua}{kind_lua}{worth_lua} }},'
         )
     lines += ["  },", "})", ""]
     return "\n".join(lines)
@@ -573,6 +576,9 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
             (out / f"{pk['name']}.toc").unlink(missing_ok=True)
         else:
             (out / f"{pk['name']}.toc").write_text(toc(version, f"AzerothGPS StreetView: {pk['title']}"), encoding="utf-8")
+        from . import worth as worth_
+        pois = worth_.load_pois()  # (each spot's worth in Where in the Azeroth?: by its points of interest)
+        mine = [dict(p, worth=worth_.worth(pois, p)) for p in mine]
         (out / "Index.lua").write_text(index_lua(mine, version, pk["name"]), encoding="utf-8")
         size = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
         if size > cfg["budget_bytes"]:

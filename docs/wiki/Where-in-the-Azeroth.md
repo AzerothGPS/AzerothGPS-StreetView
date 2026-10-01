@@ -33,17 +33,21 @@ closed it.
 
 ## Scoring
 
-Each round is worth 0 to 100 points:
+**What a round is worth:** 100 points at a spot by a town, a flight master, a named place or a landmark,
+and more the farther it is from all of them, up to 200 for a road deep in the wilds (from about 1,000
+yards away). The panel shows it next to the round: "worth up to 165".
 
-| Distance | Points |
-|---|---|
-| within 25 yards | 100 |
-| 200 yards | 92 |
-| 500 yards | 78 |
-| 1,000 yards | 58 |
-| 2,000 yards | 30 |
-| 4,000 yards | 7 |
-| another continent, or no guess | 0 |
+**How much of it you get** depends on how far off your guess is:
+
+| Distance | Share of the round's worth | On a 100 round | On a 200 round |
+|---|---|---|---|
+| within 25 yards | all of it | 100 | 200 |
+| 200 yards | 92% | 92 | 184 |
+| 500 yards | 78% | 78 | 156 |
+| 1,000 yards | 58% | 58 | 116 |
+| 2,000 yards | 30% | 30 | 60 |
+| 4,000 yards | 7% | 7 | 14 |
+| another continent, or no guess | none | 0 | 0 |
 
 Being in the right zone isn't enough for full marks: the points fall quickly past a few hundred yards.
 
@@ -51,7 +55,7 @@ Being in the right zone isn't enough for full marks: the points fall quickly pas
 decimals, for example 99.8 for a guess 5 yards off and 99.6 for one 10 yards off. The same goes for
 the totals.
 
-An average of 75 or more earns a celebration at the end.
+Scoring 75% or more of what the rounds were worth earns a celebration at the end.
 
 ## What you'll see
 

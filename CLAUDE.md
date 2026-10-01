@@ -72,12 +72,16 @@ no walking on, not marked on the map); in that time the player double-clicks the
 guess (again to move it), and the one placed when the time runs out counts;
 only open-world and city spots are used, never instances or caves (the user, 2026-09-29: cities are in, Undercity's level too, placed on its continent by `Gm.OnMap`; any spot with a
 `kind`, which the harvester's meta.json sets and the Index carries, or a level of 20000+ is skipped); street views come only from the map packs every player has (they're exchanged on joining; the
-panel lists who lacks which, or has an older one). `Gm.Score` gives 0-100 (full within 25 yd, then
-`floor(100 * e^(-((yd - 25) / 1700) ^ 1.1))`: 92 at 200 yd, 78 at 500, 58 at 1,000, 30 at 2,000, 7 at 4,000 (tightened 2026-09-30);
-ties go to the closer guess: `Gm.Fine` gives a score to the hundredth from where in its points' band of yards
-the guess was (100 points: 99.8 at 5 yd, 99.2 at 20), shown only where players would tie (`Gm.ShowTied`), and
-`Gm.Standings`/`Gm.Winners` order by it after the whole points (2026-09-30);
-the celebration needs an average round score of 75: the player's solo, the winner's otherwise). While a game is on the map is held (`AzerothGPS.HoldMap`, API
+panel lists who lacks which, or has an older one). **A round's worth** (the user, 2026-10-01): 100 at a spot
+by a point of interest, up to 200 far from any (`svtools/worth.py`: AzerothGPS's flight masters and map POIs,
+Data/Pois.lua kinds 1-2, and every landmark; 100 within 100 yd, 200 from 1,000 yd, rounded to 5s; the Index's
+`worth`); the host sends it in P (`game.worths`), so everyone scores alike. `Gm.Score(yd, worth)` gives 0 to the
+worth (all of it within 25 yd, then `floor(worth * e^(-((yd - 25) / 1700) ^ 1.1))`: 92% at 200 yd, 78% at 500, 58%
+at 1,000, 30% at 2,000, 7% at 4,000; tightened 2026-09-30); ties go to the closer guess: `Gm.Fine` gives a score
+to the hundredth from where in its points' band of yards the guess was (100 points: 99.8 at 5 yd, 99.2 at 20),
+shown only where players would tie (`Gm.ShowTied`), and `Gm.Standings`/`Gm.Winners` order by it after the whole
+points (2026-09-30); the celebration needs 75% of what the rounds were worth (`Gm.Percent`): the player's solo,
+the winner's otherwise). While a game is on the map is held (`AzerothGPS.HoldMap`, API
 version 3): the route and directions panel hide, double-clicks are guesses, and the game's panel
 sits in the directions' place; its X leaves and the route comes back. Players talk through addon
 messages (prefix `AGPSSV`, the protocol is at the top of Game.lua), invitations are always asked.

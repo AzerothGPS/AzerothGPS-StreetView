@@ -1,7 +1,8 @@
 -- Where in the Azeroth? (Street Guess): a GeoGuessr-style game on the AzerothGPS map. Everyone gets the same street view
 -- (no zone name or coordinates) and has 30 seconds to look around and double-click the map where
 -- they think it is (again to move the guess: the one placed when the time runs out counts): the
--- closer, the more points (0-100 a round, the first ones easy, the last hard).
+-- closer, the more points (the first ones easy, the last hard): up to 100 a round by a town or landmark,
+-- up to 200 far from any (the round's worth).
 -- Street views come only from the map packs every player has; the panel says who lacks which.
 -- Solo, with the party, with one player by whisper, or an open game (a link posted in chat: whoever
 -- clicks it joins, up to 40); 1, 3 or 5 rounds. The lobby counts down 30 s, the same for everyone.
@@ -22,7 +23,7 @@
 --   K:id:name:packs        a player's packs (host)    (packs: Kalimdor/2026.09.29,EasternKingdoms/...)
 --   L:id:ver:part:parts:name,name,...   the players (host), split over as many messages as a raid's
 --                          names need (an addon message holds 255 bytes)   Q:id   a player left
---   P:id:round:spot        the next street view (host)   O:id:round / M:id:round   have it / missing
+--   P:id:round:spot:worth  the next street view (host)   O:id:round / M:id:round   have it / missing
 --   G:id:round             the round starts (host)    S:id:round:score:yards:cont:x:y   a guess
 --   Y:id:round             a guess placed (not where: that's S, when the time runs out)
 --   N:id:round             the round is over (host)   F:id  the game is over   X:id  the host ended it
@@ -62,6 +63,11 @@ Gm.FULL_YD = 25 -- a guess this close gets all 100 points
 Gm.SCALE_YD = 1700 -- ... then 100 * e^(-((yards - 25) / 1700) ^ 1.1), rounded down: 99 just past 25 yd, 92 at
 Gm.SCORE_POWER = 1.1 -- 200 yd, 78 at 500, 58 at 1,000, 30 at 2,000, 7 at 4,000, 1 at 6,000 (tightened by the
 -- user, 2026-09-30: somewhere in the right zone is no longer nearly full marks)
+-- A round's worth: the most it can score (the user, 2026-10-01). 100 at a spot by a point of interest (a town,
+-- a flight master, a named place, a landmark), up to 200 far from any: the build puts each spot's in the
+-- Index (`worth`, tools/svtools/worth.py) and the host sends it with the street view (P). The points above
+-- scale with it: worth * e^(...).
+Gm.WORTH_MIN, Gm.WORTH_MAX = 100, 200
 Gm.FIT_MAX_YD = 2950 -- the result: guess and answer shown together up to this zoom (yards from the middle to
 -- the edge), the terrain view's widest (AzerothGPS shows map art past 3000: the view never flips style;
 -- right-click still goes out to the continent); farther apart, the answer alone
@@ -96,11 +102,19 @@ end
 ---------------------------------------------------------------------------------------------
 -- Pure helpers
 
--- Points (0-100) for a guess `yards` off (nil: no guess, or on another continent).
-function Gm.Score(yards)
+-- A spot's worth (Gm.WORTH_MIN when the Index has none).
+function Gm.Worth(p)
+  local w = tonumber(p and p.worth) or Gm.WORTH_MIN
+  return math.max(Gm.WORTH_MIN, math.min(Gm.WORTH_MAX, math.floor(w + 0.5)))
+end
+
+-- Points (0 to the round's `worth`, 100 when not given) for a guess `yards` off (nil: no guess, or on
+-- another continent).
+function Gm.Score(yards, worth)
+  worth = worth or Gm.WORTH_MIN
   if not yards then return 0 end
-  if yards <= Gm.FULL_YD then return 100 end
-  return math.floor(100 * math.exp(-((yards - Gm.FULL_YD) / Gm.SCALE_YD) ^ Gm.SCORE_POWER))
+  if yards <= Gm.FULL_YD then return worth end
+  return math.floor(worth * math.exp(-((yards - Gm.FULL_YD) / Gm.SCALE_YD) ^ Gm.SCORE_POWER) + 1e-9)
 end
 
 function Gm.Encode(...)
@@ -217,24 +231,30 @@ end
 -- lower the farther into its points' band of yards the guess was, and always above the points below
 -- (100 points: 100 at 0 yd, 99.6 at 10 yd, 99.0 at 25 yd; 92 points: 92.0 to 91.01). The points stay
 -- whole; the fine score only orders players who'd tie and is shown only then (Gm.ShowTied). Every
--- client works it out alike from the yards in S (whole yards).
-local function BandEdge(n) -- the yards up to which a guess earns at least n points (1-100)
-  if n >= 100 then return Gm.FULL_YD end
-  return Gm.FULL_YD + Gm.SCALE_YD * (-math.log(n / 100)) ^ (1 / Gm.SCORE_POWER)
+-- client works it out alike from the yards in S (whole yards) and the round's worth.
+local function BandEdge(n, worth) -- the yards up to which a guess earns at least n points (1 to worth)
+  if n >= worth then return Gm.FULL_YD end
+  return Gm.FULL_YD + Gm.SCALE_YD * (-math.log(n / worth)) ^ (1 / Gm.SCORE_POWER)
 end
-function Gm.Fine(score, yards)
+function Gm.Fine(score, yards, worth)
   if not score or score <= 0 or not yards then return score or 0 end
+  worth = worth or Gm.WORTH_MIN
   yards = math.floor(yards + 0.5)
-  local lo = score >= 100 and 0 or BandEdge(score + 1)
-  local hi = BandEdge(score)
+  local lo = score >= worth and 0 or BandEdge(score + 1, worth)
+  local hi = BandEdge(score, worth)
   local pos = hi > lo and math.min(1, math.max(0, (yards - lo) / (hi - lo))) or 0
   return math.floor((score - 0.99 * pos) * 100 + 0.5) / 100
 end
 
--- A player's fine score for round r.
-function Gm.RoundFine(pl, r)
+-- Round r's worth in game g (Gm.WORTH_MIN when not known).
+function Gm.RoundWorth(g, r)
+  return g and g.worths and g.worths[r] or Gm.WORTH_MIN
+end
+
+-- A player's fine score for round r (worth: that round's).
+function Gm.RoundFine(pl, r, worth)
   local sc, gs = pl.scores[r], pl.guesses[r]
-  return Gm.Fine(sc, gs and gs.yards)
+  return Gm.Fine(sc, gs and gs.yards, worth)
 end
 
 -- The players by total so far: { { name, total, fine, last, lastFine, rounds }, ... }; a tie on the
@@ -249,11 +269,12 @@ function Gm.Standings(g, upto)
     local total, fine, n = 0, 0, 0
     for r = 1, upto do
       if pl.scores[r] then
-        total, fine, n = total + pl.scores[r], fine + Gm.RoundFine(pl, r), n + 1
+        total, fine, n = total + pl.scores[r], fine + Gm.RoundFine(pl, r, Gm.RoundWorth(g, r)), n + 1
       end
     end
     list[#list + 1] = { name = name, total = total, fine = total - (total - fine) / math.max(1, n),
-      last = pl.scores[upto], lastFine = pl.scores[upto] and Gm.RoundFine(pl, upto) or nil, rounds = n }
+      last = pl.scores[upto], lastFine = pl.scores[upto] and Gm.RoundFine(pl, upto, Gm.RoundWorth(g, upto)) or nil,
+      rounds = n }
   end
   table.sort(list, function(a, b)
     if a.total ~= b.total then return a.total > b.total end
@@ -386,6 +407,17 @@ function Gm.Average(g)
   return g.round > 0 and math.floor(total / g.round + 0.5) or 0
 end
 
+-- A player's points as a share of what the rounds were worth (0-100): the celebration's measure, the
+-- rounds' worths differing.
+function Gm.Percent(g, name)
+  local pl = g.players[name]
+  local got, could = 0, 0
+  for r = 1, g.round do
+    got, could = got + (pl and pl.scores[r] or 0), could + Gm.RoundWorth(g, r)
+  end
+  return could > 0 and 100 * got / could or 0
+end
+
 -- A player's guess marker's tooltip (mouse over it in a round's result or the final one): their
 -- name, the round's score and distance, and their total. { { text, r, g, b }, ... }
 function Gm.PlayerTip(g, name)
@@ -399,7 +431,7 @@ function Gm.PlayerTip(g, name)
   local rounds, totals, me, st = {}, {}, nil, nil
   for _, s in ipairs(Gm.Standings(g)) do
     local other = g.players[s.name]
-    if other.scores[r] then rounds[#rounds + 1] = { other.scores[r], Gm.RoundFine(other, r) } end
+    if other.scores[r] then rounds[#rounds + 1] = { other.scores[r], Gm.RoundFine(other, r, Gm.RoundWorth(g, r)) } end
     totals[#totals + 1] = { s.total, s.fine }
     if s.name == name then
       me, st = #totals, other.scores[r] and #rounds or nil
@@ -637,12 +669,13 @@ Over = function(reason)
   local list = Gm.Standings(game)
   game.winners = Gm.Winners(list)
   game.tiebreak = #game.winners == 1 and list[2] ~= nil and list[2].total == list[1].total
+  -- (the points as a share of what the rounds were worth: they differ, 100 to 200)
   if game.mode == "solo" then
-    game.celebrate = not reason and Gm.Average(game) >= Gm.CELEBRATE_MIN
+    game.celebrate = not reason and Gm.Percent(game, game.me) >= Gm.CELEBRATE_MIN
   else
     local top = list[1]
     game.celebrate = not reason and #game.winners > 0 and top ~= nil
-      and top.total / math.max(1, game.round) >= Gm.CELEBRATE_MIN
+      and Gm.Percent(game, top.name) >= Gm.CELEBRATE_MIN
   end
   Changed()
 end
@@ -653,11 +686,13 @@ local function Propose()
   if not p then return Over("No street views are installed") end
   game.used[p.id] = true
   game.spot = Gm.OnMap(p, io().base)
+  game.worths = game.worths or {}
+  game.worths[game.round] = Gm.Worth(p)
   if game.mode == "solo" then return Look() end
   game.phase = "propose"
   game.acks = {}
   game.deadline = Now() + Gm.PROPOSE_SECONDS
-  ToOthers("P", game.id, game.round, p.id)
+  ToOthers("P", game.id, game.round, p.id, game.worths[game.round])
   Changed()
 end
 
@@ -847,7 +882,8 @@ BotsHear = function(msg)
         end
         -- (placed a while into the round: "guessed"; where, only when the time is up, as a player's)
         BotSays(name, 3 + R() * (Gm.LOOK_SECONDS - 13), "Y", id, round)
-        BotSays(name, Gm.LOOK_SECONDS + 0.2 + R() * 0.8, "S", id, round, Gm.Score(d), d and math.floor(d + 0.5) or "",
+        BotSays(name, Gm.LOOK_SECONDS + 0.2 + R() * 0.8, "S", id, round, Gm.Score(d, Gm.RoundWorth(game, round)),
+          d and math.floor(d + 0.5) or "",
           cont, math.floor(x + 0.5), math.floor(y + 0.5))
       end
     end
@@ -1015,7 +1051,7 @@ Submit = function()
   if s and pg.cont == s.cont then
     g.yards = math.sqrt((pg.x - s.x) ^ 2 + (pg.y - s.y) ^ 2)
   end
-  g.score = Gm.Score(g.yards)
+  g.score = Gm.Score(g.yards, Gm.RoundWorth(game, game.round))
   Scored(g)
 end
 
@@ -1250,6 +1286,9 @@ function Gm.OnMessage(msg, channel, sender)
       game.round = round
       game.phase = "ready"
       game.spot = Gm.OnMap(D.byId[f[3]], io().base)
+      -- (the round's worth as the host has it, so everyone scores alike; else this player's own Index)
+      game.worths = game.worths or {}
+      game.worths[round] = Gm.Worth({ worth = tonumber(f[4]) or (D.byId[f[3]] and D.byId[f[3]].worth) })
       local reply = game.mode == "whisper" and "WHISPER" or game.channel
       io().send(Gm.Encode(game.spot and "O" or "M", game.id, round), reply, game.mode == "whisper" and game.host or ChanTarget())
       Changed()
@@ -1754,11 +1793,14 @@ local function GuessLine(g)
   if not g then return "" end
   if g.none then return "|cffff8080No guess in time: 0 points|r" end
   if not g.yards then return "|cffff8080Another continent: 0 points|r" end
-  return string.format("|cffffffff%s yards away:|r |cffffd100%d points|r", Gm.Yards(g.yards), g.score)
+  return string.format("|cffffffff%s yards away:|r |cffffd100%d points|r |cff9d9d9d(of %d)|r", Gm.Yards(g.yards),
+    g.score, Gm.RoundWorth(game, game.round))
 end
 
-local function ScoreColor(n)
+-- A score's color by its share of what it could have been (`worth`: 100 when not given).
+local function ScoreColor(n, worth)
   if not n then return "|cff808080" end
+  n = 100 * n / (worth or Gm.WORTH_MIN)
   if n >= 90 then return "|cff40ff40" elseif n >= 60 then return "|cffc0ff60" elseif n >= 30 then return "|cffffd100" end
   return "|cffff9060"
 end
@@ -1807,6 +1849,9 @@ function Gm.Refresh()
   -- (a game started, by the menu or an invitation accepted: the menu folds away)
   if ph ~= "over" and fly and fly:IsShown() and fly.target > 0 then HideMenu() end
   local roundText = game.round > 0 and string.format("  |cffffffffRound %d of %d|r", game.round, game.rounds) or ""
+  if game.round > 0 and game.worths and game.worths[game.round] and ph ~= "over" then -- (what this one can score)
+    roundText = roundText .. string.format("  |cff9d9d9dworth up to|r |cffffd100%d|r", game.worths[game.round])
+  end
   panel.title:SetText("|cffffd100Where in the Azeroth?|r" .. roundText)
   local status
   if ph == "invite" then
@@ -1838,7 +1883,7 @@ function Gm.Refresh()
       status = "|cffff8080" .. game.reason .. "|r"
     elseif game.mode == "solo" then
       local avg = Gm.Average(game)
-      status = string.format("Average round score: %s%d|r", ScoreColor(avg), avg)
+      status = string.format("Average round score: %s%d|r", ScoreColor(Gm.Percent(game, game.me)), avg)
         .. (game.celebrate and "  |cffffd100Well done!|r" or "")
     else
       local w = game.winners or {}
@@ -1883,7 +1928,7 @@ function Gm.Refresh()
       local parts = {}
       for r = 1, game.round do
         local sc = pl.scores[r]
-        parts[#parts + 1] = sc and (ScoreColor(sc) .. sc .. "|r") or "|cff808080-|r"
+        parts[#parts + 1] = sc and (ScoreColor(sc, Gm.RoundWorth(game, r)) .. sc .. "|r") or "|cff808080-|r"
       end
       local row = panel.rows[1]
       -- (each round's score, not rounds left: the user read "Rounds: 0" as that)
@@ -1906,7 +1951,8 @@ function Gm.Refresh()
     local rs, ts = {}, {}
     for i, s in ipairs(list) do
       local pl = game.players[s.name]
-      rs[i] = pl.scores[game.round] and { pl.scores[game.round], Gm.RoundFine(pl, game.round) } or { -1 - i }
+      rs[i] = pl.scores[game.round]
+        and { pl.scores[game.round], Gm.RoundFine(pl, game.round, Gm.RoundWorth(game, game.round)) } or { -1 - i }
       ts[i] = { s.total, s.fine }
     end
     local roundText, totalText = Gm.ShowTied(rs), Gm.ShowTied(ts)
@@ -1926,7 +1972,7 @@ function Gm.Refresh()
       if showScores then
         -- (this player's own points once their guess is in; "guessed" before, as for the others)
         if ph == "result" or ph == "over" or (me and done) then
-          lastText = done and (ScoreColor(cur) .. "+" .. ((ph == "result" or ph == "over") and roundText[i] or cur) .. "|r")
+          lastText = done and (ScoreColor(cur, Gm.RoundWorth(game, game.round)) .. "+" .. ((ph == "result" or ph == "over") and roundText[i] or cur) .. "|r")
             or "|cff808080-|r"
         else
           local pl = game.players[s.name]

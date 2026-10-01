@@ -38,15 +38,18 @@ closer you were, the more points you get.
 - **Lobby:** a multiplayer game starts 30 seconds after the host starts it, counted down for every
   player whenever they joined; the host can start sooner, and a party's game starts as soon as
   everyone answered.
-- **Scoring:** 0 to 100 points a round: 100 within 25 yards, 92 at 200, 78 at 500, 58 at 1,000,
-  30 at 2,000, 7 at 4,000, nothing on another continent. Players with the same points are told apart
-  by who was closer, shown with decimals (for example 99.8 and 99.6).
+- **Scoring:** a round is worth 100 points at a spot by a town, flight master, named place or
+  landmark, and up to 200 far from any of them (the panel says what it's worth). The points fall with
+  the distance: all of it within 25 yards, 92% at 200, 78% at 500, 58% at 1,000, 30% at 2,000, 7% at
+  4,000, nothing on another continent. Players with the same points are told apart by who was closer,
+  shown with decimals (for example 99.8 and 99.6).
 - **Scoreboard:** five players at a time, the mouse wheel scrolls the rest, and your own row stays
   pinned under them. The others show "guessed" as soon as they place a guess; their points stay
   hidden until the round's result. Hover a player's marker on the map for their name and scores.
 - **Fair play:** only open-world and city spots are used (never dungeons or caves), and only spots
   from map packs every player has. During a game the map hides your route, dungeons and transports,
-  and your view comes back as it was when the game ends. A good average (75+) earns a celebration.
+  and your view comes back as it was when the game ends. Scoring 75% or more of what the rounds were
+  worth earns a celebration.
 
 Players' games talk only through the addon's own messages (prefix `AGPSSV`); invitations are always
 asked. Players are named as the game shows them: WoW Forever's first and last names.
