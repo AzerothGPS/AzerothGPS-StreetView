@@ -86,4 +86,5 @@ around the street view's corner and the map's panel.
   nothing away. When the game ends the map goes back to what you were looking at, and your route comes back.
 
 The panel's **X** leaves the game (the host's ends it for everyone). A finished game closes by itself
-after a minute.
+after a minute. A `/reload` doesn't end it: the game picks up where it was, and catches up on what the
+other players did meanwhile.

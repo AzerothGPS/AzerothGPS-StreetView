@@ -100,6 +100,12 @@ version 3): the route and directions panel hide, double-clicks are guesses, and 
 sits in the directions' place; its X leaves and the route comes back. Players talk through addon
 messages (prefix `AGPSSV`, the protocol is at the top of Game.lua), invitations are always asked.
 The logic runs through `Gm.io`; `tests/test_game.py` plays whole games between simulated players.
+**A /reload doesn't end a game** (the user, 2026-10-01): PLAYER_LOGOUT saves it (`Gm.Snapshot`, plain data in
+`AzerothGPSStreetViewDB.game`, the street view by id) and `Gm.TryResume` takes it up again once the windows are
+built and PLAYER_ENTERING_WORLD says it was a reload (`ns.reloadedUI`); a real login drops it. GetTime() runs on
+through a reload, so the deadlines hold; a game against bots keeps their answers (`game.botQueue`). The player
+back sends R: the others whisper their S again, the host the round as it is (P, G with the seconds left, N, F).
+`Gm.OnResume(fn)`: the dev addon seats its demo bots again. Any new game state must stay plain data.
 **Names (2026-09-30):** WoW Forever's players have a first name and a surname (the client's regional unique
 names: `UnitName` returns both; chat shows "First Surname"). `io.me` builds "First Surname-Realm" (`Gm.UnitFullName`), and
 as a fallback J carries the host's name as the joiner sees it and W the joiner's as the host sees it, so

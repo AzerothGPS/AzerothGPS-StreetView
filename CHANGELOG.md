@@ -32,6 +32,7 @@ The first public release.
   and the player list (then the points, and where you placed: the winner's name rolls, and a great
   game glows); its - button folds it to the time left.
   The panel on the map keeps to the round, the time and your guess.
+- A /reload doesn't end a game: it picks up where it was and catches up on what the others did meanwhile.
 - A scoreboard of five players that scrolls, your own row pinned; "guessed" shows during the round,
   points only with its result. Ties go to the closer guess, shown with decimals.
 - The answer is drawn with a dotted line from each guess; hover a player's marker for their name and

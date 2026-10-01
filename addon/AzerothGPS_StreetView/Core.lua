@@ -112,6 +112,11 @@ ev:SetScript("OnEvent", function(_, event, arg1, arg2)
       for id in pairs(D.byId) do ns.db.loadable[id] = true end
     end
     if arg1 or arg2 then D.loadable = ns.db.loadable end
+    -- (the first time after loading: a /reload or not; a game going on takes up again after a /reload)
+    if ns.reloadedUI == nil then
+      ns.reloadedUI = arg2 and true or false
+      if ns.Game and ns.Game.TryResume then ns.Game.TryResume() end
+    end
     return
   end
   if event == "ADDON_LOADED" and arg1 == addonName then

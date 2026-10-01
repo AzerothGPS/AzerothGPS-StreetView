@@ -367,6 +367,111 @@ def test_ordinals_and_tied_places(solo):
     assert hud(b)[1] == "Tied for 2nd" and hud(c)[1] == "Tied for 2nd" and hud(a)[1] == "You win!"
 
 
+def saved(v):
+    """A Lua value as the game's saved settings keep it (plain data, no functions), as Lua source."""
+    if v is None:
+        return "nil"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(v)
+    if isinstance(v, str):
+        return '"' + v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
+    if lupa.lua_type(v) == "table":
+        parts = [f"[{saved(k)}] = {saved(x)}" for k, x in v.items() if lupa.lua_type(x) != "function"]
+        return "{ " + ", ".join(parts) + " }"
+    return "nil"
+
+
+def reload(p, viewing=True):
+    """Start a /reload of player p: the game saved, p gone from the network (nothing reaches it meanwhile).
+    Returns the saved game; back(...) brings the player back with it."""
+    src = saved(p.G.Snapshot(viewing))
+    del p.net.players[p.name]
+    return src
+
+
+def back(name, clock, net, src, **kw):
+    """The player back after a /reload: a fresh Lua state, the saved game taken up again."""
+    q = Player(name, clock, net, **kw)
+    assert q.G.Resume(q.lua.eval(src))
+    return q
+
+
+def test_a_reload_keeps_a_solo_game(solo):
+    # the user, 2026-10-01: a /reload mustn't end the game
+    p, clock, net = solo
+    p.G.Start("solo", 3, None, "heroic")
+    run(net, clock, 5)
+    p.G.Guess(310, 300, 0)  # (placed: it counts when the time runs out)
+    src = reload(p)
+    clock.t += 8  # (the reload)
+    q = back("Me-Realm", clock, net, src)
+    g = q.game
+    assert g.phase == "look" and g.round == 1 and g.pending.x == 310 and g.level == "heroic" and g.deadline == 1030
+    assert q.shown == ["0-300-300"] and q.held == [True] and q.styles == ["zone"]  # (the street view, the map held)
+    run(net, clock, 20)
+    assert q.game.phase == "result" and scores(q, "Me-Realm") == [100]
+    # someone else's, or saved too long ago: not taken up
+    src = saved(q.G.Snapshot(True))
+    other = Player("You-Realm", clock, net)
+    assert not other.G.Resume(other.lua.eval(src)) and other.game is None
+    clock.t += 200
+    late = Player("Me-Realm", clock, net)
+    assert not late.G.Resume(late.lua.eval(src)) and late.game is None
+
+
+def test_a_reload_over_the_end_of_a_round_catches_up():
+    (a, b), clock, net = party(2)
+    a.G.Start("party", 3)
+    net.deliver()
+    net.deliver()
+    run(net, clock, 1)
+    b.G.Guess(300, 400, 0)  # 100 yd off
+    a.G.Guess(300, 310, 0)
+    run(net, clock, 25)
+    src = reload(b)
+    run(net, clock, 12)  # (the round ends without Bob: Ann has his score missing)
+    assert a.game.phase == "result" and a.game.players["Bob-Realm"].scores[1] is None
+    b2 = back("Bob-Realm", clock, net, src, group="PARTY")
+    run(net, clock, 1)
+    # Bob's guess placed before his time ran out counts; he asked (R), and the host told him what he missed
+    assert b2.game.phase == "result" and b2.game.players["Ann-Realm"].scores[1] == 100
+    assert a.game.players["Bob-Realm"].scores[1] == b2.G.Score(100) == scores(b2, "Bob-Realm")[0]
+    run(net, clock, 10)  # (the next round, both in it)
+    assert a.game.round == 2 and b2.game.round == 2 and b2.game.phase == "look" and a.game.phase == "look"
+
+
+def test_the_host_back_from_a_reload_hears_what_it_missed():
+    (a, b), clock, net = party(2)
+    a.G.Start("party", 1)
+    net.deliver()
+    net.deliver()
+    run(net, clock, 1)
+    a.G.Guess(300, 310, 0)
+    b.G.Guess(300, 400, 0)
+    run(net, clock, 28)
+    src = reload(a)
+    run(net, clock, 4)  # (Bob's time runs out: his guess goes to a host that isn't there)
+    a2 = back("Ann-Realm", clock, net, src, group="PARTY")
+    run(net, clock, 2)
+    assert a2.game.phase == "result" and b.game.phase == "result"
+    assert a2.game.players["Bob-Realm"].scores[1] == b.G.Score(100) and b.game.players["Ann-Realm"].scores[1] == 100
+
+
+def test_a_reload_keeps_a_game_against_bots(solo):
+    p, clock, net = solo
+    assert p.G.Start("bots", 1)
+    run(net, clock, 5)
+    assert p.game.phase == "look" and len(p.game.order) == 5
+    src = reload(p)  # (the bots' answers to come are in the game: they come after the reload too)
+    clock.t += 6
+    q = back("Me-Realm", clock, net, src)
+    run(net, clock, 35)
+    g = q.game
+    assert g.phase in ("result", "over") and all(g.players[n].scores[1] is not None for n in g.order.values())
+
+
 def test_messages_round_trip(solo):
     p, _, _ = solo
     msg = p.G.Encode("S", "123", 2, 57, 1234, 1, -500, 300)

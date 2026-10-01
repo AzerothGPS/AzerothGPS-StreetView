@@ -203,6 +203,35 @@ def test_the_winners_name_rolls_and_the_box_glows():
     assert box.glow._shown and not wave.on and not letters[0]._shown
 
 
+def test_a_reload_brings_the_game_back_on_the_windows(ui):
+    # the user, 2026-10-01: a /reload mustn't end the game. Saved as the UI unloads (ns.db.game), taken up
+    # again once the windows are built and the reload is known (PLAYER_ENTERING_WORLD's isReloadingUi)
+    from test_game import saved
+    p, clock, net, panel, lua = ui
+    p.G.Start("solo", 3, None, "mythic")
+    run(net, clock, 4)
+    src = saved(p.G.Snapshot(True))
+    del net.players["Me-Realm"]
+    clock.t += 7
+    q = Player("Me-Realm", clock, net)
+    panel2 = with_windows(q)
+    assert q.game is None  # (the reload not known yet: nothing taken up)
+    q.ns.db.game = q.lua.eval(src)
+    q.ns.reloadedUI = True
+    q.G.TryResume()
+    box = corner_box(q.lua)
+    assert q.game.phase == "look" and q.game.level == "mythic" and q.ns.db.game is None
+    assert box._shown and plain(box.head._text) == "Mythic  Round 1 of 3" and plain(panel2.title._text) == "Round 1 of 3"
+    q.G.TryResume()  # (once only)
+    # a real login: a game saved before is dropped
+    r = Player("Me-Realm", clock, net)
+    with_windows(r)
+    r.ns.db.game = r.lua.eval(src)
+    r.ns.reloadedUI = False
+    r.G.TryResume()
+    assert r.game is None and r.ns.db.game is None
+
+
 def test_a_game_without_street_views_ends_on_the_panel(ui):
     p, clock, net, panel, lua = ui
     p.G.Usable = lambda pt: False

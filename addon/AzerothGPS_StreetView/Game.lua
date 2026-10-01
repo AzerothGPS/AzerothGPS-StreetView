@@ -25,7 +25,10 @@
 --   L:id:ver:part:parts:name,name,...   the players (host), split over as many messages as a raid's
 --                          names need (an addon message holds 255 bytes)   Q:id   a player left
 --   P:id:round:spot:worth  the next street view (host)   O:id:round / M:id:round   have it / missing
---   G:id:round             the round starts (host)    S:id:round:score:yards:cont:x:y   a guess
+--   G:id:round[:left]      the round starts (host; left: its seconds left, to a player back from a /reload)
+--   S:id:round:score:yards:cont:x:y   a guess
+--   R:id:round             back from a /reload (Gm.Resume): what was missed since that round. Each player
+--                          whispers their S again; the host the round as it is (P, G with the seconds left, N or F)
 --   Y:id:round             a guess placed (not where: that's S, when the time runs out)
 --   N:id:round             the round is over (host)   F:id  the game is over   X:id  the host ended it
 -- The logic below has no frames (tests/test_game.py drives it under lupa through Gm.io); the
@@ -945,10 +948,11 @@ NextRound = function()
   Propose()
 end
 
--- The street view shows (a random way to look), the countdown runs.
-Look = function()
+-- The street view shows (a random way to look), the countdown runs (`left`: the seconds still to go, when
+-- the round started while this player was away: a /reload).
+Look = function(left)
   game.phase = "look"
-  game.deadline = Now() + Gm.LOOK_SECONDS
+  game.deadline = Now() + (left or Gm.LOOK_SECONDS)
   game.roundEnd = game.deadline + Gm.GRACE_SECONDS
   game.guess, game.reveal, game.pending = nil, nil, nil
   game.missing = game.spot == nil
@@ -1401,6 +1405,31 @@ local function Gone(name)
   Changed()
 end
 
+-- A player back from a /reload asks what they missed meanwhile (R, from their round): this player's own
+-- guesses since, and from the host the round as it is: its street view (P), its look with the seconds left
+-- (G), its end (N) or the game's (F). Whispered to them alone: the others have it all.
+local function Resync(to, from)
+  local function Say(...) io().send(Gm.Encode(...), "WHISPER", to) end
+  local mine = game.players[game.me]
+  for r = math.max(1, from), game.round do
+    local sc, g = mine and mine.scores[r], mine and mine.guesses[r]
+    if sc then
+      Say("S", game.id, r, sc, g and g.yards and math.floor(g.yards + 0.5) or "", g and g.cont or "",
+        g and g.x and math.floor(g.x + 0.5) or "", g and g.y and math.floor(g.y + 0.5) or "")
+    end
+  end
+  if not game.isHost then return end
+  local ph, r = game.phase, game.round
+  if ph == "over" then return Say("F", game.id) end
+  if r < 1 or not game.spot or ph == "invite" then return end
+  if from < r or ph == "propose" or ph == "ready" then Say("P", game.id, r, game.spot.id, Gm.RoundWorth(game, r)) end
+  if ph == "look" or ph == "wait" then
+    Say("G", game.id, r, math.max(0, math.floor(game.deadline - Now())))
+  elseif ph == "result" then
+    Say("N", game.id, r)
+  end
+end
+
 -- An addon message (prefix already checked) from `sender` ("Name-Realm") on `channel`.
 function Gm.OnMessage(msg, channel, sender)
   if not sender or sender == io().me() then return end
@@ -1448,6 +1477,10 @@ function Gm.OnMessage(msg, channel, sender)
   if not game or id ~= game.id then return end
   if sender == game.host then game.heardHost = Now() end
   local round = tonumber(f[2])
+  if kind == "R" then -- (a player back from a /reload: what they missed)
+    if game.players[sender] then Resync(sender, round or 1) end
+    return
+  end
   if game.isHost then
     if kind == "J" and game.open and game.phase ~= "invite" and not game.players[sender] then
       io().send(Gm.Encode("U", game.id, "started"), "WHISPER", sender)
@@ -1544,9 +1577,9 @@ function Gm.OnMessage(msg, channel, sender)
       local reply = game.mode == "whisper" and "WHISPER" or game.channel
       io().send(Gm.Encode(game.spot and "O" or "M", game.id, round), reply, game.mode == "whisper" and game.host or ChanTarget())
       Changed()
-    elseif kind == "G" and round == game.round then
-      Look()
-    elseif kind == "N" and round == game.round then
+    elseif kind == "G" and round == game.round and game.phase ~= "look" and game.phase ~= "wait" then
+      Look(tonumber(f[3])) -- (the seconds left: the host's answer to R; a round already on isn't started again)
+    elseif kind == "N" and round == game.round and game.phase ~= "result" then
       Result()
     elseif kind == "F" then
       Over()
@@ -1578,6 +1611,61 @@ function Gm.OnRoster()
     local name = game.order[i]
     if name ~= game.me and not io().inGroup(name) then Gone(name) end
   end
+end
+
+---------------------------------------------------------------------------------------------
+-- Through a /reload (the user, 2026-10-01: a /reload mustn't end the game). The game is saved as the UI
+-- unloads (Gm.Snapshot, in AzerothGPSStreetViewDB.game) and taken up again once it's back (Gm.Resume):
+-- GetTime() runs on through a /reload, so the deadlines hold, and a game against bots keeps its bots'
+-- answers (game.botQueue). What the other players sent meanwhile is asked for again (R, Resync).
+Gm.RESUME_SECONDS = 180 -- (saved longer ago than this: gone)
+Gm.resumeHooks = {}
+-- fn(game) once a saved game is taken up again, before anything is sent (the dev addon's bots).
+function Gm.OnResume(fn) Gm.resumeHooks[#Gm.resumeHooks + 1] = fn end
+
+local function Plain(v) -- (a copy without functions: what saved settings can keep)
+  if type(v) ~= "table" then return v end
+  local out = {}
+  for k, x in pairs(v) do
+    if type(x) ~= "function" then out[k] = Plain(x) end
+  end
+  return out
+end
+
+-- The game as saved (nil: none): plain data, its street view by id (`viewing`: the street view showed it).
+function Gm.Snapshot(viewing)
+  if not game then return nil end
+  local s = {}
+  for k, v in pairs(game) do
+    if k ~= "spot" and type(v) ~= "function" then s[k] = Plain(v) end
+  end
+  s.spotId = game.spot and game.spot.id or nil
+  s.viewing = viewing and true or nil
+  s.savedAt = Now()
+  return s
+end
+
+-- A saved game taken up again: this player's, saved moments ago. The map held in its level's style again,
+-- the street view open again if it was, and the others asked for what was missed.
+function Gm.Resume(s)
+  if game or type(s) ~= "table" or s.me ~= io().me() or not s.id then return false end
+  local now = Now()
+  if not s.savedAt or now < s.savedAt or now - s.savedAt > Gm.RESUME_SECONDS then return false end
+  local spotId, viewing = s.spotId, s.viewing
+  s.spotId, s.viewing, s.savedAt = nil, nil, nil
+  game = s
+  game.spot = spotId and Gm.OnMap(D.byId[spotId], io().base) or nil
+  if spotId and not game.spot then game.missing = true end
+  for _, fn in ipairs(Gm.resumeHooks) do fn(game) end
+  Hold()
+  if game.chanName then JoinChannel(game.chanName) end
+  local ph = game.phase
+  if viewing and game.spot and not game.missing and ph ~= "invite" and ph ~= "joined" then
+    io().open(game.spot, game.heading)
+  end
+  if ph ~= "over" then ToOthers("R", game.id, game.round) end
+  Changed()
+  return true
 end
 
 ---------------------------------------------------------------------------------------------
@@ -2605,8 +2693,13 @@ function Gm.Init(figureButton)
   local ev = CreateFrame("Frame")
   ev:RegisterEvent("CHAT_MSG_ADDON")
   ev:RegisterEvent("GROUP_ROSTER_UPDATE")
+  ev:RegisterEvent("PLAYER_LOGOUT") -- (a /reload too: the game is saved, Gm.TryResume takes it up again)
   ev:SetScript("OnEvent", function(_, event, prefix, msg, channel, sender)
-    if event == "CHAT_MSG_ADDON" then
+    if event == "PLAYER_LOGOUT" then
+      local V = ns.Viewer
+      local ok, s = pcall(Gm.Snapshot, V and V.Current() and V.Current().game)
+      ns.db.game = ok and s or nil
+    elseif event == "CHAT_MSG_ADDON" then
       if prefix == Gm.PREFIX then
         local ok, err = pcall(Gm.OnMessage, msg, channel, sender)
         if not ok then ns.Print("|cffff6060game message failed:|r " .. tostring(err)) end
@@ -2634,5 +2727,20 @@ function Gm.Init(figureButton)
     if game and game.reveal and Now() - game.reveal.t0 <= Gm.REVEAL_SECONDS + 0.1 then API.Redraw() end
     if game and game.celebrate and panel:IsShown() then Celebrate(GetTime()) end -- (in step with the corner box's)
   end)
+  Gm.TryResume()
   return gameButton
+end
+
+-- After a /reload: the game saved as the UI unloaded, taken up again. Once the windows are built and the
+-- reload is known (Core.lua's PLAYER_ENTERING_WORLD sets ns.reloadedUI): whichever comes last calls it.
+local resumeTried = false
+function Gm.TryResume()
+  if resumeTried or not gameButton or ns.reloadedUI == nil or not ns.db then return end
+  resumeTried = true
+  local s = ns.db.game
+  ns.db.game = nil -- (a real login: a game from before is gone)
+  if ns.reloadedUI and s then
+    local ok, err = pcall(Gm.Resume, s)
+    if not ok then ns.Print("|cffff6060the game couldn't go on after the /reload:|r " .. tostring(err)) end
+  end
 end
