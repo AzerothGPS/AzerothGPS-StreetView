@@ -1,5 +1,5 @@
 {
- "about": "Street views that always ship (the user, 2026-09-30): famous stops in Azeroth. 'spot': a planned spot by id (rendered or not), kept by pack.ship_points and the harvester's ship.py whatever the 200 yd thinning says; its 0.75 x spacing neighbors give way. 'mark': still needs its exact standing point and facing, from the dev addon's /sv mark in game (sv.cmd landmarks merges them) or a hand estimate checked on a test render; 'near' is a map-data estimate of the place. A marked entry gets id, cont, x, y, z (the floor to stand on), facing, zone and mapID and status 'spot'.",
+ "about": "Street views that always ship (the user, 2026-09-30): famous stops in Azeroth. 'spot': a planned spot by id (rendered or not), kept by pack.ship_points and the harvester's ship.py on top of the 200 yd thinning, which they don't change. 'mark': still needs its exact standing point and facing, from the dev addon's /sv mark in game (sv.cmd landmarks merges them) or a hand estimate checked on a test render; 'near' is a map-data estimate of the place. A marked entry gets id, cont, x, y, z (the floor to stand on), facing, zone and mapID and status 'spot'.",
  "landmarks": [
   {
    "name": "Thunder Bluff, central rise",
@@ -157,14 +157,13 @@
   },
   {
    "name": "Darnassus, Temple of the Moon",
-   "status": "spot",
-   "id": "1-9716-2513",
-   "cont": 1,
-   "x": 9715.7,
-   "y": 2513.1,
-   "zone": "Darnassus",
-   "mapID": 1457,
-   "note": "rendered (rev 2), thinned out; 53 yd from the temple: check the view"
+   "status": "mark",
+   "note": "the planned spot 1-9716-2513 fails placement (under a Darnassus terrace); mark a spot at the temple",
+   "near": {
+    "cont": 1,
+    "x": 9667.1,
+    "y": 2532.1
+   }
   },
   {
    "name": "Cenarion Hold",

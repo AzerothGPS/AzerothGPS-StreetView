@@ -32,7 +32,7 @@ local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "le
 local frame, chrome, view, img, missing, title, info, preload, ahead, timerBox, gameLogo, badge
 -- Where in the Azeroth?'s logo over the title bar while a game shows (Media/GameLogo.tga, square:
 -- the logo fills its width, about 3/4 of its height): this wide, centered on the title bar
-local GAME_LOGO = 176
+local GAME_LOGO = 141 -- (176 less 20%: the user, 2026-09-30)
 local GAME_LOGO_BELOW = GAME_LOGO * 0.375 -- (how far the logo reaches down from the title bar's middle)
 local tiles = {} -- panorama tile textures by col * 100 + row
 local cells = {} -- cube view cell textures

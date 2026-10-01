@@ -464,20 +464,16 @@ def ship_points(points: list[dict], spacing: float | None, pinned: set[str] | No
     every rendered spot (100 yd), the packs take a thinned set. Greedy in a fixed order (continent,
     x, y): a spot is kept unless a kept one is within 0.75 * spacing (so neighbors along a road end up
     ~0.75-1.5 spacing apart, ~0.9 on average). None or 0: every spot. `pinned` (landmarks.json's
-    spots): kept first, whatever the spacing, and their neighbors give way. Keep in step with the
-    harvester's ship.py (a test there checks they agree)."""
+    spots) are added on top of that pick and change nothing else in it: a landmark never makes other
+    spots give way or shifts the chain along its road (so nothing already rendered has to be redone).
+    Keep in step with the harvester's ship.py (a test there checks they agree)."""
     if not spacing:
         return list(points)
     pinned = pinned or set()
     mind = 0.75 * spacing
     keep, grid = [], {}
-    order = sorted(points, key=lambda p: (p["id"] not in pinned, int(p["cont"]), float(p["x"]), float(p["y"]), p["id"]))
-    for p in order:
-        if p["id"] in pinned:
-            c, x, y = int(p["cont"]), float(p["x"]), float(p["y"])
-            keep.append(p)
-            grid.setdefault((c, int(x // mind), int(y // mind)), []).append((x, y))
-            continue
+    for p in sorted((p for p in points if p["id"] not in pinned),
+                    key=lambda p: (int(p["cont"]), float(p["x"]), float(p["y"]), p["id"])):
         c, x, y = int(p["cont"]), float(p["x"]), float(p["y"])
         k = (c, int(x // mind), int(y // mind))
         near = False
@@ -489,6 +485,8 @@ def ship_points(points: list[dict], spacing: float | None, pinned: set[str] | No
         if not near:
             keep.append(p)
             grid.setdefault(k, []).append((x, y))
+    keep += sorted((p for p in points if p["id"] in pinned),
+                   key=lambda p: (int(p["cont"]), float(p["x"]), float(p["y"]), p["id"]))
     return keep
 
 

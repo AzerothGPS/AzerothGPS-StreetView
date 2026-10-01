@@ -491,13 +491,13 @@ def test_spots_held_by_eye_stay_out_until_rendered_again(tmp_path):
     assert pack.retake(build, pts, {}, {"0-5-5": {"reason": "under the city", "at": 200}}) == {}
 
 
-def test_landmarks_always_ship_and_their_neighbors_give_way():
+def test_landmarks_always_ship_on_top_of_the_thinned_pick():
     from svtools.pack import ship_points
     road = [{"id": f"1-{x}-0", "cont": 1, "x": x, "y": 0} for x in range(0, 2001, 100)]
+    plain = {p["id"] for p in ship_points(road, 200)}
     kept = {p["id"] for p in ship_points(road, 200, {"1-300-0"})}  # (300 would be thinned out)
-    assert "1-300-0" in kept and "1-200-0" not in kept and "1-400-0" not in kept
-    assert "1-500-0" in kept and "1-0-0" in kept
-    assert {p["id"] for p in ship_points(road, 200, set())} == {p["id"] for p in ship_points(road, 200)}
+    assert kept == plain | {"1-300-0"}  # (nothing else changes: no rework for a landmark)
+    assert {p["id"] for p in ship_points(road, 200, set())} == plain
 
 
 def test_marks_from_the_game_become_landmark_spots(tmp_path):
