@@ -472,6 +472,144 @@ function Gm.Yards(n)
   return tostring(n)
 end
 
+-- Seconds as m:ss (rounded up: 0:00 only when the time is up).
+function Gm.Clock(sec)
+  sec = math.max(0, math.ceil(sec))
+  return string.format("%d:%02d", math.floor(sec / 60), sec % 60)
+end
+
+-- The time left to guess: gold, red in the last 5 seconds.
+function Gm.TimeLeft(sec)
+  return (sec <= 5 and "|cffff5050" or "|cffffd100") .. Gm.Clock(sec) .. "|r"
+end
+
+-- A score's color by its share of what it could have been (`worth`: 100 when not given).
+function Gm.ScoreColor(n, worth)
+  if not n then return "|cff808080" end
+  n = 100 * n / (worth or Gm.WORTH_MIN)
+  if n >= 90 then return "|cff40ff40" elseif n >= 60 then return "|cffc0ff60" elseif n >= 30 then return "|cffffd100" end
+  return "|cffff9060"
+end
+
+function Gm.Ordinal(n)
+  local teen, last = n % 100, n % 10
+  local suffix = (teen >= 11 and teen <= 13) and "th" or ({ "st", "nd", "rd" })[last] or "th"
+  return n .. suffix
+end
+
+-- This player's place after `upto` rounds: place, players, their total, whether another has the very same.
+function Gm.Place(g, upto)
+  local list = Gm.Standings(g, upto)
+  local me
+  for _, s in ipairs(list) do
+    if s.name == g.me then me = s end
+  end
+  if not me then return nil end
+  local place, tied = 1, false
+  for _, s in ipairs(list) do
+    if s ~= me then
+      if s.total > me.total or (s.total == me.total and s.fine > me.fine + 1e-6) then
+        place = place + 1
+      elseif s.total == me.total and math.abs(s.fine - me.fine) <= 1e-6 then
+        tied = true
+      end
+    end
+  end
+  return place, #list, me.total, tied
+end
+
+-- This player's standing after `upto` rounds, one line (nil before any): solo, the points of what the
+-- rounds were worth; else the place among the players.
+function Gm.Standing(g, upto)
+  if not upto or upto < 1 then return nil end
+  if g.mode == "solo" then
+    local pl, got, could = g.players[g.me], 0, 0
+    for r = 1, upto do
+      got, could = got + (pl and pl.scores[r] or 0), could + Gm.RoundWorth(g, r)
+    end
+    return string.format("|cff9d9d9dTotal|r %s%d|r |cff9d9d9dof %d|r", Gm.ScoreColor(got, could), got, could)
+  end
+  local place, n, total, tied = Gm.Place(g, upto)
+  if not place then return nil end
+  return string.format("|cff9d9d9dYou:|r |cffffffff%s%s of %d|r, |cffffd100%d|r |cff9d9d9dpoints|r",
+    tied and "tied " or "", Gm.Ordinal(place), n, total)
+end
+
+-- The map panel's top line (the user, 2026-10-01: the map keeps to little, the street view's corner
+-- box has the rest): the round while the rounds run, else the game's name and level.
+function Gm.PanelTitle(g)
+  if g.round > 0 and g.phase ~= "over" then
+    return string.format("|cffffd100Round %d of %d|r", g.round, g.rounds)
+  end
+  local lv = Gm.Level(g.level)
+  return "|cffffd100Where in the Azeroth?|r  " .. Gm.LEVEL_COLORS[lv] .. Gm.LEVEL_NAMES[lv] .. "|r"
+end
+
+-- The box in the street view's top-right corner during a game (the user, 2026-10-01): { head = the level
+-- and the round, big = the time left or the round's points (nil: none), lines = { ... } }.
+function Gm.Hud(g, now)
+  if not g then return nil end
+  local lv = Gm.Level(g.level)
+  local head = Gm.LEVEL_COLORS[lv] .. Gm.LEVEL_NAMES[lv] .. "|r"
+  if g.round > 0 then head = head .. string.format("  |cffffffffRound %d of %d|r", g.round, g.rounds) end
+  local ph, solo, lines, big = g.phase, g.mode == "solo", {}, nil
+  local function Add(s) if s then lines[#lines + 1] = s end end
+  if ph == "look" then
+    big = g.deadline and Gm.TimeLeft(g.deadline - now) or nil
+    Add(string.format("|cff9d9d9dworth up to|r |cffffd100%d|r", Gm.RoundWorth(g, g.round)))
+    if not solo then -- (who has placed a guess: not where)
+      local n = 0
+      for _, name in ipairs(g.order) do
+        local pl = g.players[name]
+        if pl.scores[g.round] or (pl.placed and pl.placed[g.round]) then n = n + 1 end
+      end
+      Add(string.format("|cffffffff%d of %d|r |cff9d9d9dguessed|r", n, #g.order))
+    end
+    Add(Gm.Standing(g, g.round - 1))
+  elseif ph == "wait" or ph == "result" then
+    local gs, worth = g.guess, Gm.RoundWorth(g, g.round)
+    if gs then
+      big = gs.yards and (Gm.ScoreColor(gs.score, worth) .. "+" .. gs.score .. "|r") or "|cffff80800|r"
+      Add(gs.none and "|cffff8080No guess in time|r" or not gs.yards and "|cffff8080Another continent|r"
+        or string.format("|cffffffff%s yards away|r |cff9d9d9d(of %d)|r", Gm.Yards(gs.yards), worth))
+    end
+    if ph == "wait" then
+      Add("|cff9d9d9dWaiting for the others...|r")
+    else
+      Add(Gm.Standing(g, g.round))
+      if g.deadline and g.round < g.rounds then
+        Add("|cff9d9d9dnext round in|r |cffffffff" .. Gm.Clock(g.deadline - now) .. "|r")
+      end
+    end
+  elseif ph == "propose" or ph == "ready" then
+    Add("|cff9d9d9dThe next street view...|r")
+  elseif ph == "over" then
+    if g.reason then
+      Add("|cffff8080" .. g.reason .. "|r")
+    elseif solo then
+      big = g.celebrate and "|cffffd100Well done!|r" or "|cffffffffGame over|r"
+      Add(Gm.Standing(g, g.round))
+      Add(string.format("|cff9d9d9dAverage round score|r %s%d|r", Gm.ScoreColor(Gm.Percent(g, g.me)), Gm.Average(g)))
+    else
+      local w = g.winners or {}
+      local mine = false
+      for _, n in ipairs(w) do mine = mine or n == g.me end
+      local place, n, total = Gm.Place(g)
+      if #w == 0 then
+        big = "|cffffffffNo one scored|r"
+      elseif mine then
+        big = #w == 1 and "|cffffd100You win!|r" or "|cffffd100A tie for 1st!|r"
+      else
+        big = place and string.format("|cffffffff%s of %d|r", Gm.Ordinal(place), n) or nil
+        Add(#w == 1 and ("|cffffd100" .. Gm.Short(w[1]) .. " wins|r") or "|cffffd100A tie for 1st|r")
+      end
+      if place and #w > 0 then Add(string.format("|cff9d9d9dYour total:|r |cffffd100%d|r", total)) end
+    end
+    if g.closeAt then Add("|cff9d9d9dcloses in " .. Gm.Clock(g.closeAt - now) .. "|r") end
+  end
+  return { head = head, big = big, lines = lines }
+end
+
 ---------------------------------------------------------------------------------------------
 -- The game (one at a time). Everything that touches the game client goes through Gm.io.
 
@@ -1487,10 +1625,7 @@ local API, gameButton, fly, panel
 local MENU_H, MENU_EASE = 26, 14
 local CELEBRATE = { { 1, 0.85, 0.35 }, { 0.45, 0.95, 0.85 }, { 1, 0.6, 0.85 }, { 0.6, 0.75, 1 } }
 
-local function Clock(sec)
-  sec = math.max(0, math.ceil(sec))
-  return string.format("%d:%02d", math.floor(sec / 60), sec % 60)
-end
+local Clock = Gm.Clock
 
 -- A small gold-edged button (AzerothGPS's map draws its own the same way).
 local Chip
@@ -1720,12 +1855,15 @@ local function BuildPanel(parent)
   wash:Hide()
   panel.wash = wash
 
-  panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  panel.title:SetPoint("TOPLEFT", 6, -6)
-  panel.title:SetJustifyH("LEFT")
   panel.timer = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   panel.timer:SetPoint("TOPRIGHT", -28, -4)
   panel.timer:SetJustifyH("RIGHT")
+  -- (one line, ending before the timer: never under it or the X)
+  panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  panel.title:SetPoint("TOPLEFT", 6, -6)
+  panel.title:SetPoint("RIGHT", panel.timer, "LEFT", -6, 0)
+  panel.title:SetJustifyH("LEFT")
+  if panel.title.SetWordWrap then panel.title:SetWordWrap(false) end
   local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
   close:SetSize(22, 22)
   close:SetPoint("TOPRIGHT", 0, -1)
@@ -1851,13 +1989,7 @@ local function GuessLine(g)
     g.score, Gm.RoundWorth(game, game.round))
 end
 
--- A score's color by its share of what it could have been (`worth`: 100 when not given).
-local function ScoreColor(n, worth)
-  if not n then return "|cff808080" end
-  n = 100 * n / (worth or Gm.WORTH_MIN)
-  if n >= 90 then return "|cff40ff40" elseif n >= 60 then return "|cffc0ff60" elseif n >= 30 then return "|cffffd100" end
-  return "|cffff9060"
-end
+local ScoreColor = Gm.ScoreColor
 
 -- Where the panel starts: right of the map window frame's round portrait when that shows (as
 -- AzerothGPS's own top panel does).
@@ -1888,6 +2020,14 @@ local function SubText()
   end
 end
 
+-- Show Street View: this round's street view was closed (the panel and its timer ask the same).
+local function ReopenWanted()
+  local ph = game.phase
+  local V = ns.Viewer
+  return (ph == "look" or ph == "wait" or ph == "result" or ph == "over") and game.spot ~= nil
+    and not game.missing and not (V and V.Current() and V.Current().game) and true or false
+end
+
 -- Redraw the panel from the game's state.
 function Gm.Refresh()
   if not panel then return end
@@ -1902,13 +2042,8 @@ function Gm.Refresh()
   local ph = game.phase
   -- (a game started, by the menu or an invitation accepted: the menu folds away)
   if ph ~= "over" and fly and fly:IsShown() and fly.target > 0 then HideMenu() end
-  local lv = Gm.Level(game.level)
-  local roundText = "  " .. Gm.LEVEL_COLORS[lv] .. Gm.LEVEL_NAMES[lv] .. "|r"
-    .. (game.round > 0 and string.format("  |cffffffffRound %d of %d|r", game.round, game.rounds) or "")
-  if game.round > 0 and game.worths and game.worths[game.round] and ph ~= "over" then -- (what this one can score)
-    roundText = roundText .. string.format("  |cff9d9d9dworth up to|r |cffffd100%d|r", game.worths[game.round])
-  end
-  panel.title:SetText("|cffffd100Where in the Azeroth?|r" .. roundText)
+  -- (the level, the round's worth and the player's place: the street view's corner box, Gm.Hud)
+  panel.title:SetText(Gm.PanelTitle(game))
   local status
   if ph == "invite" then
     local n = #game.order - 1
@@ -1927,9 +2062,8 @@ function Gm.Refresh()
     status = "Getting the next street view ready..."
   elseif ph == "look" then
     status = game.missing and "|cffff8080You don't have this street view (update AzerothGPS StreetView): guess anyway!|r"
-      or (game.pending and (game.mode == "solo" and "Guess placed. |cffffd100Double-click|r again to move it, or submit it."
-          or "Guess placed. |cffffd100Double-click|r again to move it; it counts when the time runs out.")
-        or "Where is this? |cffffd100Double-click the map|r where you think it is.")
+      or (game.pending and "Guess placed. |cffffd100Double-click|r to move it."
+        or "|cffffd100Double-click the map|r where you think it is.")
   elseif ph == "wait" then
     status = GuessLine(game.guess) .. "\n|cff9d9d9dWaiting for the others...|r"
   elseif ph == "result" then
@@ -1980,17 +2114,19 @@ function Gm.Refresh()
     - (sub and (math.max(panel.sub:GetStringHeight(), 12) + 3) or 0)
   if game.mode == "solo" then
     local pl = game.players[game.me]
-    if pl and game.round > 0 then
-      local parts = {}
+    if pl and pl.scores[1] then -- (nothing before the first round's score)
+      local parts, sum, n = {}, 0, 0
       for r = 1, game.round do
         local sc = pl.scores[r]
         parts[#parts + 1] = sc and (ScoreColor(sc, Gm.RoundWorth(game, r)) .. sc .. "|r") or "|cff808080-|r"
+        if sc then sum, n = sum + sc, n + 1 end
       end
       local row = panel.rows[1]
       -- (each round's score, not rounds left: the user read "Rounds: 0" as that)
       row.name:SetText((#parts > 1 and "Round scores: " or "Round score: ") .. table.concat(parts, ", "))
       row.last:SetText("")
-      row.total:SetText(ph == "over" and "" or string.format("Average %d", Gm.Average(game)))
+      -- (the rounds scored so far: not the one being played)
+      row.total:SetText(ph == "over" and "" or string.format("Average %d", math.floor(sum / n + 0.5)))
       row.name:ClearAllPoints()
       row.name:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, y)
       row.total:ClearAllPoints()
@@ -2100,8 +2236,7 @@ function Gm.Refresh()
   end
   if posting then h = h + 22 end
   panel.submit:SetShown(game.mode == "solo" and ph == "look" and game.pending ~= nil)
-  local reopen = (ph == "look" or ph == "wait" or ph == "result" or ph == "over") and game.spot ~= nil
-    and not game.missing and not (ns.Viewer.Current() and ns.Viewer.Current().game)
+  local reopen = ReopenWanted()
   panel.reopen:SetShown(reopen)
   local list, extra = { panel.submit, panel.reopen }, false
   for _, e in ipairs(Gm.extraButtons) do
@@ -2130,10 +2265,11 @@ function Gm.Refresh()
   Gm.RefreshTimer()
 end
 
+-- The countdowns (the panel's timer and its line under the title) and the street view's corner box.
 function Gm.RefreshTimer()
   local V = ns.Viewer
   if not panel or not game then
-    if V and V.SetTimer then V.SetTimer(nil) end
+    if V and V.SetHud then V.SetHud(nil) end
     return
   end
   local ph = game.phase
@@ -2141,35 +2277,15 @@ function Gm.RefreshTimer()
   local wasSub = panel.sub:IsShown()
   panel.sub:SetText(sub or "")
   if (sub ~= nil) ~= wasSub then return Gm.Refresh() end -- (the line comes or goes: the panel's laid out again)
-  if (ph == "result" and game.round < game.rounds) or (ph == "over" and game.closeAt) then
-    panel.timer:SetText("")
-    if V and V.SetTimer then V.SetTimer(nil) end
-    return
+  if V and V.SetHud then V.SetHud(Gm.Hud(game, Now())) end
+  if panel.reopen and ReopenWanted() ~= panel.reopen:IsShown() then return Gm.Refresh() end
+  if ph == "invite" and game.deadline and game.postedAt and Now() - game.postedAt >= Gm.POST_COOLDOWN
+    and panel.postLabel:IsShown() and not game.postReady then
+    game.postReady = true -- (the post buttons bright again)
+    return Gm.Refresh()
   end
-  if (ph == "look" or ph == "wait" or ph == "result" or ph == "over") and panel.reopen then
-    local want = not game.missing and not (V and V.Current() and V.Current().game)
-    if want ~= panel.reopen:IsShown() then Gm.Refresh() end
-  end
-  if ph == "invite" or ph == "joined" then -- (the lobby: when the game starts, the same for everyone)
-    local at = ph == "invite" and game.deadline or game.startAt
-    panel.timer:SetText("")
-    if at then
-      if game.postedAt and ph == "invite" and Now() - game.postedAt >= Gm.POST_COOLDOWN and panel.postLabel:IsShown()
-        and not game.postReady then
-        game.postReady = true -- (the post buttons bright again)
-        Gm.Refresh()
-      end
-    end
-    if V and V.SetTimer then V.SetTimer(nil) end
-  elseif ph == "look" and game.deadline then
-    local left = game.deadline - Now()
-    local color = left <= 5 and "|cffff5050" or "|cffffd100"
-    panel.timer:SetText(color .. Clock(left) .. "|r")
-    if V and V.SetTimer then V.SetTimer(color .. Clock(left) .. "|r") end
-  else
-    panel.timer:SetText("")
-    if V and V.SetTimer then V.SetTimer(nil) end
-  end
+  -- (the time left to guess; the lobby's and the rounds' other countdowns: the line under the title)
+  panel.timer:SetText(ph == "look" and game.deadline and Gm.TimeLeft(game.deadline - Now()) or "")
 end
 
 -- The drift of the celebration's colors.

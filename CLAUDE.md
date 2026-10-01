@@ -71,9 +71,14 @@ filter turns it into a `garrmission:agpssv:` link, and a click joins the game's 
 `AGPSSV<id>` (messages go there) and whispers J to the host, who takes up to 40 (same realm and
 faction). Every game's lobby counts down 30 s for everyone who joined (I and W carry the seconds left);
 the host can start sooner, and a party's starts once everyone answered.
-A street view pops up for 30 s with a countdown on it and the panel (no zone name or coordinates,
-no walking on, not marked on the map); in that time the player double-clicks the map to place a
-guess (again to move it), and the one placed when the time runs out counts;
+A street view pops up for 30 s (no zone name or coordinates, no walking on, not marked on the map); in that
+time the player double-clicks the map to place a guess (again to move it), and the one placed when the time
+runs out counts. **The game's details are in the street view's top-right corner** (the user, 2026-10-01: the
+level and worth on the map panel's title ran under its timer): a box with the level and round, the time
+left large, the round's worth, who has guessed and the player's place; in a result the points and the yards,
+at the end the winner (`Gm.Hud` gives its text, `V.SetHud` draws it, tests/test_game_ui.py on a frame mock).
+The map's panel keeps to little: the round and the time left on its title (`Gm.PanelTitle`; the lobby and the
+end: the game's name and level), one line about the guess, the scoreboard;
 only open-world and city spots are used, never instances or caves (the user, 2026-09-29: cities are in, Undercity's level too, placed on its continent by `Gm.OnMap`; any spot with a
 `kind`, which the harvester's meta.json sets and the Index carries, or a level of 20000+ is skipped); street views come only from the map packs every player has (they're exchanged on joining; the
 panel lists who lacks which, or has an older one). **A round's worth** (the user, 2026-10-01): 100 at a spot

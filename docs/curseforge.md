@@ -50,7 +50,8 @@ then double-click the map where you think it is. The closer you are, the more po
 - **Play solo, against bots, or with friends:** four bots named after famous characters of Classic
   Azeroth (Thrall, Jaina, Hogger, Leeroy...) when nobody is around, or your party or raid, one player by whisper, or an **open game** anyone
   can join from a link you post in chat, **up to 40 players**.
-- **1, 3 or 5 rounds**, 30 seconds each, with a countdown on the picture.
+- **1, 3 or 5 rounds**, 30 seconds each. The street view's corner shows the time left, what the round is
+  worth and your place.
 - **Three levels:** Normal on the terrain map, Heroic on the world map fully revealed, Mythic on the
   world map with nothing revealed. Everyone in the game plays on the same one.
 - **Up to 100 points** a round by a town or landmark, **up to 200** for a road far from any: all of it

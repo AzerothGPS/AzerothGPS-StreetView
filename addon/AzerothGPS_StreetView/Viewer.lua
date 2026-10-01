@@ -29,7 +29,8 @@ local GRID_COLS, GRID_ROWS = 24, 12 -- cube views: the window is drawn as this m
 local MAX_LAT = 85 -- cube views: how far up or down you can look
 local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "level", [45] = "looking up", [90] = "straight up" }
 
-local frame, chrome, view, img, missing, title, info, preload, ahead, timerBox, gameLogo, badge
+local frame, chrome, view, img, missing, title, info, preload, ahead, hud, gameLogo, badge
+local HUD_PAD, HUD_LINES, HUD_MIN_W = 8, 4, 110 -- the game's corner box: its inset, lines under the time, least width
 -- Where in the Azeroth?'s logo over the title bar while a game shows (Media/GameLogo.tga, square:
 -- the logo fills its width, about 3/4 of its height): this wide, in the top-left corner
 local GAME_LOGO = 141 -- (176 less 20%: the user, 2026-09-30)
@@ -262,17 +263,26 @@ function V.Build()
       dragY = y
     end
   end)
-  -- Street Guess's countdown, over the top of the picture
-  timerBox = CreateFrame("Frame", nil, view)
-  timerBox:SetSize(84, 30)
-  timerBox:SetPoint("TOP", 0, -6)
-  timerBox:SetFrameLevel(view:GetFrameLevel() + 8)
-  local tbg = timerBox:CreateTexture(nil, "BACKGROUND")
-  tbg:SetAllPoints()
-  tbg:SetColorTexture(0, 0, 0, 0.6)
-  timerBox.text = timerBox:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  timerBox.text:SetPoint("CENTER")
-  timerBox:Hide()
+  -- Where in the Azeroth?'s box in the picture's top-right corner (the user, 2026-10-01; V.SetHud): the
+  -- level and the round, the time left large, and a few lines under it
+  hud = CreateFrame("Frame", nil, view)
+  hud:SetPoint("TOPRIGHT", -8, -8)
+  hud:SetFrameLevel(view:GetFrameLevel() + 8)
+  local hbg = hud:CreateTexture(nil, "BACKGROUND")
+  hbg:SetAllPoints()
+  hbg:SetColorTexture(0, 0, 0, 0.6)
+  hud.head = hud:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  hud.head:SetPoint("TOPRIGHT", -HUD_PAD, -HUD_PAD)
+  hud.big = hud:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  if _G.GameFontNormalHuge then hud.big:SetFontObject(_G.GameFontNormalHuge) end
+  hud.head:SetJustifyH("RIGHT")
+  hud.big:SetJustifyH("RIGHT")
+  hud.lines = {}
+  for i = 1, HUD_LINES do
+    hud.lines[i] = hud:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    hud.lines[i]:SetJustifyH("RIGHT")
+  end
+  hud:Hide()
   -- the corner logo on its brown plate, half above the title bar, in place of the round portrait:
   -- the game's during a game, StreetView's otherwise (the user, 2026-09-30; V.GameLook)
   gameLogo = CreateFrame("Frame", nil, frame)
@@ -634,7 +644,7 @@ function V.Open(p, heading, game)
   end
   local API = _G.AzerothGPS
   cur.game = game or nil
-  if not game then timerBox:Hide() end
+  if not game then V.SetHud(nil) end
   cur.dirs = not game and D.Directions(p, API and API.Roads and API.Roads(p.cont)) or nil
   if ahead.SetEnabled then ahead:SetEnabled(not game) end -- (hidden: V.GoAhead stays for the arrows)
   lastMarkHeading = nil
@@ -647,20 +657,44 @@ function V.Hide()
   if frame then frame:Hide() end
 end
 
--- Street Guess's countdown on the picture (text, nil: none).
-function V.SetTimer(text)
-  if not timerBox then return end
-  if text and cur and cur.game then
-    timerBox.text:SetText(text)
-    timerBox:Show()
-  else
-    timerBox:Hide()
+-- Where in the Azeroth?'s corner box (h: Gm.Hud's { head, big, lines }; nil: none). Called ten times a
+-- second: laid out again only when its text changes.
+function V.SetHud(h)
+  if not hud then return end
+  if not (h and cur and cur.game) then
+    hud.key = nil
+    return hud:Hide()
   end
+  local lines = h.lines or {}
+  local key = (h.head or "") .. "\1" .. (h.big or "") .. "\1" .. table.concat(lines, "\1")
+  if key == hud.key and hud:IsShown() then return end
+  hud.key = key
+  hud.head:SetText(h.head or "")
+  local above, height, width = hud.head, HUD_PAD + hud.head:GetStringHeight(), hud.head:GetStringWidth()
+  hud.big:SetShown(h.big ~= nil)
+  if h.big then
+    hud.big:SetText(h.big)
+    hud.big:ClearAllPoints()
+    hud.big:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -2)
+    above, height, width = hud.big, height + 2 + hud.big:GetStringHeight(), math.max(width, hud.big:GetStringWidth())
+  end
+  for i, s in ipairs(hud.lines) do
+    local text = lines[i]
+    s:SetShown(text ~= nil)
+    if text then
+      s:SetText(text)
+      s:ClearAllPoints()
+      s:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -3)
+      above, height, width = s, height + 3 + s:GetStringHeight(), math.max(width, s:GetStringWidth())
+    end
+  end
+  hud:SetSize(math.max(HUD_MIN_W, width + 2 * HUD_PAD), height + HUD_PAD + 1)
+  hud:Show()
 end
 
 -- Close the viewer if it shows Street Guess's view.
 function V.CloseGame()
-  V.SetTimer(nil)
+  V.SetHud(nil)
   if cur and cur.game then
     cur = nil
     if frame then frame:Hide() end

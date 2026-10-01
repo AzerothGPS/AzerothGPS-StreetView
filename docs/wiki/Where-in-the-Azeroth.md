@@ -34,7 +34,8 @@ needs AzerothGPS 1.1 or newer; with an older one the map isn't locked.)
 
 ## A round
 
-1. A street view opens with a **30-second** countdown on the picture.
+1. A street view opens. Its top-right corner shows the level, the round, the **30-second** countdown,
+   what the round is worth, your place so far and, with other players, how many have guessed.
 2. Look around (drag, mouse wheel).
 3. **Double-click the map** to place your guess. Double-click again to move it; the one placed when the
    time runs out counts. Solo, you can **Submit guess** early.
@@ -42,14 +43,15 @@ needs AzerothGPS 1.1 or newer; with an older one the map isn't locked.)
    with everyone's guesses in a multiplayer game.
 5. **10 seconds** later the next round starts ("next round in" counts down under the title).
 
-The street view stays up after the round so you can look again; **Show Street View** reopens it if you
-closed it.
+The street view stays up after the round so you can look again, its corner showing your points and
+place; **Show Street View** reopens it if you closed it. The panel on the map keeps to the round, the time
+left, your guess and the scoreboard.
 
 ## Scoring
 
 **What a round is worth:** 100 points at a spot by a town, a flight master, a named place or a landmark,
 and more the farther it is from all of them, up to 200 for a road deep in the wilds (from about 1,000
-yards away). The panel shows it next to the round: "worth up to 165".
+yards away). The street view's corner shows it: "worth up to 165".
 
 **How much of it you get** depends on how far off your guess is:
 

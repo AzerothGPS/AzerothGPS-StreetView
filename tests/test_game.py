@@ -5,6 +5,7 @@ fake that records what the game shows and routes addon messages between the play
 """
 
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -234,6 +235,88 @@ def test_the_celebration_is_by_the_share_of_the_worth(solo):
     q.G.Guess(300, 400, 0)  # 100 yd off: 96%
     run(net, clock, 31 + 11)
     assert q.game.celebrate and 96 <= q.G.Percent(q.game, "You-Realm") < 97
+
+
+def plain(s):
+    """A UI string without its color codes."""
+    return re.sub(r"\|c[0-9a-fA-F]{8}|\|r", "", s or "")
+
+
+def hud(p):
+    """The street view's corner box as plain text: (head, big, [lines])."""
+    h = p.G.Hud(p.game, p.clock.t)
+    return plain(h.head), (plain(h.big) if h.big else None), [plain(h.lines[i]) for i in range(1, len(h.lines) + 1)]
+
+
+def test_the_street_views_corner_box_has_the_games_details():
+    # the user, 2026-10-01: the level, the round's worth and the score next to the round overflowed the
+    # map's panel; they're in the street view's top-right corner now, the map keeps to the round
+    clock, net = Clock(), Net()
+    p = Player("Me-Realm", clock, net, pack=WORTH_PACK)
+    assert p.G.Start("solo", 3, None, "heroic")
+    assert hud(p) == ("Heroic  Round 1 of 3", "0:30", ["worth up to 200"])  # (no total before a score)
+    assert plain(p.G.PanelTitle(p.game)) == "Round 1 of 3"  # (no level, no worth: on the map, little)
+    run(net, clock, 26)
+    assert hud(p)[1] == "0:04" and p.G.Hud(p.game, clock.t).big.startswith("|cffff5050")  # (red at the end)
+    p.G.Guess(300, 400, 0)  # 100 yd off the 200 spot
+    run(net, clock, 5)
+    sc = p.G.Score(100, 200)
+    assert p.game.phase == "result"
+    assert hud(p) == ("Heroic  Round 1 of 3", f"+{sc}",
+                      ["100 yards away (of 200)", f"Total {sc} of 200", "next round in 0:09"])
+    run(net, clock, 10)
+    assert p.game.phase == "look" and p.game.round == 2
+    assert hud(p)[2] == ["worth up to 100", f"Total {sc} of 200"]  # (the rounds before this one)
+    run(net, clock, 31)  # no guess
+    assert hud(p)[1:] == ("0", ["No guess in time", f"Total {sc} of 300", "next round in 0:08"])
+    run(net, clock, 10)
+    p.G.Guess(9999, 9999, 0)  # (round 3's spot is on Kalimdor)
+    run(net, clock, 31)
+    assert hud(p)[1:] == ("0", ["Another continent", f"Total {sc} of 400"])  # (the last round: no next one)
+    run(net, clock, 11)
+    head, big, lines = hud(p)
+    assert p.game.phase == "over" and big == "Game over"
+    assert lines == [f"Total {sc} of 400", f"Average round score {p.G.Average(p.game)}", "closes in 0:56"]
+    assert plain(p.G.PanelTitle(p.game)) == "Where in the Azeroth?  Heroic"
+
+
+def test_the_corner_box_shows_who_guessed_and_each_players_place():
+    (a, b, c), clock, net = party(3)
+    assert a.G.Start("party", 1, None, "mythic")
+    assert plain(a.G.PanelTitle(a.game)) == "Where in the Azeroth?  Mythic"  # (the lobby)
+    net.deliver()
+    net.deliver()
+    run(net, clock, 1)
+    assert a.game.phase == "look" and c.game.phase == "look"
+    assert hud(a)[0] == "Mythic  Round 1 of 1" and hud(b)[0] == "Mythic  Round 1 of 1"
+    assert hud(a)[2] == ["worth up to 100", "0 of 3 guessed"]
+    b.G.Guess(300, 800, 0)  # 500 yd off (the others learn that Bob guessed, not where)
+    net.deliver()
+    assert hud(a)[2][1] == "1 of 3 guessed"
+    a.G.Guess(300, 310, 0)  # 10 yd off
+    assert hud(a)[2][1] == "2 of 3 guessed"
+    run(net, clock, 32)  # (Cid doesn't guess)
+    assert a.game.phase == "result" and b.game.phase == "result" and c.game.phase == "result"
+    assert hud(a)[1:] == ("+100", ["10 yards away (of 100)", "You: 1st of 3, 100 points"])
+    assert hud(b)[1:] == ("+78", ["500 yards away (of 100)", "You: 2nd of 3, 78 points"])
+    assert hud(c)[1:] == ("0", ["No guess in time", "You: 3rd of 3, 0 points"])
+    run(net, clock, 11)
+    assert a.game.phase == "over" and b.game.phase == "over"
+    assert hud(a)[1] == "You win!" and hud(a)[2][0] == "Your total: 100"
+    assert hud(b)[1] == "2nd of 3" and hud(b)[2][:2] == ["Ann wins", "Your total: 78"]
+    assert hud(c)[1] == "3rd of 3" and hud(c)[2][-1].startswith("closes in")
+
+
+def test_ordinals_and_tied_places(solo):
+    p, _, _ = solo
+    assert [p.G.Ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 40, 101, 111)] == [
+        "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "40th", "101st", "111th"]
+    (a, b), clock, net = party(2)
+    a.G.Start("party", 1)
+    net.deliver()
+    net.deliver()
+    run(net, clock, 32)  # (neither guesses: 0 each)
+    assert hud(a)[2][-1] == "You: tied 1st of 2, 0 points"
 
 
 def test_messages_round_trip(solo):
