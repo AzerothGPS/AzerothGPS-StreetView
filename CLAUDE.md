@@ -157,12 +157,14 @@ python -m pytest tests -q
 After install: `/reload` for changed Lua; **new files (images included) need a full game
 restart**. AzerothGPS itself installs with `agps install-addon` from its own repo.
 
-**Two game installs** (the user, 2026-10-01): every install goes to the real one and to the private test
-server's copy (`E:\WoWForeverPS\World of Warcraft\beta`, `PRIVATE_WOW` / `AGPS_WOW_PRIVATE`; `targets`)
-when it's there. Only the private client is ever driven by tools (streetview-harvester's `harvester.gm`,
-with the user's OK; never the real account). `sv.cmd compare --name N --render ID` stitches the private
-client's capture of a rendered spot apart from the master (build/compare-work: the capture's id is the
-render's) and puts both into the dev addon's Compare (build/compare, laid in by `install --dev`).
+**This PC is for the real game** (the user, 2026-10-01): the private test server, its client and everything
+that drives a character (streetview-harvester's `harvester.gm`, `certpatch`, the camera commands, now its
+`AGPS_Harvester` addon's `/agpscam`) run on the **capture PC** only. Every install also goes into each AddOns
+folder in `%USERPROFILE%\.agps-installs` (shared with AzerothGPS's `install-addon`; the capture PC's private
+client through its share), so one update reaches both. The dev addon never moves the camera or the
+character (a test scans it). `sv.cmd compare --name N --render ID --grabs <folder>` stitches window grabs of
+the game (taken on the capture PC) apart from the master and puts both into the dev addon's Compare
+(build/compare, laid in by `install --dev`).
 
 ## Commits
 

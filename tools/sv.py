@@ -23,9 +23,9 @@
 
 The pictures ship inside the viewer addon (packs.json, under CurseForge's limit). The game folder
 defaults to C:\\Program Files (x86)\\World of Warcraft\\_classic_beta_ (set AGPS_WOW or pass
---wow); every install also goes to the private test server's copy of the game when it's there
-(E:\\WoWForeverPS\\World of Warcraft\\beta, AGPS_WOW_PRIVATE). sv.cmd runs this with the AzerothGPS
-venv's Python (Pillow, numpy, lupa).
+--wow); every install also goes into each AddOns folder listed in %USERPROFILE%\\.agps-installs (shared
+with AzerothGPS's install-addon: the capture PC's private test client, through its share). sv.cmd runs
+this with the AzerothGPS venv's Python (Pillow, numpy, lupa).
 """
 
 from __future__ import annotations
@@ -42,10 +42,18 @@ sys.path.insert(0, str(ROOT / "tools"))
 from svtools import pack  # noqa: E402
 
 DEFAULT_WOW = Path(os.environ.get("AGPS_WOW", r"C:\Program Files (x86)\World of Warcraft\_classic_beta_"))
-# the private test server's own copy of the game (streetview-harvester's SERVER.md, Path C): every install
-# goes to both (the user, 2026-10-01), when it's there
-PRIVATE_WOW = Path(os.environ.get("AGPS_WOW_PRIVATE", r"E:\WoWForeverPS\World of Warcraft\beta"))
+# More AddOns folders every install also goes into, one per line ("#" comments): AzerothGPS's list (its
+# cli.py EXTRA_INSTALLS), in the user's home folder so the paths stay out of git. The private test client's,
+# which runs on the capture PC (streetview-harvester's SERVER.md: its share), never on the main PC's game.
+EXTRA_INSTALLS = Path.home() / ".agps-installs"
 BUILD = ROOT / "build"
+
+
+def extra_addons_dirs() -> list[Path]:
+    if not EXTRA_INSTALLS.is_file():
+        return []
+    return [Path(s.strip()) for s in EXTRA_INSTALLS.read_text(encoding="utf-8").splitlines()
+            if s.strip() and not s.strip().startswith("#")]
 
 
 def mirror(src: Path | list[Path], dst: Path) -> int:
@@ -86,6 +94,10 @@ def install(wow: Path, dev: bool) -> None:
     addons = wow / "Interface" / "AddOns"
     if not addons.is_dir():
         sys.exit(f"No AddOns folder at {addons}")
+    install_into(addons, dev)
+
+
+def install_into(addons: Path, dev: bool) -> None:
     # the viewer: its code with the built pictures and Index.lua laid over it (one addon)
     viewer = [ROOT / "addon" / "AzerothGPS_StreetView"]
     parts = []
@@ -122,19 +134,19 @@ def install(wow: Path, dev: bool) -> None:
         print("Only changed files: /reload in game.")
 
 
-def targets(wow: Path) -> list[Path]:
-    """Where an install goes: the game folder given, and the private test server's copy too when the
-    default is given and that copy is there."""
-    out = [wow]
-    if wow == DEFAULT_WOW and PRIVATE_WOW != wow and (PRIVATE_WOW / "Interface" / "AddOns").is_dir():
-        out.append(PRIVATE_WOW)
-    return out
-
-
 def install_all(wow: Path, dev: bool) -> None:
-    for w in targets(wow):
-        print(f"-> {w}")
-        install(w, dev)
+    """The game folder given, then (for the default game) every AddOns folder in EXTRA_INSTALLS."""
+    print(f"-> {wow}")
+    install(wow, dev)
+    if wow != DEFAULT_WOW:
+        return
+    main = (wow / "Interface" / "AddOns").resolve()
+    for extra in extra_addons_dirs():
+        if not extra.is_dir():
+            print(f"-> {extra}: no AddOns folder there (listed in {EXTRA_INSTALLS}); skipped")
+        elif extra.resolve() != main:
+            print(f"-> {extra}")
+            install_into(extra, dev)
 
 
 def build_and_report(flush: bool = False) -> list[dict]:
@@ -197,8 +209,8 @@ def main(argv=None) -> None:
     p_c = sub.add_parser("compare", help="a spot as rendered and as captured in the game, for the dev addon's Compare")
     p_c.add_argument("--name", required=True, help='the comparison\'s name, e.g. "Thunder Bluff"')
     p_c.add_argument("--render", required=True, help="the rendered spot's id (build/master), e.g. 1--1248-68")
-    p_c.add_argument("--capture-wow", type=Path, default=PRIVATE_WOW,
-                     help="the game folder whose capture to take (default: the private test server's)")
+    p_c.add_argument("--capture-wow", type=Path,
+                     help="the game folder whose capture tool's spots to take (else --grabs)")
     p_c.add_argument("--grabs", type=Path, help="window grabs instead (k<k>_v<n>.png, k<k>_nadir.png: harvester.gm --shot)")
     p_c.add_argument("--facing", type=float, help="the grabs' first facing (default: the render's)")
     p_c.add_argument("--rings", help='which grabs make which ring, with their rough pitch, e.g. '
@@ -258,6 +270,8 @@ def main(argv=None) -> None:
         watch(a.wow, a.every)
     elif a.cmd == "compare":
         from svtools import compare
+        if not (a.grabs or a.capture_wow):
+            sys.exit("compare needs --grabs <folder> or --capture-wow <game folder>")
         rp = compare.parse_ring_pitches(a.rings)
         compare.build_set(a.name, a.render, a.capture_wow, BUILD, grabs=a.grabs, facing=a.facing,
                           rings={k: r for k, (r, _) in rp.items()} or None,
