@@ -33,6 +33,7 @@ local frame, chrome, view, img, missing, title, info, preload, ahead, timerBox, 
 -- Where in the Azeroth?'s logo over the title bar while a game shows (Media/GameLogo.tga, square:
 -- the logo fills its width, about 3/4 of its height): this wide, in the top-left corner
 local GAME_LOGO = 141 -- (176 less 20%: the user, 2026-09-30)
+local SV_LOGO = 104 -- StreetView's own logo there outside a game, the same way (Media/SvLogo<px>.tga)
 -- ... drawn from Media/GameLogo<px>.tga, the logo pre-scaled to px pixels (svtools/media.py
 -- GAME_LOGO_PX): the size nearest its real pixels on this screen is shown 1:1, not a big picture
 -- shrunk by the graphics card
@@ -145,7 +146,7 @@ local function PlainTitle()
   logo:SetAllPoints()
   logo:SetTexture(MEDIA .. "Portrait")
   title = bar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  title:SetPoint("LEFT", 40, 0) -- (clear of the badge)
+  title:SetPoint("LEFT", 100, 0) -- (clear of the corner logo)
   title:SetPoint("RIGHT", -4, 0)
   title:SetJustifyH("LEFT")
   local ok, close = pcall(CreateFrame, "Button", nil, frame, "UIPanelCloseButton")
@@ -272,14 +273,13 @@ function V.Build()
   timerBox.text = timerBox:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   timerBox.text:SetPoint("CENTER")
   timerBox:Hide()
-  -- the game's logo on its brown plate, half above the title bar (the user, 2026-09-30); the
-  -- corner portrait goes while it shows (V.GameLook)
+  -- the corner logo on its brown plate, half above the title bar, in place of the round portrait:
+  -- the game's during a game, StreetView's otherwise (the user, 2026-09-30; V.GameLook)
   gameLogo = CreateFrame("Frame", nil, frame)
   gameLogo:SetSize(GAME_LOGO, GAME_LOGO)
   -- (the top-left corner, where the portrait is otherwise: the user, 2026-09-30; sticking out a
   -- little past the left edge, as the portrait does)
-  gameLogo:SetPoint("CENTER", frame, "TOPLEFT", GAME_LOGO * 0.42, chrome and CHROME_TITLE / 2 or -(PAD + TITLE_H / 2))
-  -- (the size and picture: FitGameLogo, when a game shows)
+  -- (its size, picture and place: FitLogo)
   gameLogo:SetFrameLevel(frame:GetFrameLevel() + 30)
   local logoTex = gameLogo:CreateTexture(nil, "ARTWORK")
   logoTex:SetAllPoints()
@@ -583,40 +583,42 @@ end
 
 -- The logo's picture for this screen: the pre-scaled size nearest the pixels GAME_LOGO UI units
 -- cover, shown at exactly that many pixels.
-local function FitGameLogo()
+local function FitLogo(game)
   local ppu = 1 -- screen pixels per UI unit of the viewer
   if GetPhysicalScreenSize then
     local _, h = GetPhysicalScreenSize()
     if h and h > 0 then ppu = h / 768 * frame:GetEffectiveScale() end
   end
-  local want, px = GAME_LOGO * ppu, GAME_LOGO_PX[1]
+  local units = game and GAME_LOGO or SV_LOGO
+  local want, px = units * ppu, GAME_LOGO_PX[1]
   for _, s in ipairs(GAME_LOGO_PX) do
     if math.abs(s - want) < math.abs(px - want) then px = s end
   end
   local pot = 1
   while pot < px do pot = pot * 2 end
-  gameLogo.tex:SetTexture(MEDIA .. "GameLogo" .. px)
+  gameLogo.tex:SetTexture(MEDIA .. (game and "GameLogo" or "SvLogo") .. px)
   gameLogo.tex:SetTexCoord(0, px / pot, 0, px / pot)
   if gameLogo.tex.SetSnapToPixelGrid then gameLogo.tex:SetSnapToPixelGrid(true) end
-  gameLogo:SetSize(px / ppu, px / ppu)
+  local size = px / ppu
+  gameLogo:SetSize(size, size)
+  gameLogo:ClearAllPoints()
+  gameLogo:SetPoint("CENTER", frame, "TOPLEFT", size * 0.42, chrome and CHROME_TITLE / 2 or -(PAD + TITLE_H / 2))
 end
 
+-- The corner logo: the game's in a game (on), else StreetView's; both on their brown plates in
+-- place of the round portrait (the user, 2026-09-30).
 function V.GameLook(on)
   if not frame then return end
-  if on then -- (over the title bar: above every part of the game frame)
-    FitGameLogo()
-    gameLogo:SetFrameStrata(frame:GetFrameStrata())
-    gameLogo:SetFrameLevel(math.min(9000, TopLevel(chrome or frame) + 5))
-  end
-  gameLogo:SetShown(on)
+  FitLogo(on)
+  gameLogo:SetFrameStrata(frame:GetFrameStrata()) -- (over the title bar: above every part of the frame)
+  gameLogo:SetFrameLevel(math.min(9000, TopLevel(chrome or frame) + 5))
+  gameLogo:Show()
   if chrome then
-    if chrome.SetBorder then
-      pcall(chrome.SetBorder, chrome, on and "ButtonFrameTemplateNoPortrait" or "PortraitFrameTemplate")
-    end
+    if chrome.SetBorder then pcall(chrome.SetBorder, chrome, "ButtonFrameTemplateNoPortrait") end
     local portrait = chrome.GetPortrait and chrome:GetPortrait() or (chrome.PortraitContainer and chrome.PortraitContainer.portrait)
-    if portrait then portrait:SetShown(not on) end
+    if portrait then portrait:Hide() end
   elseif badge then
-    badge:SetShown(not on)
+    badge:Hide()
   end
 end
 

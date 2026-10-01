@@ -217,6 +217,10 @@ def make(media: Path) -> None:
         master = game_logo(assets / "where-in-the-azeroth.png")  # the game's logo on the viewer, in sizes
         for px in GAME_LOGO_PX:
             game_logo_px(master, px).save(media / f"GameLogo{px}.tga")
+    if (assets / "logo.png").exists():  # StreetView's own, the same way: the viewer's corner outside a game
+        master = game_logo(assets / "logo.png")
+        for px in GAME_LOGO_PX:
+            game_logo_px(master, px).save(media / f"SvLogo{px}.tga")
         old = media / "GameLogo.tga"
         if old.exists():
             old.unlink()
@@ -229,4 +233,4 @@ def make(media: Path) -> None:
     old = media / "Guess.tga"
     if old.exists():
         old.unlink()
-    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, GameLogo<px>.tga, Arrow.tga, Guess1-{len(GUESS_ORCS)}.tga, GameIcon.tga and Probe.jpg in {media}")
+    print(f"wrote Figure.tga, Logo.tga, Portrait.tga, GameLogo<px>.tga, SvLogo<px>.tga, Arrow.tga, Guess1-{len(GUESS_ORCS)}.tga, GameIcon.tga and Probe.jpg in {media}")
