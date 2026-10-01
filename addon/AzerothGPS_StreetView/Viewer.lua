@@ -33,11 +33,11 @@ local frame, chrome, view, img, missing, title, info, preload, ahead, timerBox, 
 -- Where in the Azeroth?'s logo over the title bar while a game shows (Media/GameLogo.tga, square:
 -- the logo fills its width, about 3/4 of its height): this wide, in the top-left corner
 local GAME_LOGO = 141 -- (176 less 20%: the user, 2026-09-30)
-local SV_LOGO = 104 -- StreetView's own logo there outside a game, the same way (Media/SvLogo<px>.tga)
+local SV_LOGO = 94 -- StreetView's own logo there outside a game, the same way (Media/SvLogo<px>.tga; 104 less 10%: the user, 2026-09-30)
 -- ... drawn from Media/GameLogo<px>.tga, the logo pre-scaled to px pixels (svtools/media.py
 -- GAME_LOGO_PX): the size nearest its real pixels on this screen is shown 1:1, not a big picture
 -- shrunk by the graphics card
-local GAME_LOGO_PX = { 96, 112, 128, 144, 160, 176, 192, 208, 224, 256, 288 }
+local GAME_LOGO_PX = { 72, 80, 88, 96, 104, 112, 120, 128, 144, 160, 176, 192, 208, 224, 256, 288 }
 local tiles = {} -- panorama tile textures by col * 100 + row
 local cells = {} -- cube view cell textures
 local ghosts = {} -- ... a second copy, zoomed a little further, faint: the blur of a move up the road

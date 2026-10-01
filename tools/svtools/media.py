@@ -159,7 +159,7 @@ GAME_LOGO_RIM = (92, 66, 30)  # ... edged in a dark gold line, like the frame's 
 # GameLogo<px>.tga: the logo exactly px pixels square (top-left of a power-of-two canvas), so the viewer
 # shows it 1:1 on screen, picking the size nearest its real pixels (Viewer.lua GAME_LOGO_PX; the user,
 # 2026-09-30: one 512 picture shrunk on screen looked poorly scaled)
-GAME_LOGO_PX = [96, 112, 128, 144, 160, 176, 192, 208, 224, 256, 288]
+GAME_LOGO_PX = [72, 80, 88, 96, 104, 112, 120, 128, 144, 160, 176, 192, 208, 224, 256, 288]  # (finer steps below 128)
 
 
 def game_logo(src: Path) -> Image.Image:
