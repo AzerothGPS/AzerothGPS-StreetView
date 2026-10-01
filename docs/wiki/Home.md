@@ -2,22 +2,25 @@
 
 # AzerothGPS StreetView
 
-Street-level views of World of Warcraft: Forever on the [AzerothGPS](https://github.com/AzerothGPS/AzerothGPS)
-map, and **Where in the Azeroth?**, a guessing game played on those views, solo or with up to 40 players.
+Ever wanted to stand on a road in Azeroth and just look around? StreetView adds street-level views of
+World of Warcraft: Forever to the [AzerothGPS](https://github.com/AzerothGPS/AzerothGPS) map. And once
+you've had a look around, there's **Where in the Azeroth?**, a guessing game you can play on your own or
+with up to 40 people.
 
-- Drag the little figure off the AzerothGPS map onto a road and look around there.
-- Walk along the roads with the arrows on the ground.
-- Play Where in the Azeroth?: see a street view, guess where it is on the map, score by how close you were.
+- Drag the little figure off the AzerothGPS map onto a road and you're standing right there.
+- Follow the arrows on the ground to walk down the road, through the cities too.
+- Play Where in the Azeroth?: you get a street view, you guess where it is on the map, and the closer you
+  are, the more you score.
 
-## Pages
+## What's in here
 
-- [[Getting Started]]: installing, the first street view.
-- [[Street View]]: the viewer, looking around, walking, the map marker.
-- [[Where in the Azeroth?|Where-in-the-Azeroth]]: the game's rules, rounds and scoring.
-- [[Multiplayer]]: party, whisper and link games, the lobby, the scoreboard.
-- [[Commands]]: the `/sv` commands.
-- [[Coverage]]: where the street views are, and what's coming.
-- [[FAQ]]: common questions and fixes.
+- [[Getting Started]]: installing, and your first look around.
+- [[Street View]]: the viewer, looking around, walking, and the map marker.
+- [[Where in the Azeroth?|Where-in-the-Azeroth]]: how the game works, the levels and the scoring.
+- [[Multiplayer]]: party, whisper and link games, the lobby and the player list.
+- [[Commands]]: every `/sv` command.
+- [[Coverage]]: where the street views are, and what's coming next.
+- [[FAQ]]: common questions and quick fixes.
 
-StreetView is display only: it never moves your character or plays for you. Pictures of World of
+StreetView only shows you pictures: it never moves your character or plays for you. Pictures of World of
 Warcraft © Blizzard Entertainment.

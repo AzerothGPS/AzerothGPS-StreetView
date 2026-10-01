@@ -2,44 +2,54 @@
 
 ## 1.0.0
 
-The first public release.
+The first public release! Here's what's in it.
 
 ### Street View
-- 1,407 street views along the roads of the Eastern Kingdoms, Kalimdor and Zephras Isle, about one
-  every 200 yards, each a full 360-degree panorama in true perspective. They ship inside the addon:
-  one download, no separate data packs.
-- Drag the figure off the AzerothGPS map onto a road to open the nearest street view; the road network
-  lights up while you drag. A plain click (or `/sv here`) opens the one nearest you.
-- Drag the picture to look around, the mouse wheel zooms, and white arrows on the ground walk you
-  along the roads. The window shows the zone and coordinates; the map shows where you look from.
-- A cleaner window: the picture fills it (no button strip), and the logo sits in the frame's corner.
-- Pictures re-rendered with water, the zones' own light and fixed placement (no views inside trees,
-  walls or under water).
+- **Over 1,500 street views** along the roads of the Eastern Kingdoms, Kalimdor and Zephras Isle, about
+  one every 200 yards. Each one is a full 360-degree panorama, and they all ship inside the addon, so
+  there's nothing else to download.
+- **The cities are in:** walk the streets of Stormwind, Orgrimmar, Darnassus and Thunder Bluff, and
+  wander the Undercity's halls and canals.
+- **A few dozen famous spots,** picked by hand and framed on their best view: Booty Bay, Gadgetzan,
+  Lakeshire, the Crossroads, Light's Hope Chapel and plenty more.
+- Drag the figure off the AzerothGPS map onto a road to open the nearest street view. The road network
+  lights up while you drag. Or just click the figure (or type `/sv here`) for the one nearest you.
+- Drag the picture to look around, zoom with the mouse wheel, and click the white arrows on the ground
+  to walk down the road. The window's title shows the zone and coordinates, and the map shows where
+  you're looking from.
+- A cleaner window: the picture fills it, and the logo sits in the frame's corner.
+- Every picture got re-rendered with water, each zone's own light, and better placement. No more views
+  from inside a tree, a wall or under the water.
 
 ### Where in the Azeroth?
-- A guessing game on the map: see a street view, double-click the map where you think it is, and
-  score by how close you were (all of it within 25 yards; nothing on another continent). A round is
-  worth 100 by a town, flight master, named place or landmark, and up to 200 on a road far from any.
-- Solo (by yourself, or Against Bots: four opponents named after famous Classic characters such as
-  Thrall, Jaina Proudmoore and Hogger, played inside your own game), Party (party or raid), Whisper
-  (one player) and Link: an open game joined from a link posted in
-  say, guild, your group or a chat channel, up to 40 players.
-- Three levels the host picks, every player's map locked to it for the game: Normal (the terrain
-  map), Heroic (the world map, every zone revealed) and Mythic (the world map with nothing revealed).
-- 1, 3 or 5 rounds of 30 seconds, 10 seconds between rounds, and a 30-second lobby that every player
-  sees counting down.
-- The street view's top-right corner shows the level, the round, the time left, what the round is worth
-  and the player list (then the points, and where you placed: the winner's name rolls, and a great
-  game glows); its - button folds it to the time left.
-  The panel on the map keeps to the round, the time and your guess.
-- A /reload doesn't end a game: it picks up where it was and catches up on what the others did meanwhile.
-- A scoreboard of five players that scrolls, your own row pinned; "guessed" shows during the round,
-  points only with its result. Ties go to the closer guess, shown with decimals.
-- The answer is drawn with a dotted line from each guess; hover a player's marker for their name and
-  scores. Guesses on another continent show through the world map (Zephras Isle included).
-- Only open-world and city spots, never dungeons or caves, and only ones every player has; the map
-  hides your route, dungeons and transports during a game and comes back as it was afterward.
-- WoW Forever's first and last names throughout.
+- **A guessing game on your map.** You get a street view, double-click the map where you think it is,
+  and score by how close you were. You get it all within 25 yards, and nothing on the wrong continent.
+- **The middle of nowhere pays more:** a spot near a town, flight master, named place or landmark is
+  worth 100 points, and a road out in the wilds up to 200.
+- **Play it your way:** Solo, Against Bots (four opponents named after Classic legends like Thrall, Jaina
+  Proudmoore and Hogger, all played inside your own game), Party (your party or raid), Whisper (one
+  player) or Link, an open game anyone can join from a link you post in say, guild, your group or a chat
+  channel. Up to 40 players.
+- **Three levels:** Normal (the terrain map), Heroic (the world map with every zone revealed) and Mythic
+  (the world map with nothing revealed). The host picks, and everyone's map is locked to it for the game.
+- 1, 3 or 5 rounds of 30 seconds, 10 seconds between rounds, and a 30-second lobby that everyone sees
+  counting down.
+- **Everything's on the picture:** the street view's corner shows the level, the round, the time left,
+  what the round is worth and the live player list. Hit **-** to shrink it down to just the timer. The
+  panel on the map keeps it short: the round, the time and your guess.
+- **The player list** shows five players at a time and scrolls, and your own row always stays in view.
+  During a round it only shows who's guessed. Points show up with the result, and ties go to the closer
+  guess, shown with decimals.
+- **A proper finish:** "You win!" or where you placed, the winner's name rolling through the colors, and
+  a glowing celebration when you score 75% or more.
+- **The answer** gets a dotted line from each guess to the real spot. Hover a player's marker for their
+  name and scores. A guess on another continent shows on the world map (Zephras Isle included).
+- **Safe to /reload:** the game picks up right where it was and catches up on what everyone else did
+  meanwhile.
+- **Fair play:** only open-world and city spots come up, never dungeons or caves, and only ones every
+  player has. The map hides your route, dungeons and transports during a game, then goes back to how
+  you had it.
+- WoW Forever's first and last names, everywhere.
 
 ## 0.1.0
 

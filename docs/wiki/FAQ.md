@@ -1,27 +1,40 @@
 # FAQ
 
 **The figure or the game button doesn't show on the map.**
-StreetView needs AzerothGPS, a current version. Update it, then restart the game.
+StreetView needs a recent AzerothGPS. Update it, then restart the game.
 
-**The street view is black or says the picture is missing.**
-Restart the game completely: new picture files only load on a full start, not on `/reload`. `/sv probe`
-checks that your client shows the addon's pictures.
+**The street view is black, or says the picture is missing.**
+Restart the game completely: new picture files only load on a full start, not on a `/reload`. `/sv probe`
+checks that your client can show the pictures.
 
 **Left and right are swapped when I drag.**
-`/sv flipyaw`.
+Type `/sv flipyaw`.
 
 **My friend doesn't get the invitation.**
-They need StreetView too. For Party games they must be in your party or raid; for Whisper games type
-their name as the game shows it (first and last name). Link games need the same realm and faction.
+They need StreetView too. For a Party game they have to be in your party or raid. For a Whisper game,
+type their name the way the game shows it (first and last name). Link games need the same realm and
+faction.
 
-**Someone's scoreboard shows "guessed" but no points.**
-Points stay hidden until the round's result, so nobody can wait and copy the best guess.
+**Someone shows "guessed" but no points.**
+That's on purpose. Points stay hidden until the round's result, so nobody can wait and copy the best
+guess.
 
 **The panel says someone is missing a map pack.**
-They have an older StreetView: the game only uses street views every player has. Updating fixes it.
+They're on an older StreetView, and the game only uses street views everyone has. Updating fixes it.
+
+**Will a /reload kick me out of a game?**
+Nope. The game picks up where it was and catches up on what everyone else did meanwhile. Logging out
+does end it, though.
+
+**The box on the street view is covering what I want to see.**
+Click the **-** in its corner. It shrinks down to just the timer, and **+** brings it back.
 
 **Does StreetView play for me or move my character?**
-No. It only shows pictures and the map; it never moves your character or presses keys for you.
+No. It only shows pictures and the map. It never moves your character or presses keys for you.
 
 **Does it work in dungeons?**
-Not yet in the game. Key spots of dungeons are planned for the viewer (see [[Coverage]]).
+Not yet. Key spots in dungeons are planned for the viewer (see [[Coverage]]), but they'll never come up
+in the game.
+
+**Where's Ironforge?**
+Coming soon. Its halls are underground and need their own lighting first.
