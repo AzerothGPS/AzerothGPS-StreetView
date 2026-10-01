@@ -304,6 +304,17 @@ def test_compare_stitches_window_grabs_by_their_names(tmp_path, monkeypatch):
     by = {(round(s.yaw, 4), s.ring) for s in seen}
     assert (0.0, "level") in by and (round(-3 * math.pi / 4, 4), "down") in by and (round(-math.pi / 2, 4), "nadir") in by
     assert sum(1 for s in seen if s.ring == "zenith") == 2
+    # (the camera's look steps from its bottom limit, mapped to the rings; the rest left out)
+    steps = tmp_path / "steps"
+    steps.mkdir()
+    for k in range(8):
+        for s in ("p0", "p1", "p2", "p3", "p4", "p5", "p6", "v5"):
+            Image.new("RGB", (32, 18)).save(steps / f"k{k}_{s}.png")
+    rings = compare.parse_rings("p0=nadir, p2=down,p4=level,p6=up,v5=zenith,p9=sideways")
+    assert rings == {"p0": "nadir", "p2": "down", "p4": "level", "p6": "up", "v5": "zenith"}
+    seen.clear()
+    compare.stitch_grabs(steps, spot, 3.4363, tmp_path / "work2", rings=rings, log=lambda *a: None)
+    assert len(seen) == 40 and {s.ring for s in seen} == {"nadir", "down", "level", "up", "zenith"}
 
 
 def test_every_point_has_one_pack_inside_the_viewer():

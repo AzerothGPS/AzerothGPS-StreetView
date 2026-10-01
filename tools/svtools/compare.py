@@ -52,10 +52,28 @@ def nearest_capture(points: dict, spot: dict, within: float = 10.0) -> dict | No
 GRAB_RINGS = {"2": "level", "3": "up", "4": "down", "5": "zenith", "nadir": "nadir"}
 
 
-def stitch_grabs(folder: Path, spot: dict, facing: float, work: Path, log=print) -> dict:
+def parse_rings(text: str | None) -> dict[str, str]:
+    """"p0=nadir,p2=down" -> {"p0": "nadir", "p2": "down"} (which grabs make which ring)."""
+    out = {}
+    for part in (text or "").split(","):
+        k, _, v = part.strip().partition("=")
+        if k and v in stitch_rings():
+            out[k.strip()] = v.strip()
+    return out
+
+
+def stitch_rings() -> tuple:
+    from . import stitch
+    return tuple(stitch.GUESS)
+
+
+def stitch_grabs(folder: Path, spot: dict, facing: float, work: Path, rings: dict[str, str] | None = None,
+                 log=print) -> dict:
     """Window grabs of the game (harvester.gm --shot; the private client saves no screenshots of its own)
-    -> a stitched spot in `work`. Files k<k>_v<n>.png (k: 45-degree steps right of `facing`, n: the
-    saved view 2-5) and k<k>_nadir.png. Returns its point (with its cube)."""
+    -> a stitched spot in `work`. Files k<k>_<step>.png, k: 45-degree steps right of `facing`. The step
+    names: v2-v5 (the saved views: level, up, down, zenith) and nadir; or any others, mapped to rings by
+    `rings` (e.g. the camera's look steps from its bottom limit: {"p0": "nadir", "p2": "down", "p4": "level",
+    "p6": "up", "v5": "zenith"}), the rest left out. Returns its point (with its cube)."""
     import math
 
     import numpy as np
@@ -66,7 +84,10 @@ def stitch_grabs(folder: Path, spot: dict, facing: float, work: Path, log=print)
     shots = []
     for f in sorted(folder.glob("k*_*.png")):
         k, _, view = f.stem[1:].partition("_")
-        ring = GRAB_RINGS.get(view[1:] if view.startswith("v") else view)
+        if rings:
+            ring = rings.get(view)
+        else:
+            ring = GRAB_RINGS.get(view[1:] if view.startswith("v") else view)
         if not (k.isdigit() and ring):
             continue
         with Image.open(f) as im:
@@ -84,7 +105,7 @@ def stitch_grabs(folder: Path, spot: dict, facing: float, work: Path, log=print)
 
 
 def build_set(name: str, render_id: str, capture_wow: Path, build: Path, grabs: Path | None = None,
-              facing: float | None = None, log=print) -> dict:
+              facing: float | None = None, rings: dict[str, str] | None = None, log=print) -> dict:
     """The set `name`: the render `render_id` (build/master) and the latest capture near it in
     `capture_wow` (its Screenshots and SavedVariables), stitched; or, with `grabs`, window grabs of the game
     (stitch_grabs, from `facing`: default the render's). Adds it to build/compare (replacing a set of the
@@ -94,7 +115,8 @@ def build_set(name: str, render_id: str, capture_wow: Path, build: Path, grabs: 
     if not render or not render.get("cube"):
         raise SystemExit(f"{render_id}: no rendered cube in build/master")
     if grabs:
-        cap = stitch_grabs(grabs, render, render.get("facing", 0) if facing is None else facing, work, log=log)
+        cap = stitch_grabs(grabs, render, render.get("facing", 0) if facing is None else facing, work, rings=rings,
+                           log=log)
     else:
         pack.import_captures(capture_wow, work, log=log)
         points = json.loads((work / "points.json").read_text(encoding="utf-8"))
