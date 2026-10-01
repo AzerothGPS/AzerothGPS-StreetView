@@ -270,12 +270,14 @@ def test_every_point_has_one_pack_inside_the_viewer():
     files = [l.strip() for l in viewer.splitlines() if l.strip() and not l.startswith("#")]
     assert files[-1] == "Index.lua" and files.index("Data.lua") < files.index("Index.lua")
     assert "AzerothGPS_StreetView_Kalimdor" in pack.LEGACY_PACKS and "AzerothGPS_StreetView_EasternKingdoms" in pack.LEGACY_PACKS
-    # the developer addon (private repo) depends on the viewer, listed under it with its figure
+    # the developer addon (private repo) depends on the viewer, listed under it with its own icon
+    # (the figure with a gear, 2026-10-01: also its minimap button's)
     dev = ROOT.parent / "AzerothGPS-StreetView-Dev" / "addon" / "AzerothGPS_StreetView_Dev" / "AzerothGPS_StreetView_Dev.toc"
     if dev.exists():
         text = dev.read_text(encoding="utf-8")
         assert "## Dependencies: AzerothGPS_StreetView" in text
-        assert "## IconTexture: Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Figure" in text
+        assert "## IconTexture: Interface\\AddOns\\AzerothGPS_StreetView_Dev\\Media\\Icon" in text
+        assert (dev.parent / "Media" / "Icon.tga").exists()
     for pk in cfg["sd"]["packs"]:  # (planned sizes stay under the limit at the measured SD size)
         assert pk["planned"] * 700_000 < cfg["budget_bytes"], pk["name"]
 

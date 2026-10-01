@@ -46,5 +46,33 @@
  "0--9008-945": {
   "reason": "rendered under Stormwind City (camera on the terrain below the city model); capture PC sweep 2026-09-30",
   "at": 1790755126
+ },
+ "1-1971--4805": {
+  "reason": "no sky in its cube: an interior, held until the interior lighting (I0); capture PC 2026-10-01",
+  "at": 1790874440
+ },
+ "10001-1392-428": {
+  "reason": "Undercity: sees out of the city model (20.7% sky underground), broken placement; capture PC 2026-10-01",
+  "at": 1790874440
+ },
+ "1-9834-2090": {
+  "reason": "Darnassus: only rock walls in view, nothing to recognize; cities pass by eye 2026-10-01",
+  "at": 1790874440
+ },
+ "1-9866-1900": {
+  "reason": "Darnassus: against a mossy mound that fills the view; cities pass by eye 2026-10-01",
+  "at": 1790874440
+ },
+ "10001-1356-382": {
+  "reason": "Undercity: a dark corridor against a wall block; cities pass by eye 2026-10-01",
+  "at": 1790874440
+ },
+ "10001-1240-338": {
+  "reason": "Undercity: a dark carved sewer tunnel, nothing to recognize; cities pass by eye 2026-10-01",
+  "at": 1790874440
+ },
+ "10001-1346-310": {
+  "reason": "Undercity: the same sewer tunnel, dim; cities pass by eye 2026-10-01",
+  "at": 1790874440
  }
 }
