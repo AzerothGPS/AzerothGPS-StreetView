@@ -49,21 +49,60 @@ def nearest_capture(points: dict, spot: dict, within: float = 10.0) -> dict | No
     return max(near, key=lambda p: p.get("date", "")) if near else None
 
 
-def build_set(name: str, render_id: str, capture_wow: Path, build: Path, log=print) -> dict:
+GRAB_RINGS = {"2": "level", "3": "up", "4": "down", "5": "zenith", "nadir": "nadir"}
+
+
+def stitch_grabs(folder: Path, spot: dict, facing: float, work: Path, log=print) -> dict:
+    """Window grabs of the game (harvester.gm --shot; the private client saves no screenshots of its own)
+    -> a stitched spot in `work`. Files k<k>_v<n>.png (k: 45-degree steps right of `facing`, n: the
+    saved view 2-5) and k<k>_nadir.png. Returns its point (with its cube)."""
+    import math
+
+    import numpy as np
+    from PIL import Image
+
+    from . import stitch
+
+    shots = []
+    for f in sorted(folder.glob("k*_*.png")):
+        k, _, view = f.stem[1:].partition("_")
+        ring = GRAB_RINGS.get(view[1:] if view.startswith("v") else view)
+        if not (k.isdigit() and ring):
+            continue
+        with Image.open(f) as im:
+            shots.append(stitch.Shot(np.asarray(im.convert("RGB")), -int(k) * math.pi / 4, ring))
+    if len(shots) < 8:
+        raise SystemExit(f"only {len(shots)} grabs in {folder}")
+    pid = f"{spot['id']}-grabs"
+    log(f"stitching {len(shots)} grabs from {folder}")
+    cube = pack.write_cube(shots, work / "master" / pid / "cube", log=log)
+    preview = cube.pop("preview")
+    (work / "debug").mkdir(parents=True, exist_ok=True)
+    Image.fromarray(preview).save(work / "debug" / f"{pid}.jpg", "JPEG", quality=90)
+    return {"id": pid, "cont": spot["cont"], "x": spot["x"], "y": spot["y"], "facing": facing, "cube": cube,
+            "date": "", "source": "grabs"}
+
+
+def build_set(name: str, render_id: str, capture_wow: Path, build: Path, grabs: Path | None = None,
+              facing: float | None = None, log=print) -> dict:
     """The set `name`: the render `render_id` (build/master) and the latest capture near it in
-    `capture_wow` (its Screenshots and SavedVariables), stitched. Adds it to build/compare (replacing a set
-    of the same name) and returns it."""
+    `capture_wow` (its Screenshots and SavedVariables), stitched; or, with `grabs`, window grabs of the game
+    (stitch_grabs, from `facing`: default the render's). Adds it to build/compare (replacing a set of the
+    same name) and returns it."""
     out, work = build / "compare", build / "compare-work"
     render = json.loads((build / "points.json").read_text(encoding="utf-8")).get(render_id)
     if not render or not render.get("cube"):
         raise SystemExit(f"{render_id}: no rendered cube in build/master")
-    pack.import_captures(capture_wow, work, log=log)
-    points = json.loads((work / "points.json").read_text(encoding="utf-8"))
-    cap = nearest_capture(points, render)
-    if not cap:
-        raise SystemExit(f"No finished capture within 10 yd of {render_id} in {capture_wow}")
-    pack.stitch_points(capture_wow, work, only={cap["id"]}, force=True, log=log)
-    cap = json.loads((work / "points.json").read_text(encoding="utf-8"))[cap["id"]]
+    if grabs:
+        cap = stitch_grabs(grabs, render, render.get("facing", 0) if facing is None else facing, work, log=log)
+    else:
+        pack.import_captures(capture_wow, work, log=log)
+        points = json.loads((work / "points.json").read_text(encoding="utf-8"))
+        cap = nearest_capture(points, render)
+        if not cap:
+            raise SystemExit(f"No finished capture within 10 yd of {render_id} in {capture_wow}")
+        pack.stitch_points(capture_wow, work, only={cap["id"]}, force=True, log=log)
+        cap = json.loads((work / "points.json").read_text(encoding="utf-8"))[cap["id"]]
     if not cap.get("cube"):
         raise SystemExit(f"{cap['id']}: the capture couldn't be stitched (too few shots?)")
     s = slug(name)

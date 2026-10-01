@@ -279,6 +279,33 @@ def test_compare_data_for_the_dev_addon():
     assert compare.nearest_capture(pts, spot)["id"] == "b"  # (the latest within 10 yd, on its continent)
 
 
+def test_compare_stitches_window_grabs_by_their_names(tmp_path, monkeypatch):
+    # (the private client saves no screenshots of its own: harvester.gm's window grabs, named by direction
+    # and saved view, k<k>_v<n>.png and k<k>_nadir.png)
+    import math
+
+    import numpy as np
+    from PIL import Image
+    from svtools import compare, pack as pk
+    folder = tmp_path / "grabs"
+    folder.mkdir()
+    names = [f"k{k}_v{n}" for k in range(8) for n in (2, 3, 4)] + ["k0_v5", "k2_v5", "k0_nadir", "k2_nadir", "notes"]
+    for n in names:
+        Image.new("RGB", (32, 18), (40, 80, 120)).save(folder / f"{n}.png")
+    seen = []
+
+    def fake_cube(shots, out_dir, *a, **kw):
+        seen.extend(shots)
+        return {"pad": 0.08, "hfov": 90.0, "preview": np.zeros((4, 8, 3), np.uint8)}
+    monkeypatch.setattr(pk, "write_cube", fake_cube)
+    spot = {"id": "1--1248-68", "cont": 1, "x": -1248.3, "y": 68.1}
+    p = compare.stitch_grabs(folder, spot, 3.4363, tmp_path / "work", log=lambda *a: None)
+    assert p["id"] == "1--1248-68-grabs" and p["facing"] == 3.4363 and len(seen) == 28
+    by = {(round(s.yaw, 4), s.ring) for s in seen}
+    assert (0.0, "level") in by and (round(-3 * math.pi / 4, 4), "down") in by and (round(-math.pi / 2, 4), "nadir") in by
+    assert sum(1 for s in seen if s.ring == "zenith") == 2
+
+
 def test_every_point_has_one_pack_inside_the_viewer():
     cfg = pack.CONFIG
     for cont in (0, 1, 2991, 10001):  # (and Undercity's level)

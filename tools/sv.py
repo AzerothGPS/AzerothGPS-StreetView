@@ -199,6 +199,8 @@ def main(argv=None) -> None:
     p_c.add_argument("--render", required=True, help="the rendered spot's id (build/master), e.g. 1--1248-68")
     p_c.add_argument("--capture-wow", type=Path, default=PRIVATE_WOW,
                      help="the game folder whose capture to take (default: the private test server's)")
+    p_c.add_argument("--grabs", type=Path, help="window grabs instead (k<k>_v<n>.png, k<k>_nadir.png: harvester.gm --shot)")
+    p_c.add_argument("--facing", type=float, help="the grabs' first facing (default: the render's)")
     p_c.add_argument("--no-install", action="store_true")
     a = ap.parse_args(argv)
 
@@ -254,7 +256,7 @@ def main(argv=None) -> None:
         watch(a.wow, a.every)
     elif a.cmd == "compare":
         from svtools import compare
-        compare.build_set(a.name, a.render, a.capture_wow, BUILD)
+        compare.build_set(a.name, a.render, a.capture_wow, BUILD, grabs=a.grabs, facing=a.facing)
         if not a.no_install:
             install_all(a.wow, True)
 
