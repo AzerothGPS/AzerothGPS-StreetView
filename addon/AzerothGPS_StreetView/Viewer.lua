@@ -565,8 +565,22 @@ end
 -- first view), level. game: Street Guess's view (no place name, no walking on, not on the map).
 -- A game's look (on) or the viewer's own: the logo on the title bar, no corner portrait, the
 -- countdown under the logo.
+-- The highest frame level among `f` and everything under it (the game frame's border, title bar
+-- and close button sit in child frames of their own).
+local function TopLevel(f, best)
+  best = math.max(best or 0, f:GetFrameLevel())
+  for _, c in ipairs({ f:GetChildren() }) do
+    if c ~= gameLogo then best = TopLevel(c, best) end
+  end
+  return best
+end
+
 function V.GameLook(on)
   if not frame then return end
+  if on then -- (over the title bar: above every part of the game frame)
+    gameLogo:SetFrameStrata(frame:GetFrameStrata())
+    gameLogo:SetFrameLevel(math.min(9000, TopLevel(chrome or frame) + 5))
+  end
   gameLogo:SetShown(on)
   if chrome then
     if chrome.SetBorder then
