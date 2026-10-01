@@ -157,13 +157,16 @@
   },
   {
    "name": "Darnassus, Temple of the Moon",
-   "status": "mark",
-   "note": "the planned spot 1-9716-2513 fails placement (under a Darnassus terrace); mark a spot at the temple",
-   "near": {
-    "cont": 1,
-    "x": 9667.1,
-    "y": 2532.1
-   }
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): inside the temple: the waterfall and statue, the priestess statues, the open roof; 22 yd from the map estimate",
+   "id": "1-9657-2512",
+   "cont": 1,
+   "x": 9657.1,
+   "y": 2512.1,
+   "z": 1331.63,
+   "facing": 1.107,
+   "zone": "Darnassus",
+   "mapID": 1457
   },
   {
    "name": "Cenarion Hold",
@@ -243,44 +246,56 @@
    "note": "planned, never rendered"
   },
   {
-   "name": "Stormwind, Cathedral Square (the cathedral steps)",
-   "status": "mark",
-   "near": {
-    "cont": 0,
-    "x": -8548.4,
-    "y": 872.4
-   },
-   "note": "the nearest spot (0--8529-851) is inside the cathedral's nave; stand on the steps facing the square or the facade"
+   "name": "Stormwind, Cathedral Square",
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): on the square's cobbles with the cathedral and monument in view (the label point is up against a buttress; the landing in front of the doors stands on roof tiles); 63 yd from the map estimate",
+   "id": "0--8606-846",
+   "cont": 0,
+   "x": -8606.0,
+   "y": 845.7,
+   "z": 96.74,
+   "facing": 0.068,
+   "zone": "Stormwind City",
+   "mapID": 1453
   },
   {
    "name": "Stormwind, Trade District",
-   "status": "mark",
-   "near": {
-    "cont": 0,
-    "x": -8900.5,
-    "y": 642.2
-   },
-   "note": "nearest planned 61 yd"
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): the square with the fountain and the shops (the label point is on the terrain under the city); 51 yd from the map estimate",
+   "id": "0--8850-652",
+   "cont": 0,
+   "x": -8850.5,
+   "y": 652.2,
+   "z": 96.53,
+   "facing": -2.944,
+   "zone": "Stormwind City",
+   "mapID": 1453
   },
   {
    "name": "Orgrimmar, Valley of Strength",
-   "status": "mark",
-   "near": {
-    "cont": 1,
-    "x": 1628.9,
-    "y": -4407.9
-   },
-   "note": "nothing within 271 yd"
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): the open valley floor with the canyon walls (the label point stood under a rock overhang); 29 yd from the map estimate",
+   "id": "1-1603--4395",
+   "cont": 1,
+   "x": 1602.9,
+   "y": -4394.9,
+   "z": 9.35,
+   "facing": 0.565,
+   "zone": "Orgrimmar",
+   "mapID": 1454
   },
   {
    "name": "Undercity, Trade Quarter",
-   "status": "mark",
-   "near": {
-    "cont": 10001,
-    "x": 1614.9,
-    "y": 233.3
-   },
-   "note": "no Undercity spots at all"
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): the ring walkway with the tusked arch, stairs, sludge and banners (interior: lit by the outdoor ambient, no baked light yet); 23 yd from the map estimate",
+   "id": "10001-1599-217",
+   "cont": 10001,
+   "x": 1598.9,
+   "y": 217.3,
+   "z": -56.18,
+   "facing": 0.785,
+   "zone": "Undercity",
+   "mapID": 1458
   },
   {
    "name": "Ironforge, The Great Forge",
@@ -290,7 +305,7 @@
     "x": -4790.3,
     "y": -1127.1
    },
-   "note": "nothing within 368 yd"
+   "note": "held (2026-10-01): test renders at about (-4790, -1127, z 498.8) show the forge floor, bell furnaces and pillars, but cold blue-gray: wow.export drops the interior's baked light. Waits for the instance-lighting work (PLAN.md part 10)"
   },
   {
    "name": "Ironforge, The Commons",
@@ -300,77 +315,98 @@
     "x": -4886.3,
     "y": -997.4
    },
-   "note": "nothing within 207 yd"
+   "note": "held (2026-10-01): test renders at about (-4925, -966, z 501.5) face the bank's gold doors in the arched hall (everything within 24 yd of the label is inside the bank vault), but cold blue-gray: no baked interior light yet. Waits for the instance-lighting work (PLAN.md part 10)"
   },
   {
    "name": "Booty Bay",
-   "status": "mark",
-   "near": {
-    "cont": 0,
-    "x": -14383.3,
-    "y": 487.1
-   },
-   "note": "nothing within 214 yd"
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): on the boardwalk with the whole bay and the ring of docks in view; 54 yd from the map estimate",
+   "id": "0--14353-442",
+   "cont": 0,
+   "x": -14353.3,
+   "y": 442.1,
+   "z": 7.42,
+   "facing": 2.159,
+   "zone": "Stranglethorn Vale",
+   "mapID": 1434
   },
   {
    "name": "Lakeshire",
-   "status": "mark",
-   "near": {
-    "cont": 0,
-    "x": -9227.7,
-    "y": -2201.5
-   },
-   "note": "nothing within 99 yd"
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): on the boardwalk facing the town hall's front and steps (a first try 10 yd closer had the door filling the view); 32 yd from the map estimate",
+   "id": "0--9258--2212",
+   "cont": 0,
+   "x": -9257.7,
+   "y": -2211.5,
+   "z": 63.98,
+   "facing": 0.0,
+   "zone": "Redridge Mountains",
+   "mapID": 1433
   },
   {
    "name": "Bloodhoof Village",
-   "status": "mark",
-   "near": {
-    "cont": 1,
-    "x": -2323.9,
-    "y": -395.0
-   },
-   "note": "nothing within 89 yd"
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): the big totem and the chief's tent on its platform; 0 yd from the map estimate",
+   "id": "1--2324--395",
+   "cont": 1,
+   "x": -2323.9,
+   "y": -395.0,
+   "z": -8.08,
+   "facing": -1.154,
+   "zone": "Mulgore",
+   "mapID": 1412
   },
   {
    "name": "Light's Hope Chapel",
-   "status": "mark",
-   "near": {
-    "cont": 0,
-    "x": 2271.1,
-    "y": -5340.8
-   },
-   "note": "nothing within 306 yd"
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): facing the chapel, gryphon roost in view; 0 yd from the map estimate",
+   "id": "0-2271--5341",
+   "cont": 0,
+   "x": 2271.1,
+   "y": -5340.8,
+   "z": 87.11,
+   "facing": 0.074,
+   "zone": "Eastern Plaguelands",
+   "mapID": 1423
   },
   {
    "name": "Gadgetzan",
-   "status": "mark",
-   "near": {
-    "cont": 1,
-    "x": -7139.1,
-    "y": -3752.1
-   },
-   "note": "shipped spot 63 yd off-center"
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): the domed buildings inside the walls; 0 yd from the map estimate",
+   "id": "1--7139--3752",
+   "cont": 1,
+   "x": -7139.1,
+   "y": -3752.1,
+   "z": 8.54,
+   "facing": 1.792,
+   "zone": "Tanaris",
+   "mapID": 1446
   },
   {
    "name": "Grom'gol Base Camp",
-   "status": "mark",
-   "near": {
-    "cont": 0,
-    "x": -12378.4,
-    "y": 185.7
-   },
-   "note": "shipped spot 72 yd off-center"
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): inside the camp: huts on stilts, the zeppelin tower; 0 yd from the map estimate",
+   "id": "0--12378-186",
+   "cont": 0,
+   "x": -12378.4,
+   "y": 185.7,
+   "z": 2.84,
+   "facing": 0.32,
+   "zone": "Stranglethorn Vale",
+   "mapID": 1434
   },
   {
    "name": "Hammerfall",
-   "status": "mark",
-   "near": {
-    "cont": 0,
-    "x": -991.6,
-    "y": -3528.3
-   },
-   "note": "nearest planned 73 yd"
+   "status": "spot",
+   "note": "hand estimate checked on a test render (2026-10-01): inside the palisade with the watchtowers; 0 yd from the map estimate",
+   "id": "0--992--3528",
+   "cont": 0,
+   "x": -991.6,
+   "y": -3528.3,
+   "z": 56.55,
+   "facing": -0.54,
+   "zone": "Arathi Highlands",
+   "mapID": 1417
   }
  ]
 }
