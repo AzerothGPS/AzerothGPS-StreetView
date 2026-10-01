@@ -502,6 +502,36 @@ def test_landmarks_always_ship_on_top_of_the_thinned_pick():
     assert {p["id"] for p in ship_points(road, 200, set())} == plain
 
 
+def test_picked_landmarks_stay_out_of_the_thinning():
+    # 2026-10-01: 12 picked landmarks (off the roads, with a z) went into the greedy as ordinary
+    # spots and 15 shipped road spots gave way, 9 in a chain across Tanaris
+    from svtools import roads
+    from svtools.pack import ship_points, shipped
+    road = [{"id": f"1-{x}-0", "cont": 1, "x": x, "y": 0} for x in range(0, 2001, 100)]
+    picked = [{"id": "1-151-20", "cont": 1, "x": 151, "y": 20}, {"id": "1-1049-5", "cont": 1, "x": 1049, "y": 5}]
+    plain = {p["id"] for p in ship_points(road, 200)}
+    assert {p["id"] for p in ship_points(road + picked, 200)} != plain | {"1-151-20", "1-1049-5"}  # (the old way)
+    marked = {"1-151-20", "1-1049-5"}
+    got = {p["id"] for p in shipped(road + picked, 200, marked | {"1-300-0"}, marked)}
+    assert got == plain | marked | {"1-300-0"}  # (no road spot gives way, the pinned road spot joins)
+    # the road sync never retires a landmark, and a picked one covers no planned road spot
+    import svtools.landmarks as lm
+    real = lm.pinned_ids, lm.marked_ids
+    far_landmark = {"id": "1-1049-500", "cont": 1, "x": 1049, "y": 500}  # (500 yd off the road)
+    far_spot = {"id": "1-500-400", "cont": 1, "x": 500, "y": 400}
+    lm.pinned_ids = lambda doc=None: marked | {"1-1049-500"}
+    lm.marked_ids = lambda doc=None: marked | {"1-1049-500"}
+    try:
+        net = {1: {"e": [[0, 0, 0, 0, 0, 0, 2000, 0]]}}
+        d = roads.diff(road + picked + [far_landmark, far_spot], [], net, 100, None)
+        assert [p["id"] for p in d["retired"]] == ["1-500-400"]
+        lm.marked_ids = lambda doc=None: {"1-151-20", "1-1049-500"}
+        d = roads.diff([picked[0]], [{"id": "1-150-0", "cont": 1, "x": 150, "y": 0, "zone": "Z"}], net, 100, None)
+        assert [q["id"] for q in d["add"]] == ["1-150-0"]
+    finally:
+        lm.pinned_ids, lm.marked_ids = real
+
+
 def test_marks_from_the_game_become_landmark_spots(tmp_path):
     from svtools import landmarks
     doc = {"landmarks": [{"name": "Booty Bay", "status": "mark", "near": {"cont": 0, "x": -14383.3, "y": 487.1}},

@@ -490,6 +490,15 @@ def ship_points(points: list[dict], spacing: float | None, pinned: set[str] | No
     return keep
 
 
+def shipped(points: list[dict], spacing: float | None, pinned: set[str], marked: set[str]) -> list[dict]:
+    """The spots that ship: `ship_points` over the road spots (the landmarks among them pinned), and
+    the `marked` landmark spots (landmarks.json entries with a z: picked standing points, not road
+    spots) added on top. Marked spots stay out of the greedy: in it they made 15 shipped spots give
+    way (2026-10-01). Same as the harvester's ship.shipped_ids."""
+    road = [p for p in points if p["id"] not in marked]
+    return ship_points(road, spacing, pinned) + [p for p in points if p["id"] in marked]
+
+
 def build_packs(build: Path, version: str | None = None, cfg: dict | None = None,
                 manual: bool = False, reported: dict[str, int] | None = None) -> list[dict]:
     """Write every SD pack addon (packs.json) into build/packs/<name>/: its toc, Index.lua and
@@ -517,7 +526,7 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
         mine = [p for p in points.values() if pack_for(cfg, p) is pk and (manual or not is_manual(p))
                 and p["id"] not in held and p["id"] not in retired and (p.get("zone") or is_manual(p))]
         from . import landmarks
-        mine = ship_points(mine, cfg.get("ship_spacing_yd"), landmarks.pinned_ids())
+        mine = shipped(mine, cfg.get("ship_spacing_yd"), landmarks.pinned_ids(), landmarks.marked_ids())
         out = root / pk["name"]
         images = out / "Images"
         images.mkdir(parents=True, exist_ok=True)

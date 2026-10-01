@@ -4,8 +4,9 @@ Every data update starts here. A rendered spot farther than RETIRE_YD from every
 (its road was removed or moved) is retired: left out of the packs, kept in the master. A spot the
 current roads plan (the harvester's planner, the same spacing and zone rules as the render run)
 with no rendered spot within half the spacing is to render. Only the ones the packs would ship
-(pack.ship_points over what's rendered plus them) go on the list, the harvester's spot-list
-format. Written to build/road-diff.json; `build_packs` leaves the retired ones out.
+(pack.shipped over what's rendered plus them) go on the list, the harvester's spot-list
+format. Written to build/road-diff.json; `build_packs` leaves the retired ones out. Landmarks are
+never retired, and the picked ones (with a z, off the roads) neither cover nor displace road spots.
 """
 
 from __future__ import annotations
@@ -51,14 +52,20 @@ def road_distance(grid: dict, cont: int, x: float, y: float) -> float:
 
 def diff(rendered: list[dict], planned: list[dict], roads: dict, spacing: float, ship_spacing: float | None) -> dict:
     """{retired: [spot...], add: [planned spot...]} (see the module's notes)."""
-    from .pack import ship_points
+    from . import landmarks
+    from .pack import shipped
+    pinned, marked = landmarks.pinned_ids(), landmarks.marked_ids()
     grid = road_samples(roads)
-    retired = [p for p in rendered if road_distance(grid, p["cont"], p["x"], p["y"]) > RETIRE_YD]
+    # (a landmark is never retired: the picked ones stand off the roads on purpose)
+    retired = [p for p in rendered if p["id"] not in pinned
+               and road_distance(grid, p["cont"], p["x"], p["y"]) > RETIRE_YD]
     retired_ids = {p["id"] for p in retired}
     kept = [p for p in rendered if p["id"] not in retired_ids]
     half = spacing / 2
     buckets: dict = {}
     for p in kept:
+        if p["id"] in marked:  # (not road spots: they cover no planned road spot)
+            continue
         buckets.setdefault((int(p["cont"]), int(p["x"] // half), int(p["y"] // half)), []).append(p)
 
     def covered(q) -> bool:
@@ -68,8 +75,7 @@ def diff(rendered: list[dict], planned: list[dict], roads: dict, spacing: float,
 
     new = [q for q in planned if q.get("zone") and not covered(q)]
     if ship_spacing:  # only what the packs would ship, with what's rendered already
-        from . import landmarks
-        ship = {p["id"] for p in ship_points(kept + new, ship_spacing, landmarks.pinned_ids())}
+        ship = {p["id"] for p in shipped(kept + new, ship_spacing, pinned, marked)}
         new = [q for q in new if q["id"] in ship]
     return {"retired": retired, "add": new}
 

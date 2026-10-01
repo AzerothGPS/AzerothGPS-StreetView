@@ -42,6 +42,14 @@ def pinned_ids(doc: dict | None = None) -> set[str]:
     return {e["id"] for e in doc.get("landmarks", []) if e.get("status") == "spot" and e.get("id")}
 
 
+def marked_ids(doc: dict | None = None) -> set[str]:
+    """The landmark spots with a picked standing point (they carry a z: marked in game or chosen from
+    test renders), not road spots: they stay out of the thinning and ship on top (pack.shipped)."""
+    doc = doc if doc is not None else load()
+    return {e["id"] for e in doc.get("landmarks", [])
+            if e.get("status") == "spot" and e.get("id") and e.get("z") is not None}
+
+
 def spots(doc: dict | None = None) -> list[dict]:
     """The landmark spots as spot dicts (id, cont, x, y and whatever else they carry)."""
     doc = doc if doc is not None else load()
