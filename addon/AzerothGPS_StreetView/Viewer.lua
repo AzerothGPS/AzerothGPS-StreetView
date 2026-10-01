@@ -31,9 +31,8 @@ local PITCH_NAMES = { [-90] = "straight down", [-45] = "looking down", [0] = "le
 
 local frame, chrome, view, img, missing, title, info, preload, ahead, timerBox, gameLogo, badge
 -- Where in the Azeroth?'s logo over the title bar while a game shows (Media/GameLogo.tga, square:
--- the logo fills its width, about 3/4 of its height): this wide, centered on the title bar
+-- the logo fills its width, about 3/4 of its height): this wide, in the top-left corner
 local GAME_LOGO = 141 -- (176 less 20%: the user, 2026-09-30)
-local GAME_LOGO_BELOW = GAME_LOGO * 0.375 -- (how far the logo reaches down from the title bar's middle)
 local tiles = {} -- panorama tile textures by col * 100 + row
 local cells = {} -- cube view cell textures
 local ghosts = {} -- ... a second copy, zoomed a little further, faint: the blur of a move up the road
@@ -269,11 +268,13 @@ function V.Build()
   timerBox.text = timerBox:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   timerBox.text:SetPoint("CENTER")
   timerBox:Hide()
-  -- the game's logo: centered on the title bar, half above it, on its brown plate (the user,
-  -- 2026-09-30); the corner portrait goes while it shows (V.GameLook)
+  -- the game's logo on its brown plate, half above the title bar (the user, 2026-09-30); the
+  -- corner portrait goes while it shows (V.GameLook)
   gameLogo = CreateFrame("Frame", nil, frame)
   gameLogo:SetSize(GAME_LOGO, GAME_LOGO)
-  gameLogo:SetPoint("CENTER", frame, "TOP", 0, chrome and CHROME_TITLE / 2 or -(PAD + TITLE_H / 2))
+  -- (the top-left corner, where the portrait is otherwise: the user, 2026-09-30; sticking out a
+  -- little past the left edge, as the portrait does)
+  gameLogo:SetPoint("CENTER", frame, "TOPLEFT", GAME_LOGO * 0.42, chrome and CHROME_TITLE / 2 or -(PAD + TITLE_H / 2))
   gameLogo:SetFrameLevel(frame:GetFrameLevel() + 30)
   local logoTex = gameLogo:CreateTexture(nil, "ARTWORK")
   logoTex:SetAllPoints()
@@ -563,8 +564,8 @@ end
 
 -- Open point p looking toward `heading` (radians, counter-clockwise from north; default its
 -- first view), level. game: Street Guess's view (no place name, no walking on, not on the map).
--- A game's look (on) or the viewer's own: the logo on the title bar, no corner portrait, the
--- countdown under the logo.
+-- A game's look (on) or the viewer's own: the game's logo in the top-left corner instead of the
+-- portrait.
 -- The highest frame level among `f` and everything under it (the game frame's border, title bar
 -- and close button sit in child frames of their own).
 local function TopLevel(f, best)
@@ -591,9 +592,6 @@ function V.GameLook(on)
   elseif badge then
     badge:SetShown(not on)
   end
-  local below = chrome and (GAME_LOGO_BELOW - CHROME_TITLE / 2) or (GAME_LOGO_BELOW - TITLE_H / 2)
-  timerBox:ClearAllPoints()
-  timerBox:SetPoint("TOP", 0, on and -(math.max(0, below) + 6) or -6)
 end
 
 function V.Open(p, heading, game)
