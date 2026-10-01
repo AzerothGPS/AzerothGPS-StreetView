@@ -201,7 +201,8 @@ def main(argv=None) -> None:
                      help="the game folder whose capture to take (default: the private test server's)")
     p_c.add_argument("--grabs", type=Path, help="window grabs instead (k<k>_v<n>.png, k<k>_nadir.png: harvester.gm --shot)")
     p_c.add_argument("--facing", type=float, help="the grabs' first facing (default: the render's)")
-    p_c.add_argument("--rings", help='which grabs make which ring, e.g. "p0=nadir,p2=down,p4=level,p6=up,v5=zenith"')
+    p_c.add_argument("--rings", help='which grabs make which ring, with their rough pitch, e.g. '
+                     '"p0=nadir@-88,p2=down@-38,p4=level@8,p5=up@35,p6=zenith@60"')
     p_c.add_argument("--no-install", action="store_true")
     a = ap.parse_args(argv)
 
@@ -257,8 +258,10 @@ def main(argv=None) -> None:
         watch(a.wow, a.every)
     elif a.cmd == "compare":
         from svtools import compare
+        rp = compare.parse_ring_pitches(a.rings)
         compare.build_set(a.name, a.render, a.capture_wow, BUILD, grabs=a.grabs, facing=a.facing,
-                          rings=compare.parse_rings(a.rings) or None)
+                          rings={k: r for k, (r, _) in rp.items()} or None,
+                          pitches={r: p for r, p in rp.values() if p is not None} or None)
         if not a.no_install:
             install_all(a.wow, True)
 

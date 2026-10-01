@@ -53,12 +53,22 @@ GRAB_RINGS = {"2": "level", "3": "up", "4": "down", "5": "zenith", "nadir": "nad
 
 
 def parse_rings(text: str | None) -> dict[str, str]:
-    """"p0=nadir,p2=down" -> {"p0": "nadir", "p2": "down"} (which grabs make which ring)."""
+    """"p0=nadir,p2=down@-38" -> {"p0": "nadir", "p2": "down"} (which grabs make which ring)."""
+    return {k: ring for k, (ring, _) in parse_ring_pitches(text).items()}
+
+
+def parse_ring_pitches(text: str | None) -> dict[str, tuple[str, float | None]]:
+    """"p0=nadir@-88,p4=level@8,p5=up" -> {"p0": ("nadir", -88.0), "p4": ("level", 8.0), "p5": ("up", None)}:
+    each grab step's ring and the pitch it was taken at, roughly (the stitcher's starting guess)."""
     out = {}
     for part in (text or "").split(","):
         k, _, v = part.strip().partition("=")
-        if k and v in stitch_rings():
-            out[k.strip()] = v.strip()
+        ring, _, pitch = v.strip().partition("@")
+        if k and ring in stitch_rings():
+            try:
+                out[k.strip()] = (ring, float(pitch) if pitch else None)
+            except ValueError:
+                out[k.strip()] = (ring, None)
     return out
 
 
@@ -68,7 +78,7 @@ def stitch_rings() -> tuple:
 
 
 def stitch_grabs(folder: Path, spot: dict, facing: float, work: Path, rings: dict[str, str] | None = None,
-                 log=print) -> dict:
+                 log=print, pitches: dict[str, float] | None = None) -> dict:
     """Window grabs of the game (harvester.gm --shot; the private client saves no screenshots of its own)
     -> a stitched spot in `work`. Files k<k>_<step>.png, k: 45-degree steps right of `facing`. The step
     names: v2-v5 (the saved views: level, up, down, zenith) and nadir; or any others, mapped to rings by
@@ -96,7 +106,11 @@ def stitch_grabs(folder: Path, spot: dict, facing: float, work: Path, rings: dic
         raise SystemExit(f"only {len(shots)} grabs in {folder}")
     pid = f"{spot['id']}-grabs"
     log(f"stitching {len(shots)} grabs from {folder}")
-    cube = pack.write_cube(shots, work / "master" / pid / "cube", log=log)
+    rig = None
+    if pitches:  # (the rings' rough pitches as the starting guesses: the look steps aren't the saved views')
+        rig = stitch.Rig()
+        rig.pitch.update(pitches)
+    cube = pack.write_cube(shots, work / "master" / pid / "cube", log=log, rig=rig)
     preview = cube.pop("preview")
     (work / "debug").mkdir(parents=True, exist_ok=True)
     Image.fromarray(preview).save(work / "debug" / f"{pid}.jpg", "JPEG", quality=90)
@@ -105,7 +119,8 @@ def stitch_grabs(folder: Path, spot: dict, facing: float, work: Path, rings: dic
 
 
 def build_set(name: str, render_id: str, capture_wow: Path, build: Path, grabs: Path | None = None,
-              facing: float | None = None, rings: dict[str, str] | None = None, log=print) -> dict:
+              facing: float | None = None, rings: dict[str, str] | None = None, log=print,
+              pitches: dict[str, float] | None = None) -> dict:
     """The set `name`: the render `render_id` (build/master) and the latest capture near it in
     `capture_wow` (its Screenshots and SavedVariables), stitched; or, with `grabs`, window grabs of the game
     (stitch_grabs, from `facing`: default the render's). Adds it to build/compare (replacing a set of the
@@ -116,7 +131,7 @@ def build_set(name: str, render_id: str, capture_wow: Path, build: Path, grabs: 
         raise SystemExit(f"{render_id}: no rendered cube in build/master")
     if grabs:
         cap = stitch_grabs(grabs, render, render.get("facing", 0) if facing is None else facing, work, rings=rings,
-                           log=log)
+                           log=log, pitches=pitches)
     else:
         pack.import_captures(capture_wow, work, log=log)
         points = json.loads((work / "points.json").read_text(encoding="utf-8"))

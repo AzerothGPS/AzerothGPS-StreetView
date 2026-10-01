@@ -312,6 +312,8 @@ def test_compare_stitches_window_grabs_by_their_names(tmp_path, monkeypatch):
             Image.new("RGB", (32, 18)).save(steps / f"k{k}_{s}.png")
     rings = compare.parse_rings("p0=nadir, p2=down,p4=level,p6=up,v5=zenith,p9=sideways")
     assert rings == {"p0": "nadir", "p2": "down", "p4": "level", "p6": "up", "v5": "zenith"}
+    assert compare.parse_ring_pitches("p0=nadir@-88,p4=level@8,p5=up,p6=zenith@x") == {
+        "p0": ("nadir", -88.0), "p4": ("level", 8.0), "p5": ("up", None), "p6": ("zenith", None)}
     seen.clear()
     compare.stitch_grabs(steps, spot, 3.4363, tmp_path / "work2", rings=rings, log=lambda *a: None)
     assert len(seen) == 40 and {s.ring for s in seen} == {"nadir", "down", "level", "up", "zenith"}

@@ -242,15 +242,16 @@ POLE_SIZE = CONFIG["master"]["pole"]  # ... straight-up / straight-down: sky and
 
 
 def write_cube(shots, out_dir: Path, size: int = CUBE_SIZE, pole: int = POLE_SIZE,
-               quality: int = CUBE_QUALITY, log=print) -> dict:
+               quality: int = CUBE_QUALITY, log=print, rig=None) -> dict:
     """Calibrate and stitch one spot's pictures (stitch.Shot list) into its cube tiles in
     out_dir (<face><col><row>.jpg). Returns the spot's cube description for the pack (and a
-    flat preview under the key "preview": an RGB array). Shared with streetview-harvester."""
+    flat preview under the key "preview": an RGB array). Shared with streetview-harvester.
+    `rig`: the starting guesses (stitch.Rig; default the saved views' pitches)."""
     import numpy as np
 
     from . import stitch
 
-    rig = stitch.calibrate(shots, log=log)
+    rig = stitch.calibrate(shots, rig, log=log)
     shots, repaired = stitch.repair(shots, rig, log=log)  # (pictures taken at the wrong angle)
     if repaired:
         rig = stitch.calibrate(shots, rig, log=log)
