@@ -472,8 +472,7 @@ def ship_points(points: list[dict], spacing: float | None, pinned: set[str] | No
     pinned = pinned or set()
     mind = 0.75 * spacing
     keep, grid = [], {}
-    for p in sorted((p for p in points if p["id"] not in pinned),
-                    key=lambda p: (int(p["cont"]), float(p["x"]), float(p["y"]), p["id"])):
+    for p in sorted(points, key=lambda p: (int(p["cont"]), float(p["x"]), float(p["y"]), p["id"])):  # (unchanged)
         c, x, y = int(p["cont"]), float(p["x"]), float(p["y"])
         k = (c, int(x // mind), int(y // mind))
         near = False
@@ -485,7 +484,8 @@ def ship_points(points: list[dict], spacing: float | None, pinned: set[str] | No
         if not near:
             keep.append(p)
             grid.setdefault(k, []).append((x, y))
-    keep += sorted((p for p in points if p["id"] in pinned),
+    kept = {p["id"] for p in keep}
+    keep += sorted((p for p in points if p["id"] in pinned and p["id"] not in kept),
                    key=lambda p: (int(p["cont"]), float(p["x"]), float(p["y"]), p["id"]))
     return keep
 

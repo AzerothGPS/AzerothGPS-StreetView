@@ -497,6 +497,8 @@ def test_landmarks_always_ship_on_top_of_the_thinned_pick():
     plain = {p["id"] for p in ship_points(road, 200)}
     kept = {p["id"] for p in ship_points(road, 200, {"1-300-0"})}  # (300 would be thinned out)
     assert kept == plain | {"1-300-0"}  # (nothing else changes: no rework for a landmark)
+    # a landmark the pick has anyway changes nothing either (it still counts in the chain)
+    assert {p["id"] for p in ship_points(road, 200, {"1-400-0", "1-300-0"})} == plain | {"1-300-0"}
     assert {p["id"] for p in ship_points(road, 200, set())} == plain
 
 
