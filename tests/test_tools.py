@@ -674,3 +674,22 @@ def test_the_landmarks_file_is_consistent():
             assert pack.id_matches(e["id"], e["cont"], e["x"], e["y"]), e["name"]
         else:
             assert e["status"] == "mark" and {"cont", "x", "y"} <= set(e["near"]), e["name"]
+
+
+def test_pull_media_copies_new_and_changed_files_but_not_frames(tmp_path):
+    # (the CurseForge and wiki media the capture PC took, from its share's media folder)
+    from svtools import pull
+    share, dst = tmp_path / "share", tmp_path / "StreetView-media"
+    for name in ("hero-viewer.png", "candidates/h1-a.png", "sv-look-around.gif", "sv-look-around.frames/0000.png",
+                 "notes.bin"):
+        f = share / "media" / name
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(b"x" * 10)
+    stats = pull.pull_media(share, dst)
+    assert stats == {"copied": 3, "on_share": 3}
+    assert sorted(p.relative_to(dst).as_posix() for p in dst.rglob("*") if p.is_file()) == [
+        "candidates/h1-a.png", "hero-viewer.png", "sv-look-around.gif"]
+    assert pull.pull_media(share, dst)["copied"] == 0  # (nothing new)
+    (share / "media" / "hero-viewer.png").write_bytes(b"y" * 12)
+    assert pull.pull_media(share, dst)["copied"] == 1
+    assert pull.pull_media(share, dst, frames=True)["copied"] == 1  # (the frames, asked for)

@@ -968,6 +968,42 @@ function V.Zoom(delta)
   V.Refresh()
 end
 
+-- For the dev addon's media shots (the pictures for the CurseForge page and the wiki): look a given way
+-- (heading: radians counter-clockwise from north, as the map's; pitch up and the field of view across, in
+-- degrees), turn by degrees (right and up: positive), and set the window's width and place (from the
+-- screen's middle). A panorama or cube spot only (else false).
+function V.LookAt(heading, pitch, fov)
+  if not (cur and cur.pano) then return false end
+  if heading then cur.lon = D.PanoLon(cur.p, heading) end
+  if pitch then cur.lat = math.max(-MAX_LAT, math.min(MAX_LAT, pitch)) end
+  if fov then cur.fov = math.max(FOV_MIN, math.min(FOV_MAX, fov)) end
+  V.Refresh()
+  return true
+end
+
+function V.Pan(dLon, dLat)
+  if not (cur and cur.pano) then return false end
+  cur.lon = cur.lon + (dLon or 0)
+  cur.lat = math.max(-MAX_LAT, math.min(MAX_LAT, cur.lat + (dLat or 0)))
+  V.Refresh()
+  return true
+end
+
+function V.Place(width, x, y)
+  if not frame then V.Build() end
+  if width then SetWidth(width) end
+  if x and y then
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", UIParent, "CENTER", x, y)
+  end
+end
+
+-- The game's corner box folded (on) or open, as its -/+ button does.
+function V.SetHudFolded(on)
+  ns.db.viewer.hudFolded = on and true or nil
+  if hud and hud.last then V.SetHud(hud.last, true) end
+end
+
 -- The next street view toward `heading` (the nearest within 50 degrees of it and
 -- D.NEXT_RANGE yards), looking that way.
 function V.GoToward(heading)

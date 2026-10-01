@@ -1851,6 +1851,19 @@ local function HideMenu()
   if fly then fly.target = 0 end
 end
 
+-- The menu at a step ("mode", "solo", "level", "rounds", "whisper"), or folded away (nil): the dev addon's
+-- media shots. Gives the step's frame (its chips are its children), true when folded, false before the
+-- menu is built.
+function Gm.OpenMenu(step)
+  if not fly then return false end
+  if step and fly.steps[step] then
+    ShowMenu(step)
+    return fly.steps[step]
+  end
+  HideMenu()
+  return true
+end
+
 local function Choose(rounds)
   local mode = fly.mode
   local target = mode == "whisper" and fly.steps.whisper.box:GetText() or nil
@@ -2543,6 +2556,18 @@ local function BuildMarks(canvas)
   function M.Clear()
     M.Begin()
     M.End()
+  end
+  -- a player's marker's tooltip shown as if the mouse were on it (the dev addon's media shots); the first
+  -- marker without a name. False when none shows.
+  function M.Hover(name)
+    for i = 1, used.hot do
+      local f = pool.hot[i]
+      if f and f:IsShown() and (not name or f.name == name or Short(f.name) == name) then
+        f:GetScript("OnEnter")(f)
+        return true
+      end
+    end
+    return false
   end
   return M
 end

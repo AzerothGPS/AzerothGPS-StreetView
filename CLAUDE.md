@@ -148,6 +148,7 @@ python tools/sv.py install     # copy StreetView with its pictures into the game
 python tools/sv.py import      # the dev addon's capture screenshots -> stitched spots -> build/packs, then install
 python tools/sv.py watch       # the same on every /reload
 python tools/sv.py pull [--from //PC/agps-work] [--watch 10]  # harvested spots from the capture PC's share (LAN)
+python tools/sv.py pull-media  # the CurseForge/wiki media the capture PC took -> ..\StreetView-media (Dev's docs/media-automation.md)
 python tools/sv.py release     # dry run: build, zip and check the addon with its pictures (--upload: to CurseForge)
 python tools/sv.py build       # rebuild the pictures and print the size
 python tools/sv.py media       # regenerate Media/ (Figure.tga, Probe.jpg)

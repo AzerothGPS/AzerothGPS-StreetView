@@ -11,6 +11,9 @@
   sv.cmd pull [--from //PC/agps-work] [--watch MIN]
                                   the same straight from the capture PC's share over the LAN (new
                                   and changed spots only; --from is remembered; --watch repeats)
+  sv.cmd pull-media [--from //PC/agps-work] [--to DIR] [--frames]
+                                  the CurseForge and wiki media the capture PC took (<share>/media/) into
+                                  ..\\StreetView-media (new and changed files; --frames: recordings' frames too)
   sv.cmd build                    rebuild the pictures (build/packs/) and print their size
   sv.cmd roads                    road sync: retire spots whose road is gone, list spots for new roads
   sv.cmd release [--upload]       zip the addon with its pictures for CurseForge and check it (a dry run);
@@ -195,6 +198,10 @@ def main(argv=None) -> None:
     p_p.add_argument("--from", dest="src", help=r"the capture PC's share, e.g. //CAPTURE-PC/agps-work (remembered)")
     p_p.add_argument("--watch", type=float, metavar="MIN", help="pull again every MIN minutes (Ctrl+C stops)")
     p_p.add_argument("--no-install", action="store_true")
+    p_pm = sub.add_parser("pull-media", help="the CurseForge and wiki media from the capture PC's share")
+    p_pm.add_argument("--from", dest="src", help=r"the capture PC's share, e.g. //CAPTURE-PC/agps-work (remembered)")
+    p_pm.add_argument("--to", type=Path, default=ROOT.parent / "StreetView-media", help="where they go")
+    p_pm.add_argument("--frames", action="store_true", help="also the recordings' frames (<name>.frames/)")
     sub.add_parser("build")
     p_rd = sub.add_parser("roads", help="road sync: retire spots whose road is gone, list spots for new roads")
     p_rd.add_argument("--agps", type=Path, default=ROOT.parent / "azerothgps", help="the AzerothGPS checkout")
@@ -242,6 +249,11 @@ def main(argv=None) -> None:
             install_all(a.wow, False)
     elif a.cmd == "pull":
         pull_loop(a.wow, a.src, a.watch, not a.no_install)
+    elif a.cmd == "pull-media":
+        from svtools import pull
+        src = pull.resolve_source(a.src, BUILD)
+        stats = pull.pull_media(src, a.to, a.frames)
+        print(f"{src}: {stats['on_share']} media files on the share, {stats['copied']} new or changed -> {a.to}")
     elif a.cmd == "build":
         build_and_report()
     elif a.cmd == "roads":

@@ -7,6 +7,9 @@ exactly like import-harvest. The review pictures of the pilot come along into
 build/harvest-review/.
 
 The share path is remembered in build/harvest-source.txt (build/ is never in git).
+
+`pull_media` fetches the CurseForge and wiki pictures and GIFs the capture PC took (<share>/media/,
+AzerothGPS-StreetView-Dev's docs/media-automation.md) into the media folder next to this checkout.
 """
 
 from __future__ import annotations
@@ -37,8 +40,7 @@ def resolve_source(arg: str | None, build: Path) -> Path:
     raise SystemExit(r"No capture share yet: pass --from \\<capture PC name>\agps-work once.")
 
 
-def pull(src: Path, build: Path, log=print) -> dict:
-    """Copy new or changed spots from <src>/out, import them, and fetch <src>/review/*.jpg."""
+def _reachable(src: Path) -> None:
     try:
         os.listdir(src)
     except OSError as e:
@@ -49,6 +51,39 @@ def pull(src: Path, build: Path, log=print) -> dict:
                              f"{str(src)}, enter that PC's Windows sign-in and tick 'Remember my "
                              "credentials'.")
         raise SystemExit(f"{src} isn't reachable ({e.strerror}): is the capture PC on and the share set up?")
+
+
+MEDIA_TYPES = {".png", ".jpg", ".gif", ".mp4", ".json", ".txt"}
+
+
+def pull_media(src: Path, dst: Path, frames: bool = False) -> dict:
+    """Copy <src>/media/** (pictures, GIFs, videos, notes) into dst, new or changed files only (size and
+    time); a recording's frames (<name>.frames/) only with frames=True."""
+    _reachable(src)
+    media = src / "media"
+    stats = {"copied": 0, "on_share": 0}
+    if not media.is_dir():
+        return stats
+    for f in sorted(media.rglob("*")):
+        rel = f.relative_to(media)
+        if not f.is_file() or f.suffix.lower() not in MEDIA_TYPES:
+            continue
+        if not frames and any(part.endswith(".frames") for part in rel.parts[:-1]):
+            continue
+        stats["on_share"] += 1
+        t = dst / rel
+        st = f.stat()
+        if t.exists() and t.stat().st_size == st.st_size and t.stat().st_mtime >= st.st_mtime:
+            continue
+        t.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(f, t)
+        stats["copied"] += 1
+    return stats
+
+
+def pull(src: Path, build: Path, log=print) -> dict:
+    """Copy new or changed spots from <src>/out, import them, and fetch <src>/review/*.jpg."""
+    _reachable(src)
     out = src / "out"
     if not out.is_dir():  # the harvester hasn't finished a spot yet
         return {"points": 0, "images": 0, "skipped": 0, "reviews": 0, "on_share": 0}

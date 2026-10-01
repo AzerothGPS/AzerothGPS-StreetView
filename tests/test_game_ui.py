@@ -64,7 +64,7 @@ UISpecialFrames = {}
 GameTooltip_Hide = function() end
 GetCursorPosition = function() return 0, 0 end
 AzerothGPS = { version = 11,
-  MapButtonParent = function() return Make("Frame") end,
+  MapButtonParent = function() return Make("Frame") end, MapCanvas = function() return Make("Frame") end,
   HoldMap = function() end, SetOverlay = function() end, Redraw = function() end, View = function() end,
   BaseContinent = function(c) return c end,
 }
@@ -241,6 +241,62 @@ def test_a_spot_with_a_title_of_its_own_shows_it(ui):
     titles = [str(f._text) for f in lua.eval("FONTS").values() if f._text is not None]
     assert "Thunder Bluff: In Game" in titles
     assert not any("57.2" in t for t in titles)  # (not the zone and coordinates)
+
+
+def test_the_media_hooks_set_the_view_the_window_and_the_menu(ui):
+    # (the dev addon's media shots for the CurseForge page and the wiki: our own windows put in a set state)
+    p, clock, net, panel, lua = ui
+    V = p.ns.Viewer
+    spot = lua.eval("""{ id = "m1", cont = 1, x = -1248.3, y = 68.1, facing = 1, cube = { pad = 0.08 },
+      title = "Media", pack = { root = "R\\\\", ext = "jpg" } }""")
+    V.Open(spot)
+    assert V.LookAt(1.5, 20, 60)
+    cur = V.Current()
+    assert abs(V.Heading() - 1.5) < 1e-9 and cur.lat == 20 and cur.fov == 60
+    assert V.LookAt(None, 120, 5)  # (clamped: no farther up than the viewer goes, no closer zoom)
+    assert cur.lat == 85 and cur.fov == 40
+    lon = cur.lon
+    assert V.Pan(10, -100) and cur.lon == lon + 10 and cur.lat == -15
+    assert V.Pan(0, -100) and cur.lat == -85
+    V.Place(900, 0, 40)
+    assert lua.eval("AzerothGPSStreetViewFrame")._w == 900
+    V.Place(5000)
+    assert lua.eval("AzerothGPSStreetViewFrame")._w == 1400  # (the viewer's widest)
+    # the corner box folded and opened as its button does
+    p.G.Start("solo", 3)
+    box = corner_box(lua)
+    V.SetHudFolded(True)
+    assert plain(box.fold.label._text) == "+" and not box.head._shown
+    V.SetHudFolded(False)
+    assert plain(box.fold.label._text) == "-" and box.head._shown
+    # the game's menu at a step (its frame given: the chips are its children), then folded away
+    step = p.G.OpenMenu("level")
+    fly = [f for f in lua.eval("FRAMES_MADE").values() if f.steps is not None][0]
+    same = lua.eval("rawequal")
+    assert same(step, fly.steps["level"]) and fly.step == "level" and step._shown and not fly.steps["mode"]._shown
+    assert p.G.OpenMenu(None) is True and fly.target == 0
+
+
+def test_a_players_marker_tooltip_shows_without_the_mouse():
+    # (the dev addon's media shots: the tooltip of a player's marker in a round's result)
+    clock, net = Clock(), Net()
+    ann = Player("Ann-Realm", clock, net, group="PARTY")
+    Player("Bob-Realm", clock, net, group="PARTY")
+    with_windows(ann)
+    lua = ann.lua
+    ann.G.Start("party", 1)
+    net.deliver()
+    net.deliver()
+    run(net, clock, 1)
+    assert not ann.G.marks.Hover("Bob")  # (nothing drawn yet)
+    ann.G.Guess(300, 310, 0)
+    run(net, clock, 32)
+    assert ann.game.phase == "result"
+    ctx = lua.eval("""{ cont = 0, scale = 1, zoom = 1000, ToScreen = function(x, y) return x / 10, y / 10 end,
+      Dot = function() end, Line = function() end, Icon = function() end }""")
+    ann.G.Draw(ctx)
+    assert ann.G.marks.Hover("Ann")
+    assert plain(lua.eval("GameTooltip")._text) == "You"  # (Gm.PlayerTip's first line for your own)
 
 
 def test_a_game_without_street_views_ends_on_the_panel(ui):
