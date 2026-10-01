@@ -15,6 +15,8 @@
   sv.cmd roads                    road sync: retire spots whose road is gone, list spots for new roads
   sv.cmd release [--upload]       zip the addon with its pictures for CurseForge and check it (a dry run);
                                   --upload sends it (needs CF_API_TOKEN and viewer.curseforge_project in packs.json)
+  sv.cmd landmarks                landmarks.json (famous stops that always ship): merge the spots marked
+                                  in game with the dev addon's /sv mark, and list them
   sv.cmd media                    regenerate the addon's own art (Media/)
 
 The pictures ship inside the viewer addon (packs.json, under CurseForge's limit). The game folder
@@ -164,6 +166,7 @@ def main(argv=None) -> None:
     p_r = sub.add_parser("release", aliases=["release-data"], help="the addon with its pictures, zipped for CurseForge")
     p_r.add_argument("--upload", action="store_true", help="upload to CurseForge (otherwise a dry run)")
     p_r.add_argument("--version", help="the packs' version (default: today, YYYY.MM.DD)")
+    sub.add_parser("landmarks", help="landmarks.json: merge the spots marked in game (/sv mark) and list them")
     sub.add_parser("media")
     p_w = sub.add_parser("watch")
     p_w.add_argument("--every", type=float, default=3.0, help="seconds between checks")
@@ -204,6 +207,16 @@ def main(argv=None) -> None:
     elif a.cmd in ("release", "release-data"):
         from svtools import release
         release.release_data(BUILD, ROOT / "dist", a.version, upload=a.upload)
+    elif a.cmd == "landmarks":
+        from svtools import landmarks
+        doc = landmarks.load()
+        marks = landmarks.read_marks(Path(a.wow)) if getattr(a, "wow", None) else []
+        n = landmarks.merge_marks(doc, marks)
+        if n:
+            landmarks.save(doc)
+        print(f"{len(marks)} marks in the game's SavedVariables, {n} landmarks updated")
+        for line in landmarks.report(doc):
+            print("  " + line)
     elif a.cmd == "media":
         from svtools import media
         media.make(ROOT / "addon" / "AzerothGPS_StreetView" / "Media")

@@ -489,3 +489,48 @@ def test_spots_held_by_eye_stay_out_until_rendered_again(tmp_path):
     assert list(held) == ["0-5-5"] and held["0-5-5"]["reason"] == "under the city"
     pts["0-5-5"]["imported_at"] = 300  # (rendered again after it was held)
     assert pack.retake(build, pts, {}, {"0-5-5": {"reason": "under the city", "at": 200}}) == {}
+
+
+def test_landmarks_always_ship_and_their_neighbors_give_way():
+    from svtools.pack import ship_points
+    road = [{"id": f"1-{x}-0", "cont": 1, "x": x, "y": 0} for x in range(0, 2001, 100)]
+    kept = {p["id"] for p in ship_points(road, 200, {"1-300-0"})}  # (300 would be thinned out)
+    assert "1-300-0" in kept and "1-200-0" not in kept and "1-400-0" not in kept
+    assert "1-500-0" in kept and "1-0-0" in kept
+    assert {p["id"] for p in ship_points(road, 200, set())} == {p["id"] for p in ship_points(road, 200)}
+
+
+def test_marks_from_the_game_become_landmark_spots(tmp_path):
+    from svtools import landmarks
+    doc = {"landmarks": [{"name": "Booty Bay", "status": "mark", "near": {"cont": 0, "x": -14383.3, "y": 487.1}},
+                         {"name": "Crossroads, center", "status": "spot", "id": "1--454--2651", "cont": 1,
+                          "x": -453.6, "y": -2651.2}]}
+    marks = [{"name": "booty bay", "cont": 0, "x": -14400.04, "y": 470.2, "z": 9.5, "facing": 1.2, "mapID": 1434, "at": 5},
+             {"name": "Booty Bay", "cont": 0, "x": -14390.0, "y": 480.0, "z": 9.0, "facing": 1.0, "mapID": 1434, "at": 9},
+             {"name": "Undercity, Trade Quarter", "cont": 0, "x": 1630.3, "y": 240.6, "z": -43.0, "facing": 3.1,
+              "mapID": 1458, "at": 9}]
+    assert landmarks.merge_marks(doc, marks, log=lambda *a: None) == 2
+    bb = doc["landmarks"][0]
+    assert bb["status"] == "spot" and bb["id"] == "0--14390-480" and bb["facing"] == 1.0 and "near" not in bb
+    uc = doc["landmarks"][-1]
+    assert uc["cont"] == 10001 and uc["id"] == "10001-1630-241" and uc["z"] == -43.0  # (the Undercity's level)
+    assert landmarks.pinned_ids(doc) == {"0--14390-480", "1--454--2651", "10001-1630-241"}
+    assert landmarks.merge_marks(doc, marks, log=lambda *a: None) == 0  # (nothing new the second time)
+    sv = tmp_path / "WTF" / "Account" / "X" / "SavedVariables"
+    sv.mkdir(parents=True)
+    (sv / "AzerothGPS_StreetView_Dev.lua").write_text(
+        'AzerothGPSStreetViewDevDB = {\n["marks"] = {\n{\n["name"] = "Gadgetzan",\n["x"] = -7120.5,\n["y"] = -3780.25,\n'
+        '["z"] = 9,\n["cont"] = 1,\n["facing"] = 0.5,\n["mapID"] = 1446,\n["at"] = 100,\n},\n},\n}\n', encoding="utf-8")
+    assert [m["name"] for m in landmarks.read_marks(tmp_path)] == ["Gadgetzan"]
+
+
+def test_the_landmarks_file_is_consistent():
+    from svtools import landmarks
+    doc = landmarks.load()
+    names = [e["name"] for e in doc["landmarks"]]
+    assert len(names) == len(set(names)) and len(names) >= 30
+    for e in doc["landmarks"]:
+        if e["status"] == "spot":
+            assert pack.id_matches(e["id"], e["cont"], e["x"], e["y"]), e["name"]
+        else:
+            assert e["status"] == "mark" and {"cont", "x", "y"} <= set(e["near"]), e["name"]

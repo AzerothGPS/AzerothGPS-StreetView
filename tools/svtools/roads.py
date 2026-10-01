@@ -68,7 +68,8 @@ def diff(rendered: list[dict], planned: list[dict], roads: dict, spacing: float,
 
     new = [q for q in planned if q.get("zone") and not covered(q)]
     if ship_spacing:  # only what the packs would ship, with what's rendered already
-        ship = {p["id"] for p in ship_points(kept + new, ship_spacing)}
+        from . import landmarks
+        ship = {p["id"] for p in ship_points(kept + new, ship_spacing, landmarks.pinned_ids())}
         new = [q for q in new if q["id"] in ship]
     return {"retired": retired, "add": new}
 

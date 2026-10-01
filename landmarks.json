@@ -1,0 +1,377 @@
+{
+ "about": "Street views that always ship (the user, 2026-09-30): famous stops in Azeroth. 'spot': a planned spot by id (rendered or not), kept by pack.ship_points and the harvester's ship.py whatever the 200 yd thinning says; its 0.75 x spacing neighbors give way. 'mark': still needs its exact standing point and facing, from the dev addon's /sv mark in game (sv.cmd landmarks merges them) or a hand estimate checked on a test render; 'near' is a map-data estimate of the place. A marked entry gets id, cont, x, y, z (the floor to stand on), facing, zone and mapID and status 'spot'.",
+ "landmarks": [
+  {
+   "name": "Thunder Bluff, central rise",
+   "status": "spot",
+   "id": "1--1248-68",
+   "cont": 1,
+   "x": -1248.3,
+   "y": 68.1,
+   "zone": "Thunder Bluff",
+   "mapID": 1456,
+   "note": "shipped; checked by eye"
+  },
+  {
+   "name": "Darnassus, Warrior's Terrace (bank)",
+   "status": "spot",
+   "id": "1-9988-2520",
+   "cont": 1,
+   "x": 9987.8,
+   "y": 2520.5,
+   "zone": "Darnassus",
+   "mapID": 1457,
+   "note": "shipped"
+  },
+  {
+   "name": "Ironforge, gates",
+   "status": "spot",
+   "id": "0--5056--765",
+   "cont": 0,
+   "x": -5055.9,
+   "y": -764.7,
+   "zone": "Ironforge",
+   "mapID": 1455,
+   "note": "shipped"
+  },
+  {
+   "name": "Goldshire",
+   "status": "spot",
+   "id": "0--9488-66",
+   "cont": 0,
+   "x": -9488.5,
+   "y": 65.6,
+   "zone": "Elwynn Forest",
+   "mapID": 1429,
+   "note": "shipped"
+  },
+  {
+   "name": "Kharanos",
+   "status": "spot",
+   "id": "0--5619--482",
+   "cont": 0,
+   "x": -5619.5,
+   "y": -482.2,
+   "zone": "Dun Morogh",
+   "mapID": 1426,
+   "note": "shipped"
+  },
+  {
+   "name": "Southshore",
+   "status": "spot",
+   "id": "0--782--541",
+   "cont": 0,
+   "x": -782.3,
+   "y": -541.2,
+   "zone": "Hillsbrad Foothills",
+   "mapID": 1424,
+   "note": "shipped"
+  },
+  {
+   "name": "Auberdine",
+   "status": "spot",
+   "id": "1-6472-418",
+   "cont": 1,
+   "x": 6471.9,
+   "y": 417.7,
+   "zone": "Felwood",
+   "mapID": 1448,
+   "note": "shipped"
+  },
+  {
+   "name": "Camp Taurajo",
+   "status": "spot",
+   "id": "1--2353--1915",
+   "cont": 1,
+   "x": -2353.1,
+   "y": -1914.9,
+   "zone": "Dustwallow Marsh",
+   "mapID": 1445,
+   "note": "shipped"
+  },
+  {
+   "name": "Theramore Isle",
+   "status": "spot",
+   "id": "1--3688--4386",
+   "cont": 1,
+   "x": -3688,
+   "y": -4386.5,
+   "zone": "Dustwallow Marsh",
+   "mapID": 1445,
+   "note": "shipped"
+  },
+  {
+   "name": "Crossroads, center",
+   "status": "spot",
+   "id": "1--454--2651",
+   "cont": 1,
+   "x": -453.6,
+   "y": -2651,
+   "zone": "Durotar",
+   "mapID": 1411,
+   "note": "rendered (rev 1), thinned out; checked by eye: ideal"
+  },
+  {
+   "name": "Razor Hill",
+   "status": "spot",
+   "id": "1-309--4744",
+   "cont": 1,
+   "x": 309.4,
+   "y": -4743.6,
+   "zone": "Durotar",
+   "mapID": 1411,
+   "note": "rendered (rev 2), thinned out"
+  },
+  {
+   "name": "Ratchet",
+   "status": "spot",
+   "id": "1--950--3676",
+   "cont": 1,
+   "x": -950.3,
+   "y": -3676.4,
+   "zone": "Durotar",
+   "mapID": 1411,
+   "note": "rendered (rev 2), thinned out"
+  },
+  {
+   "name": "Brill",
+   "status": "spot",
+   "id": "0-2263-301",
+   "cont": 0,
+   "x": 2263.2,
+   "y": 301.3,
+   "zone": "Western Plaguelands",
+   "mapID": 1422,
+   "note": "rendered (rev 2), thinned out"
+  },
+  {
+   "name": "Astranaar",
+   "status": "spot",
+   "id": "1-2690--413",
+   "cont": 1,
+   "x": 2689.9,
+   "y": -412.8,
+   "zone": "Stonetalon Mountains",
+   "mapID": 1442,
+   "note": "rendered (rev 2), thinned out"
+  },
+  {
+   "name": "Darnassus, Temple of the Moon",
+   "status": "spot",
+   "id": "1-9716-2513",
+   "cont": 1,
+   "x": 9715.7,
+   "y": 2513.1,
+   "zone": "Darnassus",
+   "mapID": 1457,
+   "note": "rendered (rev 2), thinned out; 53 yd from the temple: check the view"
+  },
+  {
+   "name": "Cenarion Hold",
+   "status": "spot",
+   "id": "1--6831-752",
+   "cont": 1,
+   "x": -6830.6,
+   "y": 752.1,
+   "zone": "Silithus",
+   "mapID": 1451,
+   "note": "rendered (rev 2), thinned out"
+  },
+  {
+   "name": "Everlook",
+   "status": "spot",
+   "id": "1-6736--4593",
+   "cont": 1,
+   "x": 6735.8,
+   "y": -4593.4,
+   "zone": "Winterspring",
+   "mapID": 1452,
+   "note": "rendered (rev 2), thinned out"
+  },
+  {
+   "name": "Tarren Mill",
+   "status": "spot",
+   "id": "0--36--916",
+   "cont": 0,
+   "x": -36.3,
+   "y": -916.4,
+   "zone": "Alterac Mountains",
+   "mapID": 1416,
+   "note": "planned, never rendered"
+  },
+  {
+   "name": "Sentinel Hill",
+   "status": "spot",
+   "id": "0--10508-1068",
+   "cont": 0,
+   "x": -10508.4,
+   "y": 1068,
+   "zone": "Westfall",
+   "mapID": 1436,
+   "note": "planned, never rendered"
+  },
+  {
+   "name": "Darkshire",
+   "status": "spot",
+   "id": "0--10557--1172",
+   "cont": 0,
+   "x": -10557,
+   "y": -1171.9,
+   "zone": "Deadwind Pass",
+   "mapID": 1430,
+   "note": "planned, never rendered"
+  },
+  {
+   "name": "Menethil Harbor",
+   "status": "spot",
+   "id": "0--3669--833",
+   "cont": 0,
+   "x": -3668.9,
+   "y": -832.6,
+   "zone": "Wetlands",
+   "mapID": 1437,
+   "note": "planned, never rendered"
+  },
+  {
+   "name": "Stormwind, gates and Valley of Heroes",
+   "status": "spot",
+   "id": "0--9162-354",
+   "cont": 0,
+   "x": -9162.4,
+   "y": 354.3,
+   "zone": "Elwynn Forest",
+   "mapID": 1429,
+   "note": "planned, never rendered"
+  },
+  {
+   "name": "Stormwind, Cathedral Square (the cathedral steps)",
+   "status": "mark",
+   "near": {
+    "cont": 0,
+    "x": -8548.4,
+    "y": 872.4
+   },
+   "note": "the nearest spot (0--8529-851) is inside the cathedral's nave; stand on the steps facing the square or the facade"
+  },
+  {
+   "name": "Stormwind, Trade District",
+   "status": "mark",
+   "near": {
+    "cont": 0,
+    "x": -8900.5,
+    "y": 642.2
+   },
+   "note": "nearest planned 61 yd"
+  },
+  {
+   "name": "Orgrimmar, Valley of Strength",
+   "status": "mark",
+   "near": {
+    "cont": 1,
+    "x": 1628.9,
+    "y": -4407.9
+   },
+   "note": "nothing within 271 yd"
+  },
+  {
+   "name": "Undercity, Trade Quarter",
+   "status": "mark",
+   "near": {
+    "cont": 10001,
+    "x": 1614.9,
+    "y": 233.3
+   },
+   "note": "no Undercity spots at all"
+  },
+  {
+   "name": "Ironforge, The Great Forge",
+   "status": "mark",
+   "near": {
+    "cont": 0,
+    "x": -4790.3,
+    "y": -1127.1
+   },
+   "note": "nothing within 368 yd"
+  },
+  {
+   "name": "Ironforge, The Commons",
+   "status": "mark",
+   "near": {
+    "cont": 0,
+    "x": -4886.3,
+    "y": -997.4
+   },
+   "note": "nothing within 207 yd"
+  },
+  {
+   "name": "Booty Bay",
+   "status": "mark",
+   "near": {
+    "cont": 0,
+    "x": -14383.3,
+    "y": 487.1
+   },
+   "note": "nothing within 214 yd"
+  },
+  {
+   "name": "Lakeshire",
+   "status": "mark",
+   "near": {
+    "cont": 0,
+    "x": -9227.7,
+    "y": -2201.5
+   },
+   "note": "nothing within 99 yd"
+  },
+  {
+   "name": "Bloodhoof Village",
+   "status": "mark",
+   "near": {
+    "cont": 1,
+    "x": -2323.9,
+    "y": -395.0
+   },
+   "note": "nothing within 89 yd"
+  },
+  {
+   "name": "Light's Hope Chapel",
+   "status": "mark",
+   "near": {
+    "cont": 0,
+    "x": 2271.1,
+    "y": -5340.8
+   },
+   "note": "nothing within 306 yd"
+  },
+  {
+   "name": "Gadgetzan",
+   "status": "mark",
+   "near": {
+    "cont": 1,
+    "x": -7139.1,
+    "y": -3752.1
+   },
+   "note": "shipped spot 63 yd off-center"
+  },
+  {
+   "name": "Grom'gol Base Camp",
+   "status": "mark",
+   "near": {
+    "cont": 0,
+    "x": -12378.4,
+    "y": 185.7
+   },
+   "note": "shipped spot 72 yd off-center"
+  },
+  {
+   "name": "Hammerfall",
+   "status": "mark",
+   "near": {
+    "cont": 0,
+    "x": -991.6,
+    "y": -3528.3
+   },
+   "note": "nearest planned 73 yd"
+  }
+ ]
+}

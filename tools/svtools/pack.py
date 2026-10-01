@@ -459,16 +459,25 @@ def retake(build: Path, points: dict, reported: dict[str, int] | None = None,
     return out
 
 
-def ship_points(points: list[dict], spacing: float | None) -> list[dict]:
+def ship_points(points: list[dict], spacing: float | None, pinned: set[str] | None = None) -> list[dict]:
     """The spots shipped at about `spacing` yards apart (packs.json ship_spacing_yd): the master keeps
     every rendered spot (100 yd), the packs take a thinned set. Greedy in a fixed order (continent,
     x, y): a spot is kept unless a kept one is within 0.75 * spacing (so neighbors along a road end up
-    ~0.75-1.5 spacing apart, ~0.9 on average). None or 0: every spot."""
+    ~0.75-1.5 spacing apart, ~0.9 on average). None or 0: every spot. `pinned` (landmarks.json's
+    spots): kept first, whatever the spacing, and their neighbors give way. Keep in step with the
+    harvester's ship.py (a test there checks they agree)."""
     if not spacing:
         return list(points)
+    pinned = pinned or set()
     mind = 0.75 * spacing
     keep, grid = [], {}
-    for p in sorted(points, key=lambda p: (int(p["cont"]), float(p["x"]), float(p["y"]), p["id"])):
+    order = sorted(points, key=lambda p: (p["id"] not in pinned, int(p["cont"]), float(p["x"]), float(p["y"]), p["id"]))
+    for p in order:
+        if p["id"] in pinned:
+            c, x, y = int(p["cont"]), float(p["x"]), float(p["y"])
+            keep.append(p)
+            grid.setdefault((c, int(x // mind), int(y // mind)), []).append((x, y))
+            continue
         c, x, y = int(p["cont"]), float(p["x"]), float(p["y"])
         k = (c, int(x // mind), int(y // mind))
         near = False
@@ -509,7 +518,8 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
         # (a spot in no zone is outside the Classic game's world: Gilneas behind the Greymane Wall)
         mine = [p for p in points.values() if pack_for(cfg, p) is pk and (manual or not is_manual(p))
                 and p["id"] not in held and p["id"] not in retired and (p.get("zone") or is_manual(p))]
-        mine = ship_points(mine, cfg.get("ship_spacing_yd"))
+        from . import landmarks
+        mine = ship_points(mine, cfg.get("ship_spacing_yd"), landmarks.pinned_ids())
         out = root / pk["name"]
         images = out / "Images"
         images.mkdir(parents=True, exist_ok=True)
