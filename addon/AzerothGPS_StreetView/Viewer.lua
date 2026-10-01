@@ -402,9 +402,11 @@ function V.Build()
   end)
 end
 
--- The title: the spot's zone and map coordinates (a game's street view: neither).
+-- The title: the spot's zone and map coordinates (a game's street view: neither; a spot with a `title` of
+-- its own, the dev addon's comparisons: that).
 local function Title(p)
   if cur and cur.game then return SetTitle("") end -- (the game's logo sits on the title bar)
+  if type(p.title) == "string" then return SetTitle(p.title) end
   local API = _G.AzerothGPS
   local where = p.zone or "?"
   local mapID, zone, u, v

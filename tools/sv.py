@@ -18,10 +18,14 @@
   sv.cmd landmarks                landmarks.json (famous stops that always ship): merge the spots marked
                                   in game with the dev addon's /sv mark, and list them
   sv.cmd media                    regenerate the addon's own art (Media/)
+  sv.cmd compare --name N --render ID   a spot as rendered and as captured in the game (on the private
+                                  test server, --capture-wow), for the dev addon's Compare; then install --dev
 
 The pictures ship inside the viewer addon (packs.json, under CurseForge's limit). The game folder
 defaults to C:\\Program Files (x86)\\World of Warcraft\\_classic_beta_ (set AGPS_WOW or pass
---wow). sv.cmd runs this with the AzerothGPS venv's Python (Pillow, numpy, lupa).
+--wow); every install also goes to the private test server's copy of the game when it's there
+(E:\\WoWForeverPS\\World of Warcraft\\beta, AGPS_WOW_PRIVATE). sv.cmd runs this with the AzerothGPS
+venv's Python (Pillow, numpy, lupa).
 """
 
 from __future__ import annotations
@@ -38,6 +42,9 @@ sys.path.insert(0, str(ROOT / "tools"))
 from svtools import pack  # noqa: E402
 
 DEFAULT_WOW = Path(os.environ.get("AGPS_WOW", r"C:\Program Files (x86)\World of Warcraft\_classic_beta_"))
+# the private test server's own copy of the game (streetview-harvester's SERVER.md, Path C): every install
+# goes to both (the user, 2026-10-01), when it's there
+PRIVATE_WOW = Path(os.environ.get("AGPS_WOW_PRIVATE", r"E:\WoWForeverPS\World of Warcraft\beta"))
 BUILD = ROOT / "build"
 
 
@@ -93,7 +100,9 @@ def install(wow: Path, dev: bool) -> None:
     if dev:
         if not DEV_ADDON.is_dir():
             sys.exit(f"No developer addon at {DEV_ADDON} (clone AzerothGPS/AzerothGPS-StreetView-Dev next to this repo)")
-        parts.append((DEV_ADDON, "AzerothGPS_StreetView_Dev"))
+        # (with the comparisons sv.cmd compare built: their pictures and CompareData.lua over the stub)
+        dev_src = [DEV_ADDON] + ([BUILD / "compare"] if (BUILD / "compare").is_dir() else [])
+        parts.append((dev_src, "AzerothGPS_StreetView_Dev"))
         for old in OLD_DEV:
             if (addons / old).exists():
                 shutil.rmtree(addons / old)
@@ -111,6 +120,21 @@ def install(wow: Path, dev: bool) -> None:
         print("New files: restart the game completely (a /reload doesn't see new files).")
     else:
         print("Only changed files: /reload in game.")
+
+
+def targets(wow: Path) -> list[Path]:
+    """Where an install goes: the game folder given, and the private test server's copy too when the
+    default is given and that copy is there."""
+    out = [wow]
+    if wow == DEFAULT_WOW and PRIVATE_WOW != wow and (PRIVATE_WOW / "Interface" / "AddOns").is_dir():
+        out.append(PRIVATE_WOW)
+    return out
+
+
+def install_all(wow: Path, dev: bool) -> None:
+    for w in targets(wow):
+        print(f"-> {w}")
+        install(w, dev)
 
 
 def build_and_report(flush: bool = False) -> list[dict]:
@@ -132,7 +156,7 @@ def pull_loop(wow: Path, src_arg: str | None, every_min: float | None, do_instal
         if stats["points"]:
             build_and_report(flush=True)
             if do_install:
-                install(wow, False)
+                install_all(wow, False)
         if not every_min:
             return
         time.sleep(every_min * 60)
@@ -170,10 +194,16 @@ def main(argv=None) -> None:
     sub.add_parser("media")
     p_w = sub.add_parser("watch")
     p_w.add_argument("--every", type=float, default=3.0, help="seconds between checks")
+    p_c = sub.add_parser("compare", help="a spot as rendered and as captured in the game, for the dev addon's Compare")
+    p_c.add_argument("--name", required=True, help='the comparison\'s name, e.g. "Thunder Bluff"')
+    p_c.add_argument("--render", required=True, help="the rendered spot's id (build/master), e.g. 1--1248-68")
+    p_c.add_argument("--capture-wow", type=Path, default=PRIVATE_WOW,
+                     help="the game folder whose capture to take (default: the private test server's)")
+    p_c.add_argument("--no-install", action="store_true")
     a = ap.parse_args(argv)
 
     if a.cmd == "install":
-        install(a.wow, a.dev)
+        install_all(a.wow, a.dev)
     elif a.cmd == "import":
         stats = pack.import_captures(a.wow, BUILD)
         k = 0 if a.no_stitch else pack.stitch_points(a.wow, BUILD)
@@ -181,19 +211,19 @@ def main(argv=None) -> None:
               f"{stats['skipped']} unfinished captures skipped); {k} newly stitched.")
         build_and_report()
         if not a.no_install:
-            install(a.wow, False)
+            install_all(a.wow, False)
     elif a.cmd == "stitch":
         k = pack.stitch_points(a.wow, BUILD, only=set(a.id) if a.id else None, force=a.force)
         print(f"stitched {k} spots.")
         build_and_report()
         if not a.no_install:
-            install(a.wow, False)
+            install_all(a.wow, False)
     elif a.cmd == "import-harvest":
         stats = pack.import_harvest(a.folder, BUILD)
         print(f"imported {stats['points']} harvested spots ({stats['skipped']} skipped).")
         build_and_report()
         if not a.no_install:
-            install(a.wow, False)
+            install_all(a.wow, False)
     elif a.cmd == "pull":
         pull_loop(a.wow, a.src, a.watch, not a.no_install)
     elif a.cmd == "build":
@@ -222,6 +252,11 @@ def main(argv=None) -> None:
         media.make(ROOT / "addon" / "AzerothGPS_StreetView" / "Media")
     elif a.cmd == "watch":
         watch(a.wow, a.every)
+    elif a.cmd == "compare":
+        from svtools import compare
+        compare.build_set(a.name, a.render, a.capture_wow, BUILD)
+        if not a.no_install:
+            install_all(a.wow, True)
 
 
 def watch(wow: Path, every: float) -> None:
@@ -251,7 +286,7 @@ def watch(wow: Path, every: float) -> None:
             print(f"[{stamp}] {stats['captures']} spots in the list, {k} newly stitched.", flush=True)
             build_and_report(flush=True)
             if k:
-                install(wow, False)
+                install_all(wow, False)
             else:
                 print(f"[{stamp}] nothing new to install.", flush=True)
         except Exception as e:  # (keep watching: the next save may be fine)

@@ -46,12 +46,12 @@ local Make
 Make = function(kind)
   return setmetatable({ _scripts = {}, _shown = true, _kind = kind }, { __index = function(_, k)
     if Methods[k] then return Methods[k] end
-    if k == "CreateFontString" then return function() return Make("FontString") end end
+    if k == "CreateFontString" then return function() local f = Make("FontString") FONTS[#FONTS + 1] = f return f end end
     if k == "CreateTexture" then return function() return Make("Texture") end end
     if k:match("^%u") then return function() end end
   end })
 end
-FRAMES_MADE = {}
+FRAMES_MADE, FONTS = {}, {}
 function CreateFrame(kind, name, parent, template)
   if template == "PortraitFrameTemplate" then error("not on this client") end -- (the viewer's own title bar)
   local f = Make(kind)
@@ -230,6 +230,17 @@ def test_a_reload_brings_the_game_back_on_the_windows(ui):
     r.ns.reloadedUI = False
     r.G.TryResume()
     assert r.game is None and r.ns.db.game is None
+
+
+def test_a_spot_with_a_title_of_its_own_shows_it(ui):
+    # (the dev addon's comparisons: "Thunder Bluff: In Game" in the title, not the zone and coordinates)
+    p, clock, net, panel, lua = ui
+    spot = lua.eval("""{ id = "tb-game", cont = 1, x = -1248.3, y = 68.1, facing = 1, cube = { pad = 0.08 },
+      title = "Thunder Bluff: In Game", pack = { root = "R\\\\", ext = "jpg" } }""")
+    p.ns.Viewer.Open(spot)
+    titles = [str(f._text) for f in lua.eval("FONTS").values() if f._text is not None]
+    assert "Thunder Bluff: In Game" in titles
+    assert not any("57.2" in t for t in titles)  # (not the zone and coordinates)
 
 
 def test_a_game_without_street_views_ends_on_the_panel(ui):

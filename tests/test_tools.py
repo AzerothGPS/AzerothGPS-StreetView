@@ -258,6 +258,27 @@ def test_cube_tiles_render_the_panorama():
         assert np.abs(img.reshape(-1, 3).astype(float) - want).mean() < 10, name
 
 
+def test_compare_data_for_the_dev_addon():
+    # the user, 2026-10-01: a spot as rendered and as captured in the game, for the dev addon's Compare
+    import lupa
+    from svtools import compare
+    sets = [{"name": 'Thunder "Bluff"', "cont": 1, "x": -1248.3, "y": 68.1, "z": 127.57, "versions": [
+        {"key": "game", "label": "In Game", "id": "thunder-bluff-game", "facing": 1.23456, "pad": 0.08},
+        {"key": "render", "label": "Render", "id": "thunder-bluff-render", "facing": -2.8469, "pad": 0.08}]}]
+    lua = lupa.LuaRuntime()
+    lua.execute(compare.compare_lua(sets))
+    s = lua.globals().AzerothGPSStreetViewDevCompare[1]
+    assert s.name == 'Thunder "Bluff"' and s.cont == 1 and s.versions[2].id == "thunder-bluff-render"
+    assert abs(s.versions[1].facing - 1.2346) < 1e-9
+    assert compare.slug("Thunder Bluff, central rise") == "thunder-bluff-central-rise"
+    spot = {"cont": 1, "x": -1248.3, "y": 68.1}
+    pts = {"a": {"id": "a", "cont": 1, "x": -1248.0, "y": 68.0, "date": "2026-10-01 17:00"},
+           "b": {"id": "b", "cont": 1, "x": -1249.0, "y": 69.0, "date": "2026-10-01 18:00"},
+           "c": {"id": "c", "cont": 1, "x": -1300.0, "y": 68.0, "date": "2026-10-01 19:00"},
+           "d": {"id": "d", "cont": 0, "x": -1248.3, "y": 68.1, "date": "2026-10-01 20:00"}}
+    assert compare.nearest_capture(pts, spot)["id"] == "b"  # (the latest within 10 yd, on its continent)
+
+
 def test_every_point_has_one_pack_inside_the_viewer():
     cfg = pack.CONFIG
     for cont in (0, 1, 2991, 10001):  # (and Undercity's level)

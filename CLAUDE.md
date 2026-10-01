@@ -157,6 +157,13 @@ python -m pytest tests -q
 After install: `/reload` for changed Lua; **new files (images included) need a full game
 restart**. AzerothGPS itself installs with `agps install-addon` from its own repo.
 
+**Two game installs** (the user, 2026-10-01): every install goes to the real one and to the private test
+server's copy (`E:\WoWForeverPS\World of Warcraft\beta`, `PRIVATE_WOW` / `AGPS_WOW_PRIVATE`; `targets`)
+when it's there. Only the private client is ever driven by tools (streetview-harvester's `harvester.gm`,
+with the user's OK; never the real account). `sv.cmd compare --name N --render ID` stitches the private
+client's capture of a rendered spot apart from the master (build/compare-work: the capture's id is the
+render's) and puts both into the dev addon's Compare (build/compare, laid in by `install --dev`).
+
 ## Commits
 
 Commit and push completed work to origin (the private repo), short imperative messages.
