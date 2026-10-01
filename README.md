@@ -4,6 +4,12 @@
 
 # AzerothGPS StreetView
 
+[![Release build](https://github.com/AzerothGPS/AzerothGPS-StreetView/actions/workflows/release.yml/badge.svg)](https://github.com/AzerothGPS/AzerothGPS-StreetView/actions/workflows/release.yml)
+![WoW Forever 1.60.1](https://img.shields.io/badge/WoW%20Forever-1.60.1-1f6feb)
+![Interface 16001](https://img.shields.io/badge/interface-16001-555555)
+![Lua 5.1](https://img.shields.io/badge/Lua-5.1-2C2D72?logo=lua&logoColor=white)
+[![Needs AzerothGPS](https://img.shields.io/badge/needs-AzerothGPS-6f42c1)](https://github.com/AzerothGPS/AzerothGPS)
+
 A companion addon for [AzerothGPS](https://github.com/AzerothGPS/AzerothGPS) on World of
 Warcraft: Forever. Drag the little figure off the AzerothGPS map: the road network lights up,
 the road under the pointer brightest, with the street views as dots. Drop it and the nearest
