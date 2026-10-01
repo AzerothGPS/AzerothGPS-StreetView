@@ -15,10 +15,11 @@
 -- open game's hidden channel "AGPSSV<id>") and only about the game: an invitation is always asked
 -- before joining (an open game's link is the asking: clicking it joins). The host picks the
 -- street views and paces the rounds; each player scores their own guess and tells the others.
---   I:id:rounds:packs:secs invitation (host)          J:id:packs / D:id / B:id   join / decline / busy
+--   I:id:rounds:packs:secs:level   invitation (host)  J:id:packs / D:id / B:id   join / decline / busy
 --   (J's 3rd field: the host's name as the joiner sees it; W's 3rd: the one who joined, as the host
 --   sees them: WoW Forever's names are "First Surname", and each side takes the others' spelling)
---   W:id:secs:name         the lobby's seconds left (host, on each join)   U:id:why   (host) can't join:
+--   (I's 6th field and W's 5th: the game's level, Gm.LEVELS; none from an older host: Normal)
+--   W:id:secs:name:level   the lobby's seconds left (host, on each join)   U:id:why   (host) can't join:
 --                          full / started / over (an open game's J, whispered)
 --   K:id:name:packs        a player's packs (host)    (packs: Kalimdor/2026.09.29,EasternKingdoms/...)
 --   L:id:ver:part:parts:name,name,...   the players (host), split over as many messages as a raid's
@@ -75,6 +76,23 @@ Gm.PAN_SECONDS = 0.9 -- ... the map pans and zooms out to them this smoothly, th
 Gm.SPOT_ZOOM_YD = 600 -- ... else the spot alone, this zoomed
 Gm.CELEBRATE_MIN = 75 -- the average round score that earns the celebration (solo: the player's; else the winner's)
 Gm.ROUNDS = { 1, 3, 5 }
+-- Difficulty (the user, 2026-10-01): the host or solo player picks one, and every player's map is locked to
+-- its style for the game (AzerothGPS.HoldMap's opts.style, API version 9): Normal the terrain map, Heroic
+-- the world map fully revealed, Mythic the world map with nothing revealed. Sent in I and W.
+Gm.LEVELS = { "normal", "heroic", "mythic" }
+Gm.LEVEL_NAMES = { normal = "Normal", heroic = "Heroic", mythic = "Mythic" }
+Gm.LEVEL_STYLES = { normal = "minimap", heroic = "zone", mythic = "unrevealed" }
+Gm.LEVEL_COLORS = { normal = "|cff40ff40", heroic = "|cff0070dd", mythic = "|cffa335ee" }
+Gm.LEVEL_TIPS = {
+  normal = "The terrain map: the land as it looks from above, every road and building on it.",
+  heroic = "The world map, every zone revealed, but no terrain: only the drawn map.",
+  mythic = "The world map with nothing revealed: only its bare outlines, the same for everyone.",
+}
+
+-- A level's key ("normal" for anything else: an older host sends none).
+function Gm.Level(s)
+  return Gm.LEVEL_STYLES[s or ""] and s or "normal"
+end
 -- Each player's look: their icon on the map and their color (their name on the scoreboard, their
 -- dotted line). Up to 5 players (solo, whisper, a party): one of the user's orc animations each
 -- (Media/Guess<n>.tga, the color its skin's); solo, a random one. A raid: the player's own guess
@@ -512,6 +530,16 @@ local function Changed() io().changed() end
 local function Now() return io().now() end
 
 local function Short(name) return (name or "?"):match("^([^-]+)") or name end
+
+-- The map held for the game, in its level's style (again when the level arrives: a joiner's).
+local function Hold()
+  local lv = Gm.Level(game and game.level)
+  io().hold(true, Gm.LEVEL_STYLES[lv])
+  if game and lv ~= "normal" and Gm.StyleLocks == false and not game.lockWarned then -- (an AzerothGPS before 9)
+    game.lockWarned = true
+    io().print(Gm.LEVEL_NAMES[lv] .. " locks the map's style with AzerothGPS 1.1 or newer: update it to play it as meant.")
+  end
+end
 Gm.Short = Short
 
 -- WoW Forever's players have a first name and a surname (the client's "regional unique names":
@@ -781,8 +809,8 @@ end
 
 -- Start a game as its host. mode: "solo", "party", "whisper" (target: the player's name) or "open"
 -- (a party of whoever clicks the link the host posts in chat, up to Gm.MAX_PLAYERS, over the game's
--- own hidden channel).
-function Gm.Start(mode, rounds, target)
+-- own hidden channel). level: "normal" (the default), "heroic" or "mythic" (Gm.LEVELS).
+function Gm.Start(mode, rounds, target, level)
   if game and game.phase ~= "over" then
     io().print("A game is already on.")
     return false
@@ -813,6 +841,7 @@ function Gm.Start(mode, rounds, target)
     return false
   end
   NewGame(mode, rounds)
+  game.level = Gm.Level(level)
   game.before = io().mapState()
   game.channel = mode == "party" and not bots and io().group() or nil
   if bots then Gm.SeatBots() end
@@ -821,7 +850,7 @@ function Gm.Start(mode, rounds, target)
     JoinChannel(game.chanName)
   end
   game.target = mode == "whisper" and target or nil
-  io().hold(true)
+  Hold()
   io().showMap()
   if mode == "solo" then
     Gm.AssignLooks(game, game.order, function(n) return io().random(1, n) end)
@@ -832,7 +861,9 @@ function Gm.Start(mode, rounds, target)
   game.answers = {}
   game.deadline = Now() + Gm.JOIN_SECONDS
   -- (the seconds left: the lobby's countdown, the same for everyone)
-  if not open then ToOthers("I", game.id, rounds, Gm.PackField(game.packs[game.me]), Gm.JOIN_SECONDS) end
+  if not open then
+    ToOthers("I", game.id, rounds, Gm.PackField(game.packs[game.me]), Gm.JOIN_SECONDS, game.level)
+  end
   Changed()
   return true
 end
@@ -970,7 +1001,7 @@ function Gm.JoinLink(host, id, rounds)
   game.deadline = Now() + Gm.JOIN_SECONDS + 10
   game.heardHost = Now()
   io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me]), host), "WHISPER", host)
-  io().hold(true)
+  Hold() -- (Normal until the host's W says the level)
   io().showMap()
   Changed()
   return true
@@ -1171,6 +1202,7 @@ function Gm.OnMessage(msg, channel, sender)
     local reply = channel == "WHISPER" and "WHISPER" or channel
     local to = channel == "WHISPER" and sender or nil
     local left, heard = tonumber(f[4]) or Gm.JOIN_SECONDS, Now() -- (the lobby's countdown)
+    local level = Gm.Level(f[5])
     if game and game.phase ~= "over" then
       io().send(Gm.Encode("B", id), reply, to)
       return
@@ -1178,6 +1210,7 @@ function Gm.OnMessage(msg, channel, sender)
     io().ask(sender, rounds, function()
       if game and game.phase ~= "over" then return io().send(Gm.Encode("B", id), reply, to) end
       NewGame(channel == "WHISPER" and "whisper" or "party", rounds, sender, id)
+      game.level = level
       game.channel = channel ~= "WHISPER" and channel or nil
       game.packs[sender] = Gm.ParsePacks(f[3])
       game.phase = "joined"
@@ -1186,12 +1219,12 @@ function Gm.OnMessage(msg, channel, sender)
       game.deadline = game.startAt + 10 -- (no word from the host by then: it started without us)
       game.heardHost = Now()
       io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me]), sender), reply, to) -- (the host as seen here)
-      io().hold(true)
+      Hold()
       io().showMap()
       Changed()
     end, function()
       io().send(Gm.Encode("D", id), reply, to)
-    end)
+    end, level)
     return
   end
   if kind == "J" and channel == "WHISPER" and id and (not game or id ~= game.id or game.phase == "over") then
@@ -1215,11 +1248,11 @@ function Gm.OnMessage(msg, channel, sender)
       if game.open then
         if game.deadline - Now() < 3 then -- (joined at the last moment: time to hear the channel)
           game.deadline = Now() + 3
-          ToOthers("W", game.id, SecondsLeft())
+          ToOthers("W", game.id, SecondsLeft(), "", game.level)
         end
-        io().send(Gm.Encode("W", game.id, SecondsLeft(), sender), "WHISPER", sender)
+        io().send(Gm.Encode("W", game.id, SecondsLeft(), sender, game.level), "WHISPER", sender)
       else
-        ToOthers("W", game.id, SecondsLeft(), sender) -- (sender: the one who joined, as seen here)
+        ToOthers("W", game.id, SecondsLeft(), sender, game.level) -- (sender: the one who joined, as seen here)
       end
       Changed()
     elseif (kind == "D" or kind == "B") and game.phase == "invite" then
@@ -1242,6 +1275,10 @@ function Gm.OnMessage(msg, channel, sender)
     if kind == "W" and game.phase == "joined" then -- (the lobby's seconds left)
       if f[3] and f[3] ~= game.me and not game.nameSet and Gm.SameRoot(f[3], game.me) then Rename(game.me, f[3]) end
       if f[3] == game.me then game.nameSet = true end
+      if f[4] and f[4] ~= "" and Gm.Level(f[4]) ~= game.level then -- (the game's level: the map's style)
+        game.level = Gm.Level(f[4])
+        Hold()
+      end
       local left = tonumber(f[2])
       if left then
         game.startAt = Now() + left
@@ -1489,8 +1526,9 @@ local function Tip(b, title, text)
   end)
 end
 
--- The menu: slides out to the left of the game button. Step 1: solo, party or whisper; step 2:
--- how many rounds (whisper: and whose name).
+-- The menu: slides out to the left of the game button. Step 1: solo, party, whisper or link (solo: by
+-- yourself or against bots); step 2: the level (Normal, Heroic, Mythic); step 3: how many rounds
+-- (whisper: and whose name).
 local function ShowMenu(step)
   fly.step, fly.idle = step, 0
   for _, s in pairs(fly.steps) do s:Hide() end
@@ -1518,7 +1556,7 @@ local function Choose(rounds)
   local mode = fly.mode
   local target = mode == "whisper" and fly.steps.whisper.box:GetText() or nil
   if mode == "whisper" then fly.steps.whisper.box:ClearFocus() end
-  if Gm.Start(mode, rounds, target) then HideMenu() end
+  if Gm.Start(mode, rounds, target, fly.level) then HideMenu() end
 end
 
 local function BuildMenu(parent)
@@ -1556,14 +1594,14 @@ local function BuildMenu(parent)
   local party = Chip(fly, "Party", 48, function()
     if not io().group() then return io().print("You're not in a party.") end
     fly.mode = "party"
-    ShowMenu("rounds")
+    ShowMenu("level")
   end)
   Tip(party, "Party", function()
     return io().group() and "Invite your party: everyone with StreetView is asked to join." or "|cffff6060Join a party first.|r"
   end)
-  local whisper = Chip(fly, "Whisper", 60, function() fly.mode = "whisper" ShowMenu("whisper") end)
+  local whisper = Chip(fly, "Whisper", 60, function() fly.mode = "whisper" ShowMenu("level") end)
   Tip(whisper, "Whisper", "Play against one player: your target, a name you type, or shift-click their name in chat.")
-  local link = Chip(fly, "Link", 40, function() fly.mode = "open" ShowMenu("rounds") end)
+  local link = Chip(fly, "Link", 40, function() fly.mode = "open" ShowMenu("level") end)
   Tip(link, "Link", "An open game: post its link in say, guild or a channel, and whoever clicks it joins (they need"
     .. " AzerothGPS StreetView; your realm and faction), up to " .. Gm.MAX_PLAYERS .. " players.")
   local s1 = Step("mode", { solo, party, whisper, link })
@@ -1571,13 +1609,31 @@ local function BuildMenu(parent)
 
   -- Solo: by yourself, or against Gm.BOT_COUNT bots
   local back0 = Chip(fly, "<", 20, function() ShowMenu("mode") end)
-  local alone = Chip(fly, "Solo", 44, function() fly.mode = "solo" ShowMenu("rounds") end)
+  local alone = Chip(fly, "Solo", 44, function() fly.mode = "solo" ShowMenu("level") end)
   Tip(alone, "Solo", "Play by yourself: your average round score at the end.")
-  local vsBots = Chip(fly, "Against Bots", 88, function() fly.mode = "bots" ShowMenu("rounds") end)
+  local vsBots = Chip(fly, "Against Bots", 88, function() fly.mode = "bots" ShowMenu("level") end)
   Tip(vsBots, "Against Bots", "Play against " .. Gm.BOT_COUNT .. " bots named after famous characters of Azeroth, "
     .. "on a scoreboard like a party game's. Some of them are good at this.")
   local s0 = Step("solo", { back0, alone, vsBots })
   for _, c in ipairs({ back0, alone, vsBots }) do c:SetParent(s0) end
+
+  -- The level (the user, 2026-10-01): every player's map locked to its style for the game
+  local backL = Chip(fly, "<", 20, function()
+    ShowMenu((fly.mode == "solo" or fly.mode == "bots") and "solo" or "mode")
+  end)
+  local levelItems = { backL }
+  for _, key in ipairs(Gm.LEVELS) do
+    local c = Chip(fly, Gm.LEVEL_COLORS[key] .. Gm.LEVEL_NAMES[key] .. "|r", 54, function()
+      fly.level = key
+      ShowMenu(fly.mode == "whisper" and "whisper" or "rounds")
+    end)
+    Tip(c, Gm.LEVEL_NAMES[key], function()
+      return Gm.LEVEL_TIPS[key] .. (fly.mode ~= "solo" and " Every player's map shows it for the game." or "")
+    end)
+    levelItems[#levelItems + 1] = c
+  end
+  local sL = Step("level", levelItems)
+  for _, c in ipairs(levelItems) do c:SetParent(sL) end
 
   local function RoundChips(parent)
     local list = {}
@@ -1588,9 +1644,7 @@ local function BuildMenu(parent)
     end
     return list
   end
-  local back1 = Chip(fly, "<", 20, function()
-    ShowMenu((fly.mode == "solo" or fly.mode == "bots") and "solo" or "mode")
-  end)
+  local back1 = Chip(fly, "<", 20, function() ShowMenu("level") end)
   local label = CreateFrame("Frame", nil, fly)
   label:SetSize(46, MENU_H - 6)
   local lt = label:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -1601,7 +1655,7 @@ local function BuildMenu(parent)
   local s2 = Step("rounds", items)
   for _, c in ipairs(items) do c:SetParent(s2) end
 
-  local back2 = Chip(fly, "<", 20, function() fly.steps.whisper.box:ClearFocus() ShowMenu("mode") end)
+  local back2 = Chip(fly, "<", 20, function() fly.steps.whisper.box:ClearFocus() ShowMenu("level") end)
   local box = CreateFrame("EditBox", nil, fly, "InputBoxTemplate")
   box:SetSize(96, 18)
   box:SetAutoFocus(false)
@@ -1848,7 +1902,9 @@ function Gm.Refresh()
   local ph = game.phase
   -- (a game started, by the menu or an invitation accepted: the menu folds away)
   if ph ~= "over" and fly and fly:IsShown() and fly.target > 0 then HideMenu() end
-  local roundText = game.round > 0 and string.format("  |cffffffffRound %d of %d|r", game.round, game.rounds) or ""
+  local lv = Gm.Level(game.level)
+  local roundText = "  " .. Gm.LEVEL_COLORS[lv] .. Gm.LEVEL_NAMES[lv] .. "|r"
+    .. (game.round > 0 and string.format("  |cffffffffRound %d of %d|r", game.round, game.rounds) or "")
   if game.round > 0 and game.worths and game.worths[game.round] and ph ~= "over" then -- (what this one can score)
     roundText = roundText .. string.format("  |cff9d9d9dworth up to|r |cffffd100%d|r", game.worths[game.round])
   end
@@ -2256,7 +2312,7 @@ local function BuildMarks(canvas)
 end
 
 -- The invitation, asked before joining.
-local function Ask(sender, rounds, onYes, onNo)
+local function Ask(sender, rounds, onYes, onNo, level)
   if not (StaticPopupDialogs and StaticPopup_Show) then
     io().print(Short(sender) .. " invited you to play Where in the Azeroth?, but this client can't ask: declined.")
     return onNo()
@@ -2277,7 +2333,8 @@ local function Ask(sender, rounds, onYes, onNo)
     yes = function() if not answered then answered = true onYes() end end,
     no = function() if not answered then answered = true onNo() end end,
   }
-  local dlg = StaticPopup_Show("AGPS_STREETGUESS_INVITE", Short(sender), rounds == 1 and "1 round" or (rounds .. " rounds"), data)
+  local what = (rounds == 1 and "1 round" or (rounds .. " rounds")) .. ", " .. Gm.LEVEL_NAMES[Gm.Level(level)]
+  local dlg = StaticPopup_Show("AGPS_STREETGUESS_INVITE", Short(sender), what, data)
   if dlg then dlg.data = data else data.no() end
 end
 
@@ -2298,9 +2355,13 @@ function Gm.Init(figureButton)
   local io_ = Gm.io
   io_.open = function(p, heading) ns.Viewer.Open(p, heading, true) end
   io_.close = function() ns.Viewer.CloseGame() end
-  io_.hold = function(on)
-    API.HoldMap("StreetGuess", on, function(x, y, cont) Gm.Guess(x, y, API.BaseContinent(cont)) end)
+  -- (style: the game level's map style, locked for the game: AzerothGPS API version 9; an older one
+  -- ignores it, and the panel says the lock needs a newer AzerothGPS)
+  io_.hold = function(on, style)
+    API.HoldMap("StreetGuess", on, function(x, y, cont) Gm.Guess(x, y, API.BaseContinent(cont)) end,
+      on and style and { style = style } or nil)
   end
+  Gm.StyleLocks = (tonumber(API.version) or 0) >= 9
   io_.lookAt = function(cont, x, y, zoom) if API.LookAt then API.LookAt(cont, x, y, zoom) end end
   io_.view = function() -- the map's center, continent (the base one) and zoom (yards to the edge)
     local x, y, c, _, sc, half = API.View()

@@ -35,6 +35,9 @@ closer you were, the more points you get.
 - **Rounds:** 1, 3 or 5. Each street view shows for 30 seconds with a countdown on the picture; the
   guess placed when the time runs out counts (double-click again to move it). 10 seconds between
   rounds, counted down under the title.
+- **Levels:** the host or solo player picks Normal (the terrain map), Heroic (the world map, every
+  zone revealed) or Mythic (the world map with nothing revealed); every player's map is locked to it
+  for the game (AzerothGPS 1.1 or newer).
 - **Lobby:** a multiplayer game starts 30 seconds after the host starts it, counted down for every
   player whenever they joined; the host can start sooner, and a party's game starts as soon as
   everyone answered.

@@ -60,7 +60,11 @@ additive, with a lupa test) rather than reaching into AzerothGPS's private names
 
 ## Where in the Azeroth? (Street Guess, Game.lua)
 
-A GeoGuessr-style game from the button above the figure: solo, party, whisper or Link, 1/3/5 rounds.
+A GeoGuessr-style game from the button above the figure: solo, party, whisper or Link, a level, 1/3/5 rounds.
+**Levels** (the user, 2026-10-01): Normal, Heroic, Mythic (`Gm.LEVELS`), picked by the host or solo player and sent
+in I and W; every player's map is held in its style (`Gm.LEVEL_STYLES`: "minimap" terrain, "zone" world map
+revealed, "unrevealed" nothing revealed) through `AzerothGPS.HoldMap`'s opts.style (API version 9; older: unlocked,
+a note printed).
 Link (2026-09-30) is an open game: the host posts a plain-text code `AGPSSV-<id>-<rounds>` in say,
 guild, the group or a numbered channel (panel buttons; chat needs the click); other players' chat
 filter turns it into a `garrmission:agpssv:` link, and a click joins the game's hidden channel

@@ -24,6 +24,8 @@ The first public release.
   Thrall, Jaina Proudmoore and Hogger, played inside your own game), Party (party or raid), Whisper
   (one player) and Link: an open game joined from a link posted in
   say, guild, your group or a chat channel, up to 40 players.
+- Three levels the host picks, every player's map locked to it for the game: Normal (the terrain
+  map), Heroic (the world map, every zone revealed) and Mythic (the world map with nothing revealed).
 - 1, 3 or 5 rounds of 30 seconds, a countdown on the picture, 10 seconds between rounds, and a
   30-second lobby that every player sees counting down.
 - A scoreboard of five players that scrolls, your own row pinned; "guessed" shows during the round,

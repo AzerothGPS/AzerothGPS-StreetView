@@ -44,6 +44,8 @@ class Player:
         self.shown = []  # street views opened
         self.closed = 0
         self.held = []
+        self.styles = []  # (the map style each hold asked for: the game's level)
+        self.asked_level = None
         self.printed = []
         self.looked = []
         self.map_view = None  # (the map's center and zoom, when a test gives one: the result animates from it)
@@ -63,7 +65,7 @@ class Player:
             "random": self.random,
             "open": lambda p, h: self.shown.append(p.id),
             "close": self.close,
-            "hold": lambda on: self.held.append(bool(on)),
+            "hold": self.hold,
             "lookAt": lambda c, x, y, z: self.looked.append((c, x, y, z)),
             "world": lambda spot: self.looked.append("world"),
             "view": lambda: self.map_view,
@@ -85,10 +87,15 @@ class Player:
     def close(self):
         self.closed += 1
 
+    def hold(self, on, style=None):
+        self.held.append(bool(on))
+        self.styles.append(style)
+
     def send(self, msg, chat, target=None):
         self.net.queue.append((self.name, msg, chat, target))
 
-    def ask(self, sender, rounds, yes, no):
+    def ask(self, sender, rounds, yes, no, level=None):
+        self.asked_level = level
         (yes if self.answer else no)()
 
     @property
@@ -757,7 +764,7 @@ def test_the_lobby_counts_down_the_same_for_everyone_who_joins():
     a = Player("Ann-Realm", clock, net, group="PARTY")
     b = Player("Bob-Realm", clock, net, group="PARTY")
     c = Player("Cid-Realm", clock, net, group="PARTY")
-    c.ask = lambda sender, rounds, yes, no: c.later.append(yes)  # (Cid answers late)
+    c.ask = lambda sender, rounds, yes, no, level=None: c.later.append(yes)  # (Cid answers late)
     c.later = []
     c.G.io.ask = c.ask
     assert a.G.JOIN_SECONDS == 30
@@ -775,7 +782,7 @@ def test_the_lobby_counts_down_the_same_for_everyone_who_joins():
 
 def test_the_lobby_waits_for_the_countdown_until_everyone_answered():
     (a, b, c), clock, net = party(3)
-    c.G.io.ask = lambda sender, rounds, yes, no: None  # (Cid never answers)
+    c.G.io.ask = lambda sender, rounds, yes, no, level=None: None  # (Cid never answers)
     a.G.Start("party", 1)
     run(net, clock, 20)
     assert a.game.phase == "invite" and b.game.phase == "joined" and b.game.startAt - clock.t == pytest.approx(10, abs=1)
@@ -1015,3 +1022,46 @@ def test_no_developer_tools_ship():
     for word in ("Report picture", "DEMO_NAMES", "/sv demo", "db.reported", "AGPSCapture"):
         assert word not in shipped, word
 
+
+
+def test_a_level_locks_every_players_map_to_its_style():
+    # the user, 2026-10-01: Normal the terrain map, Heroic the world map revealed, Mythic nothing revealed
+    (a, b), clock, net = party(2)
+    assert a.G.Level("heroic") == "heroic" and a.G.Level("bogus") == "normal" and a.G.Level(None) == "normal"
+    assert a.G.Start("party", 1, None, "mythic")
+    assert a.game.level == "mythic" and a.styles[-1] == "unrevealed"
+    net.deliver()  # the invitation: B is asked, with the level, and joins
+    assert b.asked_level == "mythic" and b.game.level == "mythic" and b.styles[-1] == "unrevealed"
+    net.deliver()
+    run(net, clock, 1)
+    assert a.game.phase == "look" and b.game.phase == "look"
+    run(net, clock, 31 + 11)
+    assert b.game.phase == "over"
+    b.G.Leave()
+    assert b.held[-1] is False  # (the map's own style back: the hold is let go)
+
+
+def test_solo_and_older_hosts_play_normal():
+    clock, net = Clock(), Net()
+    p = Player("Me-Realm", clock, net)
+    assert p.G.Start("solo", 1)
+    assert p.game.level == "normal" and p.styles[-1] == "minimap"
+    (a, b), clock, net = party(2)
+    a.G.Start("party", 1)
+    net.queue.clear()  # (the invitation as an older host sends it: no level)
+    g = a.game
+    net.queue.append(("Ann-Realm", f"I:{g.id}:1:{a.G.PackField(g.packs['Ann-Realm'])}:30", "PARTY", None))
+    net.deliver()
+    assert b.game.level == "normal" and b.styles[-1] == "minimap"
+
+
+def test_a_link_joiner_learns_the_level_from_the_host():
+    clock, net = Clock(), Net()
+    ps = [Player(f"P{i:02d}-Realm", clock, net) for i in range(2)]
+    a, b = ps
+    assert a.G.Start("open", 1, None, "heroic")
+    a.G.PostLink("SAY")
+    link = b.G.Linkify(a.posted[0][0], "P00").split("|H")[1].split("|h")[0]
+    assert b.G.OnLink(link) and b.styles[-1] == "minimap"  # (Normal until the host says)
+    run(net, clock, 1)
+    assert b.game.level == "heroic" and b.styles[-1] == "zone"

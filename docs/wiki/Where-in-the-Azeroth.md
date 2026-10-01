@@ -16,7 +16,21 @@ Click the **Where in the Azeroth?** button above the map's figure. A menu slides
 | **Whisper** | One player: your target, a name you type, or shift-click their name in chat. |
 | **Link** | An open game: post its link in chat; whoever clicks it joins (up to 40). See [[Multiplayer]]. |
 
-Then pick **1, 3 or 5 rounds**. The menu closes by itself if you leave it alone for 20 seconds.
+Then pick the **level**, and **1, 3 or 5 rounds**. The menu closes by itself if you leave it alone for
+20 seconds.
+
+## Levels
+
+The host (or the solo player) picks one, and every player's map shows it for the whole game:
+
+| Level | The map |
+|---|---|
+| **Normal** | The terrain map: the land as it looks from above, every road and building on it. |
+| **Heroic** | The world map with every zone revealed, but no terrain: only the drawn map. |
+| **Mythic** | The world map with nothing revealed: only its bare outlines, the same for everyone. |
+
+The map's style can't be changed while the game is on, and yours comes back when it ends. (This
+needs AzerothGPS 1.1 or newer; with an older one the map isn't locked.)
 
 ## A round
 
