@@ -16,11 +16,20 @@ the road under the pointer brightest, with the street views as dots. Drop it and
 view opens in its own window, where you can look around and walk ahead. The spot and the
 direction you look show on the map.
 
-Street views cover the open world of the Eastern Kingdoms, Kalimdor and Zephras Isle, a spot about
-every 200 yards along the roads (1,407 in all), and ship inside the addon. Cities and the key spots of
-dungeons (entrances, bosses, stairs) are planned.
+<p align="center"><img src="https://github.com/user-attachments/assets/a488152a-0bad-467f-83fc-bc0218abcb0c" alt="Booty Bay at dusk in the street view" width="820"></p>
 
-Status: 1.0.0 in preparation (private repo; CurseForge release planned).
+Street views cover the open world of the Eastern Kingdoms, Kalimdor and Zephras Isle, a spot about
+every 200 yards along the roads (over 1,600 in all), plus the capitals' streets and halls (Stormwind,
+Orgrimmar, Ironforge, Darnassus, Thunder Bluff, the Undercity) and a few dozen famous spots, and they
+all ship inside the addon. In a dungeon, Shift-click a boss on its map (AzerothGPS 1.1 or newer) to see
+him standing in his room.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/wiki/AzerothGPS/AzerothGPS-StreetView/images/sv-drag-open.gif" alt="Dragging the figure onto a road opens its street view" width="400">
+  <img src="https://raw.githubusercontent.com/wiki/AzerothGPS/AzerothGPS-StreetView/images/dungeon-boss-shift-click.gif" alt="Shift-click a boss on a dungeon's map for his street view" width="400">
+</p>
+
+Status: 1.0.0 in preparation (CurseForge release planned). More: the [wiki](https://github.com/AzerothGPS/AzerothGPS-StreetView/wiki).
 
 ## Where in the Azeroth?
 
@@ -33,11 +42,13 @@ up with no zone name or coordinates; look around, then double-click the map wher
 is. When the time is up the answer shows on the map with a dotted line from your guess, and the
 closer you were, the more points you get.
 
+<p align="center"><img src="https://raw.githubusercontent.com/wiki/AzerothGPS/AzerothGPS-StreetView/images/game-round.gif" alt="A round of Where in the Azeroth?" width="640"></p>
+
 - **Modes:** Solo (by yourself, or Against Bots: four opponents named after famous characters of
-  Classic Azeroth, played inside your own game), Party (everyone in your party or raid with StreetView is asked), Whisper (one
-  player: your target, a typed name, or shift-click their name in chat) and Link (an open game: post
-  its link in say, guild, your group or a numbered channel, and whoever clicks it joins, up to 40
-  players on your realm and faction).
+  Classic Azeroth, played inside your own game) and Link: the game's link goes into your chat box for
+  your party, raid, a whisper to your target, say, guild or a numbered channel; you send it, and whoever
+  clicks it joins (it shows the level and rounds first), up to 40 players on your realm and faction.
+  Nothing is sent without you, and there are no popups.
 - **Rounds:** 1, 3 or 5. Each street view shows for 30 seconds, its top-right corner showing the level,
   the round, the time left, what the round is worth and the player list (- folds it to the time left); the
   guess placed when the time runs out counts (double-click again to move it). 10 seconds between
@@ -46,8 +57,7 @@ closer you were, the more points you get.
   zone revealed) or Mythic (the world map with nothing revealed); every player's map is locked to it
   for the game (AzerothGPS 1.1 or newer).
 - **Lobby:** a multiplayer game starts 30 seconds after the host starts it, counted down for every
-  player whenever they joined; the host can start sooner, and a party's game starts as soon as
-  everyone answered.
+  player whenever they joined; the host can start sooner.
 - **Scoring:** a round is worth 100 points at a spot by a town, flight master, named place or
   landmark, and up to 200 far from any of them (the panel says what it's worth). The points fall with
   the distance: all of it within 25 yards, 92% at 200, 78% at 500, 58% at 1,000, 30% at 2,000, 7% at
@@ -61,8 +71,10 @@ closer you were, the more points you get.
   and your view comes back as it was when the game ends. Scoring 75% or more of what the rounds were
   worth earns a celebration.
 
-Players' games talk only through the addon's own messages (prefix `AGPSSV`); invitations are always
-asked. Players are named as the game shows them: WoW Forever's first and last names.
+<p align="center"><img src="https://github.com/user-attachments/assets/cacff4cd-8867-4aa7-aca1-963a21cd0a6a" alt="Everyone's guesses on the map after a round" width="820"></p>
+
+Players' games talk only through the addon's own messages (prefix `AGPSSV`); you join a game only by
+clicking its link. Players are named as the game shows them: WoW Forever's first and last names.
 
 ## Layout
 
