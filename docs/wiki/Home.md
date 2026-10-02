@@ -17,7 +17,7 @@ with up to 40 people.
 - [[Getting Started]]: installing, and your first look around.
 - [[Street View]]: the viewer, looking around, walking, and the map marker.
 - [[Where in the Azeroth?|Where-in-the-Azeroth]]: how the game works, the levels and the scoring.
-- [[Multiplayer]]: party, whisper and link games, the lobby and the player list.
+- [[Multiplayer]]: playing with others through a link you send, the lobby and the player list.
 - [[Commands]]: every `/sv` command.
 - [[Coverage]]: where the street views are, and what's coming next.
 - [[FAQ]]: common questions and quick fixes.

@@ -99,9 +99,9 @@ the winner's otherwise). While a game is on the map is held (`AzerothGPS.HoldMap
 version 3): the route and directions panel hide, double-clicks are guesses, and the game's panel
 sits in the directions' place; its X leaves and the route comes back. Players talk through addon
 messages (prefix `AGPSSV`, the protocol is at the top of Game.lua). **Nothing is sent by itself** (the user,
-2026-10-02): the menu's Party and Whisper start an open game whose link goes into the chat box, on party/raid chat or a
-whisper (`Gm.StartLinked`; `io.post` inserts, like linking a map position: the player presses Enter), and the Link
-panel's buttons insert the same way. The link says "[Join Where in the Azeroth?: Heroic, 3 rounds]": the code ends in
+2026-10-02): the menu has Solo and Link only; every game with others is an open game whose link the panel's buttons
+put into the chat box (Party, Raid, Say, Guild, the channels, Target: a whisper to the target; `Gm.PostLink`,
+`io.post` inserts, like linking a map position: the player presses Enter). The link says "[Join Where in the Azeroth?: Heroic, 3 rounds]": the code ends in
 its level's letter (`AGPSSV-<id>-<rounds>-<N|H|M>`). An I invitation (bots, older clients) shows as such a link in
 chat, never a popup; unclicked by the lobby's end, declined (`Ask`, `Gm.AnswerInvite`).
 The logic runs through `Gm.io`; `tests/test_game.py` plays whole games between simulated players.

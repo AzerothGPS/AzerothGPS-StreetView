@@ -11,9 +11,8 @@ checks that your client can show the pictures.
 Type `/sv flipyaw`.
 
 **My friend doesn't get the invitation.**
-They need StreetView too. For a Party game they have to be in your party or raid. For a Whisper game,
-type their name the way the game shows it (first and last name). Link games need the same realm and
-faction.
+They need StreetView too, and you have to send the link yourself: it goes into your chat box, so press Enter.
+For a whisper, target them and click **Target**. Games work on your realm and faction.
 
 **Someone shows "guessed" but no points.**
 That's on purpose. Points stay hidden until the round's result, so nobody can wait and copy the best

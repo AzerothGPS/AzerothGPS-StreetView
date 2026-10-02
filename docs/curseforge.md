@@ -57,8 +57,8 @@ more points you score.
 [image: G3, GIF: a round from the street view to the answer's dotted line]
 
 - **Play however you like:** on your own, against four bots named after Classic legends (Thrall, Jaina,
-  Hogger, Leeroy...), with your party or raid, with one friend by whisper, or as an **open game** anyone
-  can join from a link you drop in chat. **Up to 40 players.**
+  Hogger, Leeroy...), or with others: the game's link drops into your chat box for your party, raid, a
+  friend by whisper, guild or any channel, you hit Enter, and whoever clicks it joins. **Up to 40 players.**
 - **Pick your difficulty:** Normal plays on the terrain map, Heroic on the world map with every zone
   revealed, and Mythic on the bare world map with nothing revealed at all. Everyone in the game gets the
   same one.

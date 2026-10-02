@@ -3,31 +3,20 @@
 Everyone in the game needs AzerothGPS StreetView. The host picks the street views and keeps the rounds
 moving, and each player scores their own guess and shares it with the others.
 
-## Party and raid
+## Playing with others
 
-Pick **Party** and the game's link goes into your chat box on party (or raid) chat, the way linking a map
-position does. Press Enter to send it. Everyone with StreetView sees **[Join Where in the Azeroth?: Heroic, 3
-rounds]**, so they know the level and the rounds before they click, and one click puts them in. Nothing is
-ever sent without you, and nobody gets a popup. The game starts when the 30-second lobby runs out, when
-it's full, or when you click **Start now**.
+Pick **Link** (then a level and the rounds) to host a game. Nothing gets sent until you send it:
 
-## Whisper
-
-Pick **Whisper** and give a name: your target, a typed name (first and last, the way WoW Forever shows
-it), or shift-click their name in chat. A whisper to them opens with the join link in it; press Enter to
-send it.
-
-## Link (open games)
-
-Pick **Link** to host a game anyone can join:
-
-1. The panel shows **Post the link:** with buttons for Say, Guild, Party, Raid and your numbered chat
-   channels (General, Trade...). Click one and the link goes into your chat box on that chat; press Enter to
-   send it (once every 5 seconds, so nobody gets spammed).
-2. Players with StreetView see **[Join Where in the Azeroth?: Heroic, 3 rounds]** in chat. One click and
-   they're in, no questions asked. Players without the addon just see a short code.
+1. The panel shows **Send the link:** with buttons for Party, Raid, Say, Guild, your numbered chat channels
+   (General, Trade...) and **Target** (a whisper to the player you have targeted). Click one and the game's
+   link goes into your chat box on that chat, the way linking a map position does. Press Enter to send it.
+   Already typing a message? The link goes right where your cursor is. (Once every 5 seconds, so nobody
+   gets spammed.)
+2. Players with StreetView see **[Join Where in the Azeroth?: Heroic, 3 rounds]** in chat, so they know the
+   level and the rounds before they click. One click and they're in, no popups. Players without the addon
+   just see a short code.
 3. Up to **40 players** can join. The game starts when the lobby's countdown ends, when it's full, or
-   when the host clicks **Start now**.
+   when you click **Start now**.
 
 Link games work on your realm and faction (they run on a hidden chat channel of their own). Click too
 late and you're told the game already started, is full, or is over.

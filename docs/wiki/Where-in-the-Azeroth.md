@@ -13,9 +13,7 @@ Click the **Where in the Azeroth?** button above the map's figure and a menu sli
 | Mode | Who plays |
 |---|---|
 | **Solo** | Then **Solo** again for just you (your average round score is what counts), or **Against Bots** for four opponents named after Classic legends, with a player list just like a party game. Nothing gets sent to anyone. |
-| **Party** | The join link goes into your party or raid chat box; send it, and whoever has StreetView clicks it to join. |
-| **Whisper** | One player: your target, a name you type, or shift-click their name in chat. |
-| **Link** | An open game: post its link in chat and whoever clicks it joins, up to 40. See [[Multiplayer]]. |
+| **Link** | Play with others: the game's link goes into your chat box for party, raid, a whisper to your target, say, guild or a channel. Send it, and whoever clicks it joins, up to 40. See [[Multiplayer]]. |
 
 Then pick a **level** and **1, 3 or 5 rounds**. Leave the menu alone for 20 seconds and it tucks itself
 away.

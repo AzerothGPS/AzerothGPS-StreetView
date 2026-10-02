@@ -31,9 +31,9 @@ The first public release! Here's what's in it.
 - **The middle of nowhere pays more:** a spot near a town, flight master, named place or landmark is
   worth 100 points, and a road out in the wilds up to 200.
 - **Play it your way:** Solo, Against Bots (four opponents named after Classic legends like Thrall, Jaina
-  Proudmoore and Hogger, all played inside your own game), Party (your party or raid), Whisper (one
-  player) or Link, an open game anyone can join from a link you post in say, guild, your group or a chat
-  channel. Up to 40 players.
+  Proudmoore and Hogger, all played inside your own game), or Link: the game's link goes into your chat box
+  for your party, raid, a whisper, say, guild or a channel, you send it, and whoever clicks it joins. It
+  shows the level and rounds up front, and there are no popups. Up to 40 players.
 - **Three levels:** Normal (the terrain map), Heroic (the world map with every zone revealed) and Mythic
   (the world map with nothing revealed). The host picks, and everyone's map is locked to it for the game.
 - 1, 3 or 5 rounds of 30 seconds, 10 seconds between rounds, and a 30-second lobby that everyone sees

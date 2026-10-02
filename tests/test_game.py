@@ -1309,22 +1309,19 @@ def test_a_link_joiner_learns_the_level_from_the_host():
     assert b.game.level == "heroic" and b.styles[-1] == "zone"
 
 
-def test_party_and_whisper_put_the_link_in_the_chat_box():
-    # the user, 2026-10-02: nothing broadcast by itself; Party and Whisper put the game's link into the chat box (like
-    # linking a map position) for the player to send; whoever clicks it joins, seeing the level and rounds first
+def test_a_link_game_goes_into_the_chat_box_for_party_raid_or_a_whisper():
+    # the user, 2026-10-02: nothing broadcast by itself; the menu has Solo and Link, and the link panel's buttons put the
+    # game's link into the chat box (like linking a map position) for the player to send; it says the level and rounds
     clock, net = Clock(), Net()
     a = Player("Ann-Realm", clock, net, group="PARTY")
     b = Player("Bob-Realm", clock, net, group="PARTY")
-    assert a.G.StartLinked("party", 3, None, "heroic")
+    assert a.G.Start("open", 3, None, "heroic")
     g = a.game
     assert g.open and g.phase == "invite" and net.queue == []  # (no invitation sent)
+    assert a.G.PostLink("PARTY")
     assert a.posted == [(f"AGPSSV-{g.id}-3-H", "PARTY", None)]
     shown = b.G.Linkify(a.posted[0][0], "Ann")
     assert "Heroic, 3 rounds]" in shown and b.G.OnLink(shown.split("|H")[1].split("|h")[0])
-    c = Player("Cid-Realm", clock, net)
-    assert not c.G.StartLinked("party", 1)  # (not in a party)
-    assert c.G.StartLinked("whisper", 1, " Bob Smith ", "mythic")
-    assert c.posted == [(f"AGPSSV-{c.game.id}-1-M", "WHISPER", None, "Bob Smith")]
-    d = Player("Dan-Realm", clock, net)
-    assert not d.G.StartLinked("whisper", 1, "") and d.game is None
-    assert d.G.StartLinked("solo", 1) and d.game.mode == "solo"  # (solo as before)
+    clock.t += 10
+    assert a.G.PostLink("WHISPER", None, "Cid Smith")  # (the panel's Target button: a whisper to the target)
+    assert a.posted[-1] == (f"AGPSSV-{g.id}-3-H", "WHISPER", None, "Cid Smith")

@@ -1274,29 +1274,6 @@ function Gm.PostLink(chatType, index, target)
   return true
 end
 
--- The menu's Party and Whisper (the user, 2026-10-02): nothing sent by itself. An open game whose link
--- goes into the chat box, on the party's or raid's chat or a whisper to `target`; whoever clicks it joins.
--- Solo and Against Bots start as before.
-function Gm.StartLinked(mode, rounds, target, level)
-  if mode ~= "party" and mode ~= "whisper" then return Gm.Start(mode, rounds, target, level) end
-  local chat = mode == "party" and io().group() or "WHISPER"
-  if mode == "party" and not io().group() then
-    io().print("You're not in a party.")
-    return false
-  end
-  if mode == "whisper" then
-    target = target and (tostring(target):gsub("^%s+", ""):gsub("%s+$", "")) or nil
-    if not target or target == "" then
-      io().print("Whose name? Target a player or type their name.")
-      return false
-    end
-  end
-  if not Gm.Start("open", rounds, nil, level) then return false end
-  game.linkTo = { chat = chat, target = target }
-  Gm.PostLink(chat, nil, target)
-  return true
-end
-
 -- host: start without waiting for the rest of the answers
 function Gm.StartNow()
   if game and game.isHost and game.phase == "invite" then Begin() end
@@ -1884,9 +1861,9 @@ local function Tip(b, title, text)
   end)
 end
 
--- The menu: slides out to the left of the game button. Step 1: solo, party, whisper or link (solo: by
--- yourself or against bots); step 2: the level (Normal, Heroic, Mythic); step 3: how many rounds
--- (whisper: and whose name).
+-- The menu: slides out to the left of the game button. Step 1: solo or link (the user, 2026-10-02: every game with
+-- others is a link the player sends; solo: by
+-- yourself or against bots); step 2: the level (Normal, Heroic, Mythic); step 3: how many rounds.
 local function ShowMenu(step)
   fly.step, fly.idle = step, 0
   for _, s in pairs(fly.steps) do s:Hide() end
@@ -1898,19 +1875,13 @@ local function ShowMenu(step)
     fly:SetWidth(1)
     fly:Show()
   end
-  if step == "whisper" then
-    local name = UnitIsPlayer and UnitIsPlayer("target") and not UnitIsUnit("target", "player") and Gm.UnitFullName("target")
-    s.box:SetText(name or s.box:GetText() or "")
-    s.box:SetFocus()
-    s.box:HighlightText()
-  end
 end
 
 local function HideMenu()
   if fly then fly.target = 0 end
 end
 
--- The menu at a step ("mode", "solo", "level", "rounds", "whisper"), or folded away (nil): the dev addon's
+-- The menu at a step ("mode", "solo", "level", "rounds"), or folded away (nil): the dev addon's
 -- media shots. Gives the step's frame (its chips are its children), true when folded, false before the
 -- menu is built.
 function Gm.OpenMenu(step)
@@ -1924,10 +1895,7 @@ function Gm.OpenMenu(step)
 end
 
 local function Choose(rounds)
-  local mode = fly.mode
-  local target = mode == "whisper" and fly.steps.whisper.box:GetText() or nil
-  if mode == "whisper" then fly.steps.whisper.box:ClearFocus() end
-  if Gm.StartLinked(mode, rounds, target, fly.level) then HideMenu() end
+  if Gm.Start(fly.mode, rounds, nil, fly.level) then HideMenu() end
 end
 
 local function BuildMenu(parent)
@@ -1962,21 +1930,12 @@ local function BuildMenu(parent)
   end
   local solo = Chip(fly, "Solo", 44, function() ShowMenu("solo") end)
   Tip(solo, "Solo", "Play by yourself, or against bots.")
-  local party = Chip(fly, "Party", 48, function()
-    if not io().group() then return io().print("You're not in a party.") end
-    fly.mode = "party"
-    ShowMenu("level")
-  end)
-  Tip(party, "Party", function()
-    return io().group() and "Invite your party: everyone with StreetView is asked to join." or "|cffff6060Join a party first.|r"
-  end)
-  local whisper = Chip(fly, "Whisper", 60, function() fly.mode = "whisper" ShowMenu("level") end)
-  Tip(whisper, "Whisper", "Play against one player: your target, a name you type, or shift-click their name in chat.")
   local link = Chip(fly, "Link", 40, function() fly.mode = "open" ShowMenu("level") end)
-  Tip(link, "Link", "An open game: post its link in say, guild or a channel, and whoever clicks it joins (they need"
-    .. " AzerothGPS StreetView; your realm and faction), up to " .. Gm.MAX_PLAYERS .. " players.")
-  local s1 = Step("mode", { solo, party, whisper, link })
-  for _, c in ipairs({ solo, party, whisper, link }) do c:SetParent(s1) end
+  Tip(link, "Link", "Play with others: its link goes into your chat box (party, raid, say, guild, a channel, or a"
+    .. " whisper to your target), you send it, and whoever clicks it joins (they need AzerothGPS StreetView; your realm"
+    .. " and faction), up to " .. Gm.MAX_PLAYERS .. " players.")
+  local s1 = Step("mode", { solo, link })
+  for _, c in ipairs({ solo, link }) do c:SetParent(s1) end
 
   -- Solo: by yourself, or against Gm.BOT_COUNT bots
   local back0 = Chip(fly, "<", 20, function() ShowMenu("mode") end)
@@ -1996,7 +1955,7 @@ local function BuildMenu(parent)
   for _, key in ipairs(Gm.LEVELS) do
     local c = Chip(fly, Gm.LEVEL_COLORS[key] .. Gm.LEVEL_NAMES[key] .. "|r", 54, function()
       fly.level = key
-      ShowMenu(fly.mode == "whisper" and "whisper" or "rounds")
+      ShowMenu("rounds")
     end)
     Tip(c, Gm.LEVEL_NAMES[key], function()
       return Gm.LEVEL_TIPS[key] .. (fly.mode ~= "solo" and " Every player's map shows it for the game." or "")
@@ -2026,26 +1985,11 @@ local function BuildMenu(parent)
   local s2 = Step("rounds", items)
   for _, c in ipairs(items) do c:SetParent(s2) end
 
-  local back2 = Chip(fly, "<", 20, function() fly.steps.whisper.box:ClearFocus() ShowMenu("level") end)
-  local box = CreateFrame("EditBox", nil, fly, "InputBoxTemplate")
-  box:SetSize(96, 18)
-  box:SetAutoFocus(false)
-  box:SetMaxLetters(48)
-  box:SetScript("OnEscapePressed", function(self) self:ClearFocus() HideMenu() end)
-  box:SetScript("OnEnterPressed", function(self) self:ClearFocus() Choose(3) end)
-  local spacer = CreateFrame("Frame", nil, fly) -- (InputBoxTemplate's border sticks out on the left)
-  spacer:SetSize(4, 1)
-  local items3 = { back2, spacer, box }
-  for _, c in ipairs(RoundChips(fly)) do items3[#items3 + 1] = c end
-  local s3 = Step("whisper", items3)
-  for _, c in ipairs(items3) do c:SetParent(s3) end
-  s3.box = box
-
   -- the slide: the width eases toward its target (0: closing); left open with nothing chosen and
-  -- the mouse elsewhere for Gm.MENU_IDLE_SECONDS, it closes by itself (typing a name counts as using it)
+  -- the mouse elsewhere for Gm.MENU_IDLE_SECONDS, it closes by itself
   fly:SetScript("OnUpdate", function(self, dt)
     if self.target > 0 then
-      local busy = self:IsMouseOver() or gameButton:IsMouseOver() or box:HasFocus()
+      local busy = self:IsMouseOver() or gameButton:IsMouseOver()
       self.idle = busy and 0 or (self.idle or 0) + dt
       if self.idle >= Gm.MENU_IDLE_SECONDS then HideMenu() end
     end
@@ -2163,12 +2107,17 @@ local function BuildPanel(parent)
   panel.start = start
   -- an open game's host: post the link (where: say, guild, the group, the numbered channels joined)
   panel.postLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  panel.postLabel:SetText("Post the link:")
+  panel.postLabel:SetText("Send the link:")
   panel.postLabel:Hide()
   panel.posts = {}
   local function Post(text, width, chatType, index, tip)
-    local b = Chip(panel, text, width, function() Gm.PostLink(chatType, index) end)
-    Tip(b, "Post the link in " .. tip, "Players with AzerothGPS StreetView click it to join.")
+    local b = Chip(panel, text, width, function()
+      if chatType ~= "WHISPER" then return Gm.PostLink(chatType, index) end
+      local name = UnitIsPlayer and UnitIsPlayer("target") and not UnitIsUnit("target", "player") and Gm.UnitFullName("target")
+      if not name then return io().print("Target a player to whisper the link to.") end
+      Gm.PostLink("WHISPER", nil, name)
+    end)
+    Tip(b, "Put the link in your chat box: " .. tip, "Press Enter to send it. Players with AzerothGPS StreetView click it to join.")
     b.shown = function()
       if chatType == "GUILD" then return IsInGuild and IsInGuild() end
       if chatType == "PARTY" then return IsInGroup and IsInGroup() and not (IsInRaid and IsInRaid()) end
@@ -2189,6 +2138,7 @@ local function BuildPanel(parent)
   Post("Guild", 44, "GUILD", nil, "guild chat")
   Post("Party", 44, "PARTY", nil, "party chat")
   Post("Raid", 40, "RAID", nil, "raid chat")
+  Post("Target", 50, "WHISPER", nil, "a whisper to your target")
   for i = 1, 4 do Post("/" .. i, 44, "CHANNEL", i, "chat channel " .. i) end
   -- solo: done guessing before the time runs out
   local ok2, submit = pcall(CreateFrame, "Button", nil, panel, "UIPanelButtonTemplate")
@@ -2515,7 +2465,7 @@ local function BuildButton(parent, figure)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("Where in the Azeroth?")
     GameTooltip:AddLine("Where is this street view? You have 30 seconds to look around and double-click the map where you think it is (again to move it).", 1, 1, 1, true)
-    GameTooltip:AddLine("Solo, with your party, or with one player by whisper.", 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine("Solo, or with others: a link you send in party, raid, a whisper or any chat.", 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
   end)
   gameButton:SetScript("OnLeave", GameTooltip_Hide)
@@ -2728,20 +2678,6 @@ function Gm.Init(figureButton)
     return not (D.loadable and not D.loadable[p.id])
   end
   API.SetOverlay("StreetGuess", Gm.Draw)
-  -- Whisper: shift-click a player's name in chat to fill the name box
-  if hooksecurefunc and SetItemRef then
-    hooksecurefunc("SetItemRef", function(link)
-      local box = fly and fly.steps.whisper and fly.steps.whisper.box
-      if not (box and fly:IsShown() and fly.step == "whisper") then return end
-      local shift = (IsModifiedClick and IsModifiedClick("CHATLINK")) or (IsShiftKeyDown and IsShiftKeyDown())
-      local name = shift and type(link) == "string" and link:match("^player:([^:]+)")
-      if name then
-        box:SetText(name)
-        box:SetFocus()
-        box:SetCursorPosition(#name)
-      end
-    end)
-  end
   if API.OnLayout then API.OnLayout("StreetGuess", function() Gm.Refresh() end) end -- (the frame's portrait on or off)
 
   if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then C_ChatInfo.RegisterAddonMessagePrefix(Gm.PREFIX) end
