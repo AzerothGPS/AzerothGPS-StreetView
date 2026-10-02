@@ -520,9 +520,12 @@ def shipped(points: list[dict], spacing: float | None, pinned: set[str], marked:
     """The spots that ship: `ship_points` over the road and city spots (the landmarks among them
     pinned), and the `marked` landmark spots (landmarks.json entries with a z: picked standing points,
     not road spots) added on top. Marked spots stay out of the greedy: in it they made 15 shipped
-    spots give way (2026-10-01). Same as the harvester's ship.shipped_ids."""
-    road = [p for p in points if p["id"] not in marked]
-    return ship_points(road, spacing, pinned, city_spacing) + [p for p in points if p["id"] in marked]
+    spots give way (2026-10-01). Same as the harvester's ship.shipped_ids. Instance spots (a dungeon's bosses,
+    `kind` "instance") always ship too, like the marked ones: thinned as neighbors, Ragefire's three bosses lost
+    one (2026-10-02)."""
+    extra = set(marked) | {p["id"] for p in points if p.get("kind") == "instance"}
+    road = [p for p in points if p["id"] not in extra]
+    return ship_points(road, spacing, pinned, city_spacing) + [p for p in points if p["id"] in extra]
 
 
 def build_packs(build: Path, version: str | None = None, cfg: dict | None = None,

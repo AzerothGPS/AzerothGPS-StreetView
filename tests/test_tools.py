@@ -709,3 +709,11 @@ def test_install_private_skips_the_real_game(tmp_path, monkeypatch):
     monkeypatch.setattr(sv, "install_into", lambda addons, dev: into.append((addons, dev)))
     monkeypatch.setattr(sv, "install", lambda *a: into.append("the real game"))
     assert sv.install_private(True) == 1 and into == [(private, True)]
+
+
+def test_a_dungeons_boss_spots_all_ship():
+    # (2026-10-02: Ragefire's three bosses, 140-150 yd apart, were thinned like road spots and lost Taragaman)
+    pts = [{"id": f"20389-{x}-0", "cont": 20389, "x": x, "y": 0, "kind": "instance"} for x in (0, 140, 290)]
+    pts += [{"id": f"1-{x}-0", "cont": 1, "x": x, "y": 0} for x in (0, 100, 200)]
+    ids = {p["id"] for p in pack.shipped(pts, 200, set(), set())}
+    assert {"20389-0-0", "20389-140-0", "20389-290-0"} <= ids and len([i for i in ids if i.startswith("1-")]) < 3
