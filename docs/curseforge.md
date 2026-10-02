@@ -33,10 +33,12 @@ up, zoom in, and follow the arrows on the ground to walk down the road.
 
 ### Go take a look
 
-- **Over 1,500 street views** along the roads of the Eastern Kingdoms, Kalimdor and Zephras Isle,
+- **Over 1,600 street views** along the roads of the Eastern Kingdoms, Kalimdor and Zephras Isle,
   roughly one every 200 yards.
-- **The cities too:** walk the streets of Stormwind, Orgrimmar, Darnassus and Thunder Bluff, and wander
-  the Undercity's halls and canals.
+- **The cities too:** walk the streets of Stormwind, Orgrimmar, Darnassus and Thunder Bluff, wander the
+  Undercity's halls and canals, and head down into Ironforge.
+- **Step inside:** Stormwind Keep and the Cathedral, the inns, Thunder Bluff's tents, Orgrimmar's halls and
+  Ironforge's great underground city, all lit the way they glow in the game.
 - **Famous spots, picked by hand:** Booty Bay, Gadgetzan, Lakeshire, the Crossroads, Light's Hope Chapel
   and a few dozen more, each one framed so you know it the second it opens.
 - **Look anywhere:** drag the picture around, and the mouse wheel zooms.
@@ -87,10 +89,11 @@ everything is on the wiki.
 
 ### What's next
 
-- **Ironforge:** its halls are underground, so they need their own lighting to look right. That's being
-  worked on now.
-- **Dungeons:** the key spots in each one, like the entrance, the bosses and the stairs between floors.
-  Those will be in the viewer only, never in the game.
+- **Dungeons, boss by boss:** Shift-click a boss on a dungeon's map and see him standing in his room.
+  The first one, Taragaman the Hungerer in Ragefire Chasm, is already in (with AzerothGPS 1.1.0 or
+  later; the top of the map tells you when it works). More bosses, entrances and the stairs between floors
+  are on the way. They're in the viewer only, never in the game.
+- **A few more spots:** the Great Forge and some of Darnassus' tree houses are getting a last bit of polish.
 
 ### Notes
 

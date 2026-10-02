@@ -85,7 +85,8 @@ celebration too: a glow of drifting colors around the street view's corner and t
 
 ## Keeping it fair
 
-- Only open-world and city street views come up. Never dungeons or caves.
+- Only open-world and city street views come up, inside the cities' buildings too. Never dungeons or
+  caves.
 - Only street views every player has get used. If someone's on an older version, the panel tells you who's
   missing what.
 - While you play, the map hides your route, dungeons and transports (boats, zeppelins) so they don't give

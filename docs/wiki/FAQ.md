@@ -33,8 +33,12 @@ Click the **-** in its corner. It shrinks down to just the timer, and **+** brin
 No. It only shows pictures and the map. It never moves your character or presses keys for you.
 
 **Does it work in dungeons?**
-Not yet. Key spots in dungeons are planned for the viewer (see [[Coverage]]), but they'll never come up
-in the game.
+It's starting to. Open a dungeon's map in AzerothGPS and Shift-click a boss to see him in his room. So far
+that's Taragaman in Ragefire Chasm, with more on the way (see [[Coverage]]). It needs AzerothGPS 1.1.0 or
+later, and the top of the map says "Shift-click a boss: its street view" when it works. Dungeon spots
+never come up in Where in the Azeroth?. `/sv here` can't find you inside a dungeon, because the game hides
+your position there.
 
-**Where's Ironforge?**
-Coming soon. Its halls are underground and need their own lighting first.
+**Can I go inside buildings?**
+Yes. Ironforge, Stormwind Keep and the Cathedral, the inns, Thunder Bluff's tents and Orgrimmar's halls are
+all in, and they can come up in Where in the Azeroth? too.

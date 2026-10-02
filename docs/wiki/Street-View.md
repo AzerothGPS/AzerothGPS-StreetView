@@ -6,6 +6,8 @@
   (brightest under your pointer) and the street views show as dots. Let go and the nearest one opens.
 - **Click the figure**, or type `/sv here`, to see the street view nearest you.
 - Know its id? `/sv open <id>` opens it straight away (`/sv list` lists them all).
+- **In a dungeon,** Shift-click a boss on its map to see him standing in his room (with AzerothGPS 1.1.0 or
+  later; the top of the map says so when it works). Dragging the figure onto a dungeon's map works too.
 
 ## Looking around
 
@@ -24,5 +26,6 @@ and keeps up as you turn or walk.
 ## Good to know
 
 - Every picture is a full 360-degree panorama rendered from the game world: about one every 200 yards
-  along the roads, the streets of the cities, and a few dozen famous spots framed by hand.
+  along the roads, the streets of the cities and inside their buildings, a few dozen famous spots framed by
+  hand, and the first dungeon boss.
 - Left and right look swapped on your client? `/sv flipyaw` turns the views the other way.

@@ -2,22 +2,26 @@
 
 ## What's in 1.0.0
 
-- **Over 1,500 street views**, about one every 200 yards along the roads of:
+- **Over 1,600 street views**, about one every 200 yards along the roads of:
   - the Eastern Kingdoms
   - Kalimdor
   - Zephras Isle
-- **The cities:** the streets of Stormwind, Orgrimmar, Darnassus and Thunder Bluff, and the Undercity's
-  halls and canals.
+- **The cities:** the streets of Stormwind, Orgrimmar, Darnassus and Thunder Bluff, the Undercity's
+  halls and canals, and Ironforge underground.
+- **Inside the buildings:** Stormwind Keep and the Cathedral, the inns, Thunder Bluff's tents, Orgrimmar's
+  halls and Ironforge's, lit by their own lamps and forges the way the game lights them.
+- **The first dungeon boss:** Taragaman the Hungerer in Ragefire Chasm. Shift-click him on the dungeon's
+  map (see [[Street View]]).
 - **Famous spots, picked by hand:** a few dozen places you'd know anywhere, like Booty Bay, Gadgetzan,
   Lakeshire, the Crossroads, Light's Hope Chapel and Menethil Harbor, each one framed on its best view.
 - Every picture is a full 360-degree panorama, looking up and down too.
 
 ## Coming next
 
-- **Ironforge:** the city's halls are underground, so they need their own lighting before they look
-  right. It's in the works.
-- **Dungeons:** just the key spots: the entrance, the bosses and the stairs between floors. Those will be
-  in the viewer only, never in the game.
+- **More dungeons:** the bosses first, then the entrances and the stairs between floors. They're in the
+  viewer only, never in the game.
+- **A few more spots:** the Great Forge and some of Darnassus' tree houses are getting a last bit of
+  polish.
 
 ## A picture looks wrong?
 
