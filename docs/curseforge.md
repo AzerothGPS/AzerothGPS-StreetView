@@ -22,7 +22,7 @@ the repo is public. The voice is the same as AzerothGPS's page: talk to the play
 
 ## Description
 
-<p align="center"><img src="https://raw.githubusercontent.com/AzerothGPS/AzerothGPS-StreetView/main/assets/where-in-the-azeroth.png" alt="Where in the Azeroth?" width="260"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/AzerothGPS/AzerothGPS-StreetView/main/assets/logo.png" alt="AzerothGPS StreetView" width="260"></p>
 
 **Ever wanted to stand on a road in Azeroth and just look around?** AzerothGPS StreetView adds
 street-level views to the [AzerothGPS](https://github.com/AzerothGPS/AzerothGPS) map. Drag the little
@@ -47,6 +47,8 @@ up, zoom in, and follow the arrows on the ground to walk down the road.
 - **Nothing else to download:** every picture ships inside the addon.
 
 <p align="center"><img src="https://github.com/user-attachments/assets/a488152a-0bad-467f-83fc-bc0218abcb0c" alt="Booty Bay at dusk in the street view" width="820"></p>
+
+<p align="center"><img src="https://raw.githubusercontent.com/AzerothGPS/AzerothGPS-StreetView/main/assets/where-in-the-azeroth.png" alt="Where in the Azeroth?" width="260"></p>
 
 ### Where in the Azeroth?
 
