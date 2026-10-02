@@ -18,7 +18,7 @@ direction you look show on the map.
 
 Street views cover the open world of the Eastern Kingdoms, Kalimdor and Zephras Isle, a spot about
 every 200 yards along the roads (1,407 in all), and ship inside the addon. Cities and the key spots of
-dungeons (entrances, bosses, stairs) are planned (`PLAN.md`).
+dungeons (entrances, bosses, stairs) are planned.
 
 Status: 1.0.0 in preparation (private repo; CurseForge release planned).
 
@@ -84,8 +84,9 @@ asked. Players are named as the game shows them: WoW Forever's first and last na
   to this one): one addon with the manual capture tool for example views on your own client
   (it never moves the character or the camera: you turn and press the game's own Set View keys,
   and it hides names and takes one screenshot per key press), `/sv demo` (a game against bots) and
-  Report picture. Never shipped; installed with `sv.cmd install --dev`. The automated capture for a
-  private server lives in the separate private repo AzerothGPS/streetview-harvester.
+  Report picture. Never shipped; installed with `sv.cmd install --dev`. The pictures are rendered
+  offline (wow.export and Blender, reading the client's files) by the separate private repo
+  AzerothGPS/streetview-harvester.
 - `tools/sv.py`: install the addons; import manual captures (`import`) or points exported by
   the harvester on the capture PC (`import-harvest <folder>`) into the pictures.
 - `packs.json`: how the pictures ship (inside the viewer: continents, tile sizes, spacing, the

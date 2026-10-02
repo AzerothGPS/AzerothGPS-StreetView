@@ -1,8 +1,8 @@
 """AzerothGPS StreetView developer tool.
 
-  sv.cmd install [--dev] [--private]  copy the viewer with its built pictures into the game's AddOns folder
-                                  (--private: only into the private test client's, the folders in
-                                  %USERPROFILE%\\.agps-installs, not the real game)
+  sv.cmd install [--dev] [--extras]  copy the viewer with its built pictures into the game's AddOns folder
+                                  (--extras: only into the extra AddOns folders listed in
+                                  %USERPROFILE%\\.agps-installs, not the main game)
                                   (--dev adds the private developer addon AzerothGPS_StreetView_Dev from
                                   the AzerothGPS-StreetView-Dev checkout next to this one: the manual
                                   capture tool, /sv demo against bots, Report picture)
@@ -24,12 +24,12 @@
                                   in game with the dev addon's /sv mark, and list them
   sv.cmd media                    regenerate the addon's own art (Media/)
   sv.cmd compare --name N --render ID   a spot as rendered and as captured in the game (on the private
-                                  test server, --capture-wow), for the dev addon's Compare; then install --dev
+                                  game folder, --capture-wow), for the dev addon's Compare; then install --dev
 
 The pictures ship inside the viewer addon (packs.json, under CurseForge's limit). The game folder
 defaults to C:\\Program Files (x86)\\World of Warcraft\\_classic_beta_ (set AGPS_WOW or pass
 --wow); every install also goes into each AddOns folder listed in %USERPROFILE%\\.agps-installs (shared
-with AzerothGPS's install-addon: the capture PC's private test client, through its share). sv.cmd runs
+with AzerothGPS's install-addon: a second test install, say). sv.cmd runs
 this with the AzerothGPS venv's Python (Pillow, numpy, lupa).
 """
 
@@ -48,8 +48,7 @@ from svtools import pack  # noqa: E402
 
 DEFAULT_WOW = Path(os.environ.get("AGPS_WOW", r"C:\Program Files (x86)\World of Warcraft\_classic_beta_"))
 # More AddOns folders every install also goes into, one per line ("#" comments): AzerothGPS's list (its
-# cli.py EXTRA_INSTALLS), in the user's home folder so the paths stay out of git. The private test client's,
-# which runs on the capture PC (streetview-harvester's SERVER.md: its share), never on the main PC's game.
+# cli.py EXTRA_INSTALLS), in the user's home folder so the paths stay out of git.
 EXTRA_INSTALLS = Path.home() / ".agps-installs"
 BUILD = ROOT / "build"
 
@@ -139,8 +138,8 @@ def install_into(addons: Path, dev: bool) -> None:
         print("Only changed files: /reload in game.")
 
 
-def install_private(dev: bool) -> int:
-    """Only the AddOns folders in EXTRA_INSTALLS (the private test client), never the real game. Returns
+def install_extras(dev: bool) -> int:
+    """Only the AddOns folders in EXTRA_INSTALLS, not the main game. Returns
     how many were installed into."""
     n = 0
     for extra in extra_addons_dirs():
@@ -151,7 +150,7 @@ def install_private(dev: bool) -> int:
         install_into(extra, dev)
         n += 1
     if not n:
-        print(f"No private AddOns folder to install into (list them in {EXTRA_INSTALLS}).")
+        print(f"No extra AddOns folder to install into (list them in {EXTRA_INSTALLS}).")
     return n
 
 
@@ -202,8 +201,8 @@ def main(argv=None) -> None:
     p_inst = sub.add_parser("install")
     p_inst.add_argument("--dev", "--capture", dest="dev", action="store_true",
                         help="also install the private developer addon (capture, bot demo, Report picture)")
-    p_inst.add_argument("--private", action="store_true",
-                        help="only the private test client's AddOns folders (.agps-installs), not the real game")
+    p_inst.add_argument("--extras", action="store_true",
+                        help="only the extra AddOns folders (.agps-installs), not the main game")
     p_imp = sub.add_parser("import")
     p_imp.add_argument("--no-install", action="store_true")
     p_imp.add_argument("--no-stitch", action="store_true", help="skip stitching (faster)")
@@ -238,7 +237,7 @@ def main(argv=None) -> None:
     p_c.add_argument("--render", required=True, help="the rendered spot's id (build/master), e.g. 1--1248-68")
     p_c.add_argument("--capture-wow", type=Path,
                      help="the game folder whose capture tool's spots to take (else --grabs)")
-    p_c.add_argument("--grabs", type=Path, help="window grabs instead (k<k>_v<n>.png, k<k>_nadir.png: harvester.gm --shot)")
+    p_c.add_argument("--grabs", type=Path, help="window grabs instead (k<k>_v<n>.png, k<k>_nadir.png)")
     p_c.add_argument("--facing", type=float, help="the grabs' first facing (default: the render's)")
     p_c.add_argument("--rings", help='which grabs make which ring, with their rough pitch, e.g. '
                      '"p0=nadir@-88,p2=down@-38,p4=level@8,p5=up@35,p6=zenith@60"')
@@ -246,8 +245,8 @@ def main(argv=None) -> None:
     a = ap.parse_args(argv)
 
     if a.cmd == "install":
-        if a.private:
-            install_private(a.dev)
+        if a.extras:
+            install_extras(a.dev)
         else:
             install_all(a.wow, a.dev)
     elif a.cmd == "import":

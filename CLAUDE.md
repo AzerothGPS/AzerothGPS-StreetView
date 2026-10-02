@@ -2,7 +2,9 @@
 
 Companion addon to AzerothGPS (sibling checkout `../azerothgps`, public repo
 AzerothGPS/AzerothGPS). This repo is **private**: https://github.com/AzerothGPS/AzerothGPS-StreetView.
-`PLAN.md` is the full project plan (capture rig on a second PC, data packs, mini game).
+The full project plan is `docs/PLAN.md` in the private Dev repo (AzerothGPS-StreetView-Dev, checked out next
+to this one); this repo is public, so the plan, the capture setup and anything about how the pictures are
+made beyond offline rendering stay there.
 
 ## Rules
 
@@ -14,9 +16,9 @@ AzerothGPS/AzerothGPS). This repo is **private**: https://github.com/AzerothGPS/
   character names or emails. Author is "AzerothGPS".
 - **Developer tools are not in this addon** (the user, 2026-09-30): they live in the private repo
   AzerothGPS/AzerothGPS-StreetView-Dev (checked out next to this one), one addon
-  `AzerothGPS_StreetView_Dev`: the **manual** capture tool for the user's real Blizzard account (it
-  never moves the character or the camera: the user turns and presses the game's Set View keys; it
-  only hides names and takes a screenshot per key press), `/sv demo [players] [rounds]` (a real
+  `AzerothGPS_StreetView_Dev`: the **manual** capture tool (it never moves the character or the camera:
+  the player turns and presses the game's Set View keys; it only hides names and takes a screenshot per
+  key press), `/sv demo [players] [rounds]` (a real
   Where in the Azeroth? game against bots, nothing sent) and the Report picture button (`/sv reports`).
   Never published; `sv.py install --dev` installs it. The shipped addon only offers hooks for it
   (`AzerothGPS_StreetView_Extend`, `ns.commands`, `Gm.internal`, `Gm.OnPanel`/`Gm.extraButtons`,
@@ -25,9 +27,12 @@ AzerothGPS/AzerothGPS). This repo is **private**: https://github.com/AzerothGPS/
   the capture tool are `source: "manual"` (`pack.is_manual`): they stay in the master as ground
   truth for checking renders, and `build_packs` leaves them out. The raw screenshots don't stay
   in the game install: they live in `data/manual-captures/Screenshots` (git-ignored).
-- **No automation of any kind on this PC's game.** Automated teleporting and capture live in
-  the separate private repo AzerothGPS/streetview-harvester, for a private server on the
-  other PC only. Never install anything from it into this PC's WoW folder.
+- **No automation of any kind in the game.** The street views are rendered offline (wow.export and
+  Blender read the client's files; nothing runs the game) by the separate private repo
+  AzerothGPS/streetview-harvester, on a capture PC. Never install anything from it into the game.
+- **This repo is public** (the user, 2026-10-02): how the pictures are made beyond offline rendering, test
+  setups, and anything that drives a character stay out of it (code, comments, docs, held.json reasons);
+  they belong in the private Dev repo.
 - American spelling in user-facing text.
 
 ## Size and shipping (the user: always consider the CurseForge limit)
@@ -134,7 +139,7 @@ Every data update starts from the roads: compare the rendered spots with Azeroth
 `Data/Roads.lua`. Spots whose road is gone are retired (left out of the packs, kept in the
 master); new roads get spots on the render list. Then build, check sizes and the retake list, and
 release. Rendering can run on any designated PC with the harvester repo's setup guide (wow.export
-and Blender only read the client's files; nothing runs the game). Details: `PLAN.md` part 11.
+and Blender only read the client's files; nothing runs the game). Details: the Dev repo's `docs/PLAN.md` part 11.
 
 ## Coordinates and views
 
@@ -154,7 +159,7 @@ and Blender only read the client's files; nothing runs the game). Details: `PLAN
 Use the AzerothGPS venv: `%USERPROFILE%\.venvs\azerothgps\Scripts\python.exe`.
 
 ```
-python tools/sv.py install     # copy StreetView with its pictures into the game (--dev: + the private dev addon; --private: only the private test client's folders)
+python tools/sv.py install     # copy StreetView with its pictures into the game (--dev: + the private dev addon; --extras: only the extra AddOns folders, not the main game)
 python tools/sv.py import      # the dev addon's capture screenshots -> stitched spots -> build/packs, then install
 python tools/sv.py watch       # the same on every /reload
 python tools/sv.py pull [--from //PC/agps-work] [--watch 10]  # harvested spots from the capture PC's share (LAN)
@@ -168,13 +173,10 @@ python -m pytest tests -q
 After install: `/reload` for changed Lua; **new files (images included) need a full game
 restart**. AzerothGPS itself installs with `agps install-addon` from its own repo.
 
-**This PC is for the real game** (the user, 2026-10-01): the private test server, its client and everything
-that drives a character (streetview-harvester's `harvester.gm`, `certpatch`, the camera commands, now its
-`AGPS_Harvester` addon's `/agpscam`) run on the **capture PC** only. Every install also goes into each AddOns
-folder in `%USERPROFILE%\.agps-installs` (shared with AzerothGPS's `install-addon`; the capture PC's private
-client through its share), so one update reaches both. The dev addon never moves the camera or the
-character (a test scans it). `sv.cmd compare --name N --render ID --grabs <folder>` stitches window grabs of
-the game (taken on the capture PC) apart from the master and puts both into the dev addon's Compare
+Every install also goes into each AddOns folder listed in `%USERPROFILE%\.agps-installs` (shared with
+AzerothGPS's `install-addon`; a second test install, say), so one update reaches all of them. The dev addon
+never moves the camera or the character (a test scans it). `sv.cmd compare --name N --render ID --grabs
+<folder>` stitches window grabs of the game apart from the master and puts both into the dev addon's Compare
 (build/compare, laid in by `install --dev`).
 
 ## Commits

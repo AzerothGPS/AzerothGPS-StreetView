@@ -305,7 +305,7 @@
     "x": -4790.3,
     "y": -1127.1
    },
-   "note": "held (2026-10-01): test renders at about (-4790, -1127, z 498.8) show the forge floor, bell furnaces and pillars, but cold blue-gray: wow.export drops the interior's baked light. Waits for the instance-lighting work (PLAN.md part 10)"
+   "note": "held (2026-10-01): test renders at about (-4790, -1127, z 498.8) show the forge floor, bell furnaces and pillars, but cold blue-gray: wow.export drops the interior's baked light. Waits for the instance-lighting work"
   },
   {
    "name": "Ironforge, The Commons",
@@ -315,7 +315,7 @@
     "x": -4886.3,
     "y": -997.4
    },
-   "note": "held (2026-10-01): test renders at about (-4925, -966, z 501.5) face the bank's gold doors in the arched hall (everything within 24 yd of the label is inside the bank vault), but cold blue-gray: no baked interior light yet. Waits for the instance-lighting work (PLAN.md part 10)"
+   "note": "held (2026-10-01): test renders at about (-4925, -966, z 501.5) face the bank's gold doors in the arched hall (everything within 24 yd of the label is inside the bank vault), but cold blue-gray: no baked interior light yet. Waits for the instance-lighting work"
   },
   {
    "name": "Booty Bay",

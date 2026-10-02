@@ -282,7 +282,7 @@ def test_compare_data_for_the_dev_addon():
 
 
 def test_compare_stitches_window_grabs_by_their_names(tmp_path, monkeypatch):
-    # (the private client saves no screenshots of its own: harvester.gm's window grabs, named by direction
+    # (window grabs of the game, named by direction
     # and saved view, k<k>_v<n>.png and k<k>_nadir.png)
     import math
 
@@ -698,17 +698,17 @@ def test_pull_media_copies_new_and_changed_files_but_not_frames(tmp_path):
 
 
 def test_install_private_skips_the_real_game(tmp_path, monkeypatch):
-    # the user, 2026-10-01: the latest street views into the private server's addon folder only
+    # the user, 2026-10-01: the latest street views into the extra AddOns folders only (a test install)
     import sv
     private, missing = tmp_path / "private" / "AddOns", tmp_path / "gone" / "AddOns"
     private.mkdir(parents=True)
     lst = tmp_path / ".agps-installs"
-    lst.write_text(f"# the private client\n{private}\n{missing}\n", encoding="utf-8")
+    lst.write_text(f"# a test install\n{private}\n{missing}\n", encoding="utf-8")
     monkeypatch.setattr(sv, "EXTRA_INSTALLS", lst)
     into = []
     monkeypatch.setattr(sv, "install_into", lambda addons, dev: into.append((addons, dev)))
     monkeypatch.setattr(sv, "install", lambda *a: into.append("the real game"))
-    assert sv.install_private(True) == 1 and into == [(private, True)]
+    assert sv.install_extras(True) == 1 and into == [(private, True)]
 
 
 def test_a_dungeons_boss_spots_all_ship():

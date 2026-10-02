@@ -498,7 +498,7 @@ def ship_points(points: list[dict], spacing: float | None, pinned: set[str] | No
     every rendered spot (100 yd), the packs take a thinned set. Greedy in a fixed order (continent,
     x, y): a spot is kept unless a kept one is within 0.75 * spacing (so neighbors along a road end up
     ~0.75-1.5 spacing apart, ~0.9 on average). None or 0: every spot.
-    City spots (a `city`, the capitals' own streets: PLAN.md part 12) ship denser, `city_spacing`
+    City spots (a `city`, the capitals' own streets) ship denser, `city_spacing`
     (packs.json city_ship_spacing_yd): a second greedy after the roads', its grid seeded with the road
     spots kept, so a city spot next to a shipped road spot is skipped and no road spot ever gives way.
     Without `city_spacing` they're ordinary spots. `pinned` (landmarks.json's spots) are added on top

@@ -1,5 +1,5 @@
 """Comparisons for the dev addon (the user, 2026-10-01): a spot as the harvester rendered it next to the
-same spot captured in the game (the dev addon's capture tool on the private test server), both in the
+same spot captured in the game (the dev addon's manual capture tool, or window grabs), both in the
 street view window (the dev addon's Compare.lua).
 
 The capture is imported and stitched in its own folder (build/compare-work), never in the master: its
@@ -79,7 +79,7 @@ def stitch_rings() -> tuple:
 
 def stitch_grabs(folder: Path, spot: dict, facing: float, work: Path, rings: dict[str, str] | None = None,
                  log=print, pitches: dict[str, float] | None = None) -> dict:
-    """Window grabs of the game (harvester.gm --shot; the private client saves no screenshots of its own)
+    """Window grabs of the game (screenshots of the game window)
     -> a stitched spot in `work`. Files k<k>_<step>.png, k: 45-degree steps right of `facing`. The step
     names: v2-v5 (the saved views: level, up, down, zenith) and nadir; or any others, mapped to rings by
     `rings` (e.g. the camera's look steps from its bottom limit: {"p0": "nadir", "p2": "down", "p4": "level",

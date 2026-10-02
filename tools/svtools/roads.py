@@ -1,4 +1,4 @@
-"""Road sync (PLAN.md part 11.1): the rendered street views against AzerothGPS's current roads.
+"""Road sync: the rendered street views against AzerothGPS's current roads.
 
 Every data update starts here. A rendered spot farther than RETIRE_YD from every current road
 (its road was removed or moved) is retired: left out of the packs, kept in the master. A spot the
