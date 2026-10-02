@@ -186,9 +186,8 @@ Commit and push completed work to origin (the private repo), short imperative me
 ## Docs and the wiki
 
 - `docs/curseforge.md`: the CurseForge page (settings and description); `CHANGELOG.md` has the release notes.
-- `docs/wiki/`: the GitHub wiki's pages (`Home.md`, `_Sidebar.md`...). The wiki is its own repo,
-  `AzerothGPS-StreetView.wiki.git`, which exists only after the first page is made in the web UI (and
-  wikis are enabled in the repo's settings). Then: clone it next to this repo, copy `docs/wiki/*` in,
-  copy the images it uses into its `images/` (`assets/logo.png`, `assets/where-in-the-azeroth.png`,
-  showcase pictures), commit as AzerothGPS and push. Keep `docs/wiki/` the source: edit here, copy over.
+- `docs/wiki/`: the GitHub wiki's pages (`Home.md`, `_Sidebar.md`...), the source: edit here, then copy them into
+  the wiki's own repo, `AzerothGPS-StreetView.wiki.git` (checked out next to this one, made 2026-10-02), commit as
+  AzerothGPS and push. Its `images/` holds the logos and the GIFs (from the media folder; GIFs can't go through
+  issue uploads); screenshots are issue #1 uploads (`docs/media-links.json`). The repo is public since 2026-10-02.
 
