@@ -58,6 +58,11 @@ Only through its public API, the `AzerothGPS` global (`../azerothgps/addon/Azero
 `docs/api.md` there). If StreetView needs more from the map, add it to that API (small,
 additive, with a lupa test) rather than reaching into AzerothGPS's private namespace.
 
+**The map follows the arrows** (the user, 2026-10-02; Viewer.lua `follow`): the first arrow clicked in a viewing saves
+the map's view (`AzerothGPS.SaveView`), each spot walked to centers the map at its zoom (`LookAt`), and closing restores
+the saved view (`RestoreView`), unless the player moved or zoomed the map meanwhile (`MapMoved`, checked against where
+it was put last): then it's left alone for the rest of the viewing. Never during a game.
+
 ## Where in the Azeroth? (Street Guess, Game.lua)
 
 A GeoGuessr-style game from the button above the figure: solo, party, whisper or Link, a level, 1/3/5 rounds.

@@ -45,6 +45,11 @@ local tiles = {} -- panorama tile textures by col * 100 + row
 local cells = {} -- cube view cell textures
 local ghosts = {} -- ... a second copy, zoomed a little further, faint: the blur of a move up the road
 local move -- the move to the next spot being animated (V.GoToward)
+-- The map following the arrows (the user, 2026-10-02): from the first arrow clicked in a viewing, the AzerothGPS
+-- map centers on each spot walked to; closing the street view puts the map back as it was before that first
+-- click, unless the player moved the map meanwhile: then it's left alone for the rest of the viewing.
+-- { saved = AzerothGPS.SaveView(), x, y, cont, zoom (where the map was put last), off = true (moved by the player) }
+local follow
 local MOVE_OUT, MOVE_IN = 0.3, 0.3 -- seconds: zooming toward the next spot, then fading into it
 local MOVE_ZOOM = 0.45 -- the view narrows this much on the way (a fraction of its field of view)
 local GHOST_ZOOM, GHOST_ALPHA = 0.16, 0.45 -- the blur copy: that much further in, this faint at full blur
@@ -398,6 +403,7 @@ function V.Build()
 
   frame:SetScript("OnUpdate", V.MoveStep) -- (idle unless a move is being animated)
   frame:SetScript("OnHide", function()
+    V.MapFollowEnd()
     if ns.Figure then ns.Figure.Redraw() end
   end)
 end
@@ -1013,7 +1019,11 @@ function V.GoToward(heading)
     UIErrorsFrame:AddMessage("No street view that way yet", 1, 0.82, 0)
     return
   end
-  if not (cur.cube and D.HasCube(q) and GetTime) then return V.Open(q, heading) end
+  V.MapFollowStart()
+  if not (cur.cube and D.HasCube(q) and GetTime) then
+    V.Open(q, heading)
+    return V.MapFollow(q)
+  end
   -- like Google's: turn to face the way, zoom in toward it with a blur, then settle at the next
   -- spot (its pictures start loading now, hidden)
   local i = 0
@@ -1041,6 +1051,57 @@ end
 
 local function Ease(t) return t < 0.5 and 2 * t * t or 1 - (-2 * t + 2) ^ 2 / 2 end
 
+-- Where the map is now: x, y, its base continent, zoom (yards from the middle to the edge); nil without one.
+local function MapAt()
+  local API = _G.AzerothGPS
+  if not (API and API.View) then return nil end
+  local x, y, c, _, scale, half = API.View()
+  if not (x and y and c) then return nil end
+  local zoom = scale and half and scale > 0 and half / scale or nil
+  return x, y, API.BaseContinent and API.BaseContinent(c) or c, zoom
+end
+
+-- Whether the player moved the map since it was last put on a spot (dragged, zoomed, back to their position).
+local function MapMoved()
+  if not (follow and follow.x) then return false end
+  local x, y, c, zoom = MapAt()
+  if not x then return false end
+  if c ~= follow.cont or (x - follow.x) ^ 2 + (y - follow.y) ^ 2 > 4 then return true end
+  return zoom ~= nil and follow.zoom ~= nil and math.abs(zoom - follow.zoom) > follow.zoom * 0.02
+end
+
+-- The first arrow clicked in a viewing: the map's view kept to come back to.
+function V.MapFollowStart()
+  local API = _G.AzerothGPS
+  if follow or (cur and cur.game) or not (API and API.SaveView and API.LookAt) then return end
+  follow = { saved = API.SaveView() }
+end
+
+-- Arrived at spot `p` by an arrow: the map on it, at the zoom it has (not once the player moved it).
+function V.MapFollow(p)
+  local API = _G.AzerothGPS
+  if not follow or follow.off or (cur and cur.game) or not (API and API.LookAt) then return end
+  if MapMoved() then
+    follow.off = true
+    return
+  end
+  local _, _, _, zoom = MapAt()
+  zoom = zoom or follow.zoom
+  API.LookAt(p.cont, p.x, p.y, zoom)
+  follow.x, follow.y, follow.zoom = p.x, p.y, zoom
+  follow.cont = API.BaseContinent and API.BaseContinent(p.cont) or p.cont
+end
+
+-- The street view closed: the map back where it was before the first arrow (unless the player moved it).
+function V.MapFollowEnd()
+  local f = follow
+  if not f then return end
+  local moved = f.off or MapMoved()
+  follow = nil
+  local API = _G.AzerothGPS
+  if not moved and API and API.RestoreView then API.RestoreView(f.saved) end
+end
+
 -- The move's frames (V.Build's driver).
 function V.MoveStep()
   if not move then return end
@@ -1060,6 +1121,7 @@ function V.MoveStep()
       local ghost = { p = cur.p, lon = cur.lon, lat = cur.lat, fov0 = cur.fov, fov = cur.fov, alpha = 1 }
       move = { stage = 2, t0 = GetTime(), ghost = ghost } -- (set first: the arrows stay hidden while it arrives)
       V.Open(q, heading)
+      V.MapFollow(q)
       cur.ghost = ghost
       V.Refresh()
     end

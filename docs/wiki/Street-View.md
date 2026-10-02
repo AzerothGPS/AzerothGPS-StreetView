@@ -21,7 +21,9 @@
 ## On the map
 
 While a street view is open, the AzerothGPS map shows where you're standing and which way you're looking,
-and keeps up as you turn or walk.
+and keeps up as you turn or walk. Walk with the arrows and the map moves along with you, centered on each
+spot. Close the street view and the map goes back to where it was before your first step. If you move the
+map yourself along the way, it stays where you put it.
 
 ## Good to know
 

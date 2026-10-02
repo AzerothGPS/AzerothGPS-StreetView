@@ -352,3 +352,44 @@ def test_a_party_invitation_is_a_link_in_chat_not_a_popup():
     assert bob.game is None  # (nothing until the click)
     assert bob.G.OnLink(link) and bob.game.phase == "joined" and bob.game.level == "heroic"
     assert not bob.G.OnLink(link) and "no longer open" in bob.printed[-1]  # (once only)
+
+
+def test_the_map_follows_the_arrows_and_goes_back_on_close(ui):
+    # the user, 2026-10-02: walking by the arrows, the map centers on each spot; closing puts it back where it was before
+    # the first arrow, unless the player moved the map meanwhile (then it's left alone for the rest of that viewing)
+    p, clock, net, panel, lua = ui
+    lua.execute("""
+      MAP = { x = 0, y = 0, cont = 1, zoom = 500, calls = {} }
+      AzerothGPS.LocateWorld = function() end
+      AzerothGPS.View = function() return MAP.x, MAP.y, MAP.cont, 0, 1, MAP.zoom end
+      AzerothGPS.SaveView = function() return { x = MAP.x, y = MAP.y, cont = MAP.cont, zoom = MAP.zoom } end
+      AzerothGPS.LookAt = function(c, x, y, z) MAP.cont, MAP.x, MAP.y, MAP.zoom = c, x, y, z; table.insert(MAP.calls, "look") end
+      AzerothGPS.RestoreView = function(v) MAP.cont, MAP.x, MAP.y, MAP.zoom = v.cont, v.x, v.y, v.zoom; table.insert(MAP.calls, "restore") end
+      UIErrorsFrame = { AddMessage = function() end }
+    """)
+    p.D.Load(lua.eval("""{ { name = "t", root = "R\\\\", ext = "jpg", points = {
+      { id = "1-100-100", cont = 1, x = 100, y = 100 }, { id = "1-100-300", cont = 1, x = 100, y = 300 },
+      { id = "1-100-500", cont = 1, x = 100, y = 500 } } } }"""))
+    V, M = p.ns.Viewer, lua.globals().MAP
+    west = 1.5707963
+    V.Open(p.D.byId["1-100-100"], west)
+    frame = lua.eval("AzerothGPSStreetViewFrame")
+    V.GoToward(west)
+    assert V.Current().p.id == "1-100-300" and (M.x, M.y, M.zoom) == (100, 300, 500)  # (the map on the spot, its zoom)
+    V.GoToward(west)
+    assert (M.x, M.y) == (100, 500)
+    frame._scripts["OnHide"](frame)  # (closed: back where it was before the first arrow)
+    assert (M.x, M.y, M.zoom) == (0, 0, 500) and list(M.calls.values())[-1] == "restore"
+    # moved by the player after the first arrow: the map left alone for the rest of the viewing
+    V.Open(p.D.byId["1-100-100"], west)
+    V.GoToward(west)
+    M.x, M.y = 777, 888  # (dragged)
+    V.GoToward(west)
+    assert (M.x, M.y) == (777, 888)
+    frame._scripts["OnHide"](frame)
+    assert (M.x, M.y) == (777, 888) and list(M.calls.values())[-1] == "look"
+    # no arrow clicked: closing leaves the map alone
+    n = len(M.calls)
+    V.Open(p.D.byId["1-100-100"], west)
+    frame._scripts["OnHide"](frame)
+    assert len(M.calls) == n
