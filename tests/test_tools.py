@@ -117,6 +117,8 @@ def test_import_harvest(tmp_path):
     build = tmp_path / "build"
     stats = pack.import_harvest(tmp_path / "export", build, log=lambda *_: None)
     assert stats == {"points": 1, "images": 24, "skipped": 1}
+    import json
+    assert json.loads((build / "points.json").read_text(encoding="utf-8"))["1-100--200"]["interior"] is False
     n, _ = pack.build_pack(build, "2026.10.01")
     assert n == 1
     assert (build / "packs" / KAL / "Images" / "1-100--200" / "cube" / "F00.jpg").exists()

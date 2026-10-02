@@ -347,6 +347,8 @@ def import_harvest(folder: Path, build: Path, log=print) -> dict:
             "id": pid, "cont": meta["cont"], "x": meta["x"], "y": meta["y"], "z": meta.get("z") or 0,
             "facing": meta.get("facing") or 0, "zone": meta.get("zone") or "", "mapID": meta.get("mapID"),
             "kind": meta.get("kind"), "city": meta.get("city"),
+            # (inside a building: lit by its baked light, no sky; image_check's "too bright" limit is for these)
+            "interior": bool(meta.get("interior")),
             "date": meta.get("captured", ""), "build": meta.get("client_build", ""), "poses": [],
             "cube": meta["cube"], "source": "harvester", "imported_at": int(time.time()),
         }
