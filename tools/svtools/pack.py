@@ -142,10 +142,12 @@ def index_lua(points: list[dict], version: str, name: str = LEGACY_PACK) -> str:
         kind_lua = f' kind = {lua_str(kind)},' if kind else ""
         # (the most a round there scores in Where in the Azeroth?: svtools/worth.py; the game takes 100 without)
         worth_lua = f' worth = {int(p["worth"])},' if p.get("worth") and not kind else ""
+        # (a boss spot's title in the street view: "Dungeon Name, Boss Name", svtools/bosses.py)
+        title_lua = f' title = {lua_str(p["title"])},' if p.get("title") else ""
         lines.append(
             f'    {{ id = {lua_str(p["id"])}, cont = {int(p["cont"])}, x = {p["x"]:.1f}, y = {p["y"]:.1f}, '
             f'z = {p.get("z") or 0:.1f}, facing = {p["facing"]:.4f}, zone = {lua_str(p.get("zone") or "")}, '
-            f'poses = {{ {poses} }},{cube_lua}{kind_lua}{worth_lua} }},'
+            f'poses = {{ {poses} }},{cube_lua}{kind_lua}{worth_lua}{title_lua} }},'
         )
     lines += ["  },", "})", ""]
     return "\n".join(lines)
@@ -346,7 +348,7 @@ def import_harvest(folder: Path, build: Path, log=print) -> dict:
         points[pid] = {
             "id": pid, "cont": meta["cont"], "x": meta["x"], "y": meta["y"], "z": meta.get("z") or 0,
             "facing": meta.get("facing") or 0, "zone": meta.get("zone") or "", "mapID": meta.get("mapID"),
-            "kind": meta.get("kind"), "city": meta.get("city"),
+            "kind": meta.get("kind"), "city": meta.get("city"), "boss": meta.get("boss"),
             # (inside a building: lit by its baked light, no sky; image_check's "too bright" limit is for these)
             "interior": bool(meta.get("interior")),
             "date": meta.get("captured", ""), "build": meta.get("client_build", ""), "poses": [],
@@ -585,6 +587,9 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
         from . import worth as worth_
         pois = worth_.load_pois()  # (each spot's worth in Where in the Azeroth?: by its points of interest)
         mine = [dict(p, worth=worth_.worth(pois, p)) for p in mine]
+        from . import bosses as bosses_
+        boss_data = bosses_.load()
+        mine = [dict(p, title=bosses_.title(boss_data, p)) if p.get("kind") == "instance" else p for p in mine]
         (out / "Index.lua").write_text(index_lua(mine, version, pk["name"]), encoding="utf-8")
         size = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
         if size > cfg["budget_bytes"]:

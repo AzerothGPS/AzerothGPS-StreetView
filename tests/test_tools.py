@@ -717,3 +717,29 @@ def test_a_dungeons_boss_spots_all_ship():
     pts += [{"id": f"1-{x}-0", "cont": 1, "x": x, "y": 0} for x in (0, 100, 200)]
     ids = {p["id"] for p in pack.shipped(pts, 200, set(), set())}
     assert {"20389-0-0", "20389-140-0", "20389-290-0"} <= ids and len([i for i in ids if i.startswith("1-")]) < 3
+
+
+def test_a_boss_spots_title_is_the_dungeon_and_the_nearest_boss(tmp_path):
+    # the user, 2026-10-02: "Dungeon Name, Boss Name" in the street view's title bar
+    from svtools import bosses
+    f = tmp_path / "Instances.lua"
+    f.write_text("""ns.Instances[20389] = { name = "Ragefire Chasm", map = 389, raid = false,
+  entrances = { { 1, 1815.0, -4419.2, 0.8, -8.2, -15.5 } },
+  bosses = {
+    { "Oggleflint", 11517, -147.5, 38.7, -38.8, enc = { 2732 }, order = 1 },
+    { "Taragaman the Hungerer", 11520, -244.7, 150.1, -18.7, enc = { 2733 }, order = 2 },
+  } }
+ns.Instances[20249] = { name = "Onyxia's Lair", map = 249, raid = true,
+  bosses = {
+    { "Onyxia", 10184, -21.8, -214.8, -84.7, enc = { 1084 } },
+  } }
+""", encoding="utf-8")
+    data = bosses.load(f)
+    spot = {"id": "20389--247-145", "cont": 20389, "x": -247.3, "y": 144.7, "zone": "Ragefire Chasm", "kind": "instance"}
+    assert bosses.title(data, spot) == "Ragefire Chasm, Taragaman the Hungerer"
+    assert bosses.title(data, {"cont": 20249, "x": -81, "y": -212, "zone": "Onyxia's Lair", "kind": "instance"}) == "Onyxia's Lair, Onyxia"
+    assert bosses.title(data, dict(spot, x=900)) is None  # (no boss near)
+    assert bosses.title(data, dict(spot, kind=None)) is None  # (not a dungeon spot)
+    assert bosses.title(data, dict(spot, boss="Lord Roccor")) == "Ragefire Chasm, Lord Roccor"  # (the harvester's name first)
+    assert "title = \"Ragefire Chasm, Taragaman the Hungerer\"" in pack.index_lua(
+        [dict(spot, z=0, facing=0, poses=[], cube={"pad": 0.08}, title=bosses.title(data, spot))], "v")
