@@ -1,4 +1,4 @@
-![AzerothGPS StreetView](images/logo.png)
+<p align="center"><img src="images/logo.png" alt="AzerothGPS StreetView" width="260"></p>
 
 ![Booty Bay at dusk](https://github.com/user-attachments/assets/a488152a-0bad-467f-83fc-bc0218abcb0c)
 

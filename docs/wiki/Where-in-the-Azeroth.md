@@ -1,4 +1,4 @@
-![Where in the Azeroth?](images/where-in-the-azeroth.png)
+<p align="center"><img src="images/where-in-the-azeroth.png" alt="Where in the Azeroth?" width="260"></p>
 
 # Where in the Azeroth?
 
