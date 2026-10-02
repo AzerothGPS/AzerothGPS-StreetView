@@ -29,7 +29,7 @@ street-level views to the [AzerothGPS](https://github.com/AzerothGPS/AzerothGPS)
 figure off the map onto a road and a full 360-degree view of that exact spot pops up. Look around, look
 up, zoom in, and follow the arrows on the ground to walk down the road.
 
-<p align="center"><img src="https://raw.githubusercontent.com/wiki/AzerothGPS/AzerothGPS-StreetView/images/sv-drag-open.gif" alt="Dragging the figure onto a road opens its street view" width="640"></p>
+<p align="center"><img src="https://github.com/user-attachments/assets/a488152a-0bad-467f-83fc-bc0218abcb0c" alt="Booty Bay at dusk in the street view" width="820"></p>
 
 ### Go take a look
 
@@ -46,7 +46,7 @@ up, zoom in, and follow the arrows on the ground to walk down the road.
 - **The map follows along:** AzerothGPS shows where you're standing and which way you're looking.
 - **Nothing else to download:** every picture ships inside the addon.
 
-<p align="center"><img src="https://github.com/user-attachments/assets/a488152a-0bad-467f-83fc-bc0218abcb0c" alt="Booty Bay at dusk in the street view" width="820"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/wiki/AzerothGPS/AzerothGPS-StreetView/images/sv-drag-open.gif" alt="Dragging the figure onto a road opens its street view" width="640"></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/AzerothGPS/AzerothGPS-StreetView/main/assets/where-in-the-azeroth.png" alt="Where in the Azeroth?" width="260"></p>
 
