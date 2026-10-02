@@ -16,7 +16,9 @@ the repo is public. The voice is the same as AzerothGPS's page: talk to the play
 - **License:** All Rights Reserved
 - **Avatar:** `assets/logo.png`
 - **AzerothGPS link** in the description: its GitHub page for now; swap in its CurseForge page once it has one.
-- **Links:** Issues / Wiki: the GitHub repository's, once it's public (leave empty while it's private)
+- **Links:** Issues: https://github.com/AzerothGPS/AzerothGPS-StreetView/issues · Wiki:
+  https://github.com/AzerothGPS/AzerothGPS-StreetView/wiki · Source: https://github.com/AzerothGPS/AzerothGPS-StreetView ·
+  Discord: https://discord.gg/gktYHzs2c
 
 ---
 
@@ -87,7 +89,15 @@ more points you score.
 3. Feel like playing? Click **Where in the Azeroth?** above the figure.
 
 Handy commands: `/sv here` (the street view nearest you), `/sv list`, `/sv hide`. The full rundown of
-everything is on the wiki.
+everything is on the **[wiki](https://github.com/AzerothGPS/AzerothGPS-StreetView/wiki)**.
+
+### Help and feedback
+
+- **Wiki:** how everything works, every command and what's covered, on the
+  **[StreetView wiki](https://github.com/AzerothGPS/AzerothGPS-StreetView/wiki)**.
+- **Discord:** questions, ideas and news on the **[AzerothGPS Discord](https://discord.gg/gktYHzs2c)**. Come hang out.
+- **A picture looks broken?** Open an issue on [GitHub](https://github.com/AzerothGPS/AzerothGPS-StreetView/issues)
+  or post in the Discord, with the zone and the coordinates from the street view's title bar.
 
 ### What's next
 
