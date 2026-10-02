@@ -16,6 +16,7 @@ local PICK = { 1, 0.82, 0.1 } -- the view a drop would open / the view open now
 local SNAP_UI = 40 -- a view within this many UI units of the pointer is picked on drop
 local ROAD_UI = 20 -- ... a road within this is highlighted
 local HOVER_EVERY = 0.05 -- seconds between pointer checks while carrying
+local BOSS_YD = 40 -- a dungeon's street view within this many yards of a boss is the boss's (Shift-click)
 
 local API, button, carry
 local carrying, hover, lastDrop = false, nil, 0
@@ -24,6 +25,14 @@ function F.Redraw()
   if API then API.Redraw() end
 end
 
+-- The level a map's street views are filed under: a dungeon's own (20000 + its MapID: AzerothGPS gives
+-- its "base" as its map), else the continent under a city's level.
+local function Level(cont)
+  if type(cont) == "number" and cont >= 20000 then return cont end
+  return API.BaseContinent(cont)
+end
+F.Level = function(cont) return Level(cont) end
+
 -- What's under the pointer: { cont, x, y, point, edge } or nil off the map.
 local function Probe()
   local x, y, cont = API.CursorWorld()
@@ -31,7 +40,7 @@ local function Probe()
   local _, _, _, _, scale = API.View()
   scale = scale or 1
   local h = { cont = cont, x = x, y = y }
-  h.point = D.Nearest(API.BaseContinent(cont), x, y, SNAP_UI / scale)
+  h.point = D.Nearest(Level(cont), x, y, SNAP_UI / scale)
   local ok, _, _, dist, edge = pcall(API.NearestRoad, cont, x, y)
   if ok and dist and dist * scale <= ROAD_UI then h.edge = edge end
   return h
@@ -47,7 +56,7 @@ end
 
 -- Drawn on the map on every redraw (AzerothGPS.SetOverlay).
 function F.Draw(ctx)
-  local base = API.BaseContinent(ctx.cont)
+  local base = Level(ctx.cont)
   if carrying then
     if hover and hover.edge and hover.cont == ctx.cont then
       local e = API.RoadEdge(hover.cont, hover.edge)
@@ -71,6 +80,34 @@ function F.Draw(ctx)
 end
 
 local function Playing() return ns.Game and ns.Game.Playing() end
+
+-- A boss's street view (Shift-click on its icon in the dungeon's map, AzerothGPS API 12): the dungeon's
+-- spot nearest the boss, within BOSS_YD. Without a position (the map's top line): any of the dungeon's.
+local function BossSpot(info)
+  if not (info and type(info.cont) == "number" and info.cont >= 20000) then return nil end
+  if not (info.x and info.y) then return D.PointsOn(info.cont)[1] end
+  return (D.Nearest(info.cont, info.x, info.y, BOSS_YD))
+end
+
+function F.BossClick(info)
+  if Playing() then
+    UIErrorsFrame:AddMessage("Not during a game of Where in the Azeroth?", 1, 0.82, 0)
+    return true
+  end
+  local p = BossSpot(info)
+  if not p then
+    UIErrorsFrame:AddMessage("No street view of " .. tostring(info and info.name or "this boss") .. " yet", 1, 0.82, 0)
+    return true
+  end
+  -- looking at the boss (headings: counter-clockwise from north, x north and y west)
+  local heading = (info.x and (info.x - p.x) ^ 2 + (info.y - p.y) ^ 2 > 1) and D.Bearing(p.x, p.y, info.x, info.y) or nil
+  ns.Viewer.Open(p, heading)
+  return true
+end
+
+function F.BossHint(info)
+  if BossSpot(info) then return "its street view" end
+end
 
 function F.Pick()
   if Playing() then
@@ -189,6 +226,7 @@ function F.Init()
   end)
 
   API.SetOverlay("StreetView", F.Draw)
+  if API.OnIconShiftClick then API.OnIconShiftClick("StreetView", F.BossClick, F.BossHint) end -- (API 12)
 
   -- Street Guess's button: in this one's place, with this one above it
   local ok, game = pcall(ns.Game.Init, button)

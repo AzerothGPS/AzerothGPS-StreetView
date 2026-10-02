@@ -307,3 +307,29 @@ def test_a_game_without_street_views_ends_on_the_panel(ui):
     assert plain(panel.title._text) == "Where in the Azeroth?  Normal" and not panel.reopen._shown
     p.G.RefreshTimer()  # (no endless redraw: the panel and its timer agree there's nothing to show again)
     assert not panel.reopen._shown
+
+
+def test_shift_click_on_a_boss_opens_its_street_view(ui):
+    # the user, 2026-10-02: Shift + left-click a boss in a dungeon's map for its street view (AzerothGPS API 12),
+    # said at the top of the map when StreetView is installed; the figure finds a dungeon's spots on its map too
+    p, clock, net, panel, lua = ui
+    lua.execute("""
+      SHIFT = {}
+      AzerothGPS.OnIconShiftClick = function(owner, fn, hint) SHIFT.owner, SHIFT.fn, SHIFT.hint = owner, fn, hint end
+      AzerothGPS.LocateWorld = function() end
+      UIErrorsFrame = { AddMessage = function(self, m) SHIFT.err = m end }
+    """)
+    spot = p.D.byId["20036-1-1"]
+    spot.cube, spot.facing = lua.eval("{ pad = 0.08 }"), 0
+    load = lua.eval("function(src, name) return assert(load(src, '@' .. name)) end")
+    load((ADDON / "Figure.lua").read_text(encoding="utf-8"), "Figure.lua")("AzerothGPS_StreetView", p.ns)
+    p.ns.Figure.Init()
+    S = lua.globals().SHIFT
+    assert S.owner == "StreetView" and p.ns.Figure.Level(20036) == 20036
+    boss = lua.eval('{ kind = "boss", name = "Boss", x = 5, y = 1, cont = 20036 }')
+    assert S.fn(boss) is True
+    assert p.ns.Viewer.Current().p.id == "20036-1-1" and abs(p.ns.Viewer.Heading()) < 1e-6  # (looking at the boss: north)
+    assert S.hint(boss) == "its street view" and S.hint(lua.eval('{ kind = "boss", cont = 20036 }')) == "its street view"
+    far = lua.eval('{ kind = "boss", name = "Far Boss", x = 500, y = 1, cont = 20036 }')
+    assert S.fn(far) is True and S.err == "No street view of Far Boss yet" and S.hint(far) is None
+    assert S.hint(lua.eval('{ kind = "boss", cont = 20389 }')) is None  # (a dungeon without street views: no hint)
