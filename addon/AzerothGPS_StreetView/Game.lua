@@ -720,7 +720,22 @@ Gm.io = {
   -- an open game's hidden chat channel (its addon messages; never shown in a chat window)
   joinChannel = function(name) if JoinTemporaryChannel then JoinTemporaryChannel(name) end end,
   leaveChannel = function(name) if LeaveChannelByName then LeaveChannelByName(name) end end,
-  post = function(text, chatType, index) SendChatMessage(text, chatType, nil, index) end,
+  -- the join code put into the chat box, never sent by itself (the user, 2026-10-02: like linking a map position):
+  -- into the line being typed when the box is open, else the box opened on that chat with the code in it; the
+  -- player presses Enter
+  post = function(text, chatType, index, target)
+    local box = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
+    if box then return box:Insert(text) end
+    if chatType == "WHISPER" and target and ChatFrame_SendTell then
+      ChatFrame_SendTell(target)
+      box = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
+      if box then box:Insert(text) end
+      return
+    end
+    local slash = ({ SAY = "/s ", GUILD = "/g ", PARTY = "/p ", RAID = "/raid ", INSTANCE_CHAT = "/i " })[chatType]
+    if chatType == "CHANNEL" and index then slash = "/" .. index .. " " end
+    if ChatFrame_OpenChat then ChatFrame_OpenChat((slash or "") .. text) end
+  end,
   group = function() -- the party's channel, nil when not in one
     if IsInRaid and IsInRaid() then return "RAID" end
     if IsInGroup and IsInGroup() then return "PARTY" end
@@ -1158,10 +1173,26 @@ local function SecondsLeft() return math.max(0, math.ceil(game.deadline - Now())
 
 -- An open game's invitation, as posted in chat: just its code (chat can't carry an addon's own
 -- links); players with StreetView see it as the link to click (Gm.Linkify). (The user, 2026-09-30:
--- no more text around it.)
+-- no more text around it.) Its last letter is the level (N, H or M: the link says it, the user
+-- 2026-10-02: the level and rounds shown before joining).
 function Gm.JoinText(g)
   g = g or game
-  return string.format("AGPSSV-%s-%d", g.id, g.rounds)
+  return string.format("AGPSSV-%s-%d-%s", g.id, g.rounds, Gm.Level(g.level):sub(1, 1):upper())
+end
+
+-- What an invitation says: "Heroic, 3 rounds".
+function Gm.InviteWhat(rounds, level)
+  return Gm.LEVEL_NAMES[Gm.Level(level)] .. ", " .. (rounds == 1 and "1 round" or (tostring(rounds) .. " rounds"))
+end
+
+-- The level in a chat line's code (nil: an older code without it).
+function Gm.ParseJoinLevel(text)
+  local l = tostring(text or ""):match("AGPSSV%-%d+%-%d+%-([NHMnhm])")
+  if not l then return nil end
+  l = l:upper()
+  for _, key in ipairs(Gm.LEVELS) do
+    if key:sub(1, 1):upper() == l then return key end
+  end
 end
 
 -- The game's id and rounds in a chat line with its code, else nil.
@@ -1180,12 +1211,17 @@ function Gm.Linkify(text, author)
   local id, rounds = Gm.ParseJoinCode(text)
   if not id then return text end
   author = author:gsub(":", "")
-  local link = string.format("|cff66ccff|Hgarrmission:agpssv:%s:%d:%s|h[Join Where in the Azeroth?]|h|r", id, rounds, author)
-  return (text:gsub("AGPSSV%-%d+%-%d+", function() return link end, 1))
+  local level = Gm.ParseJoinLevel(text)
+  local what = level and (": " .. Gm.InviteWhat(rounds, level)) or ""
+  local link = string.format("|cff66ccff|Hgarrmission:agpssv:%s:%d:%s|h[Join Where in the Azeroth?%s]|h|r", id, rounds,
+    author, what)
+  return (text:gsub("AGPSSV%-%d+%-%d+%-?[NHMnhm]?", function() return link end, 1))
 end
 
--- The link clicked (its "garrmission:agpssv:id:rounds:host").
+-- The link clicked (its "garrmission:agpssv:id:rounds:host"; an invitation's "garrmission:agpssvinv:n").
 function Gm.OnLink(link)
+  local key = tostring(link):match("^garrmission:agpssvinv:(%d+)$")
+  if key then return Gm.AnswerInvite(key, true) end
   local id, rounds, host = tostring(link):match("^garrmission:agpssv:(%d+):(%d+):(.+)$")
   if id then return Gm.JoinLink(host, id, tonumber(rounds)) end
   return false
@@ -1226,15 +1262,38 @@ function Gm.JoinLink(host, id, rounds)
   return true
 end
 
--- Host of an open game: post the link (chatType "SAY", "GUILD", "PARTY", "RAID" or "CHANNEL" with
--- the channel's number). A click's work (the game's chat needs one for say and the channels).
-function Gm.PostLink(chatType, index)
+-- Host of an open game: the link's code put into the chat box for that chat (chatType "SAY", "GUILD",
+-- "PARTY", "RAID", "CHANNEL" with the channel's number, or "WHISPER" to `target`); the player sends it.
+function Gm.PostLink(chatType, index, target)
   if not (game and game.isHost and game.open and game.phase == "invite") then return false end
   local now = Now()
   if game.postedAt and now - game.postedAt < Gm.POST_COOLDOWN then return false end
   game.postedAt, game.postReady = now, nil
-  if io().post then io().post(Gm.JoinText(game), chatType, index) end
+  if io().post then io().post(Gm.JoinText(game), chatType, index, target) end
   Changed()
+  return true
+end
+
+-- The menu's Party and Whisper (the user, 2026-10-02): nothing sent by itself. An open game whose link
+-- goes into the chat box, on the party's or raid's chat or a whisper to `target`; whoever clicks it joins.
+-- Solo and Against Bots start as before.
+function Gm.StartLinked(mode, rounds, target, level)
+  if mode ~= "party" and mode ~= "whisper" then return Gm.Start(mode, rounds, target, level) end
+  local chat = mode == "party" and io().group() or "WHISPER"
+  if mode == "party" and not io().group() then
+    io().print("You're not in a party.")
+    return false
+  end
+  if mode == "whisper" then
+    target = target and (tostring(target):gsub("^%s+", ""):gsub("%s+$", "")) or nil
+    if not target or target == "" then
+      io().print("Whose name? Target a player or type their name.")
+      return false
+    end
+  end
+  if not Gm.Start("open", rounds, nil, level) then return false end
+  game.linkTo = { chat = chat, target = target }
+  Gm.PostLink(chat, nil, target)
   return true
 end
 
@@ -1868,7 +1927,7 @@ local function Choose(rounds)
   local mode = fly.mode
   local target = mode == "whisper" and fly.steps.whisper.box:GetText() or nil
   if mode == "whisper" then fly.steps.whisper.box:ClearFocus() end
-  if Gm.Start(mode, rounds, target, fly.level) then HideMenu() end
+  if Gm.StartLinked(mode, rounds, target, fly.level) then HideMenu() end
 end
 
 local function BuildMenu(parent)
@@ -2573,31 +2632,36 @@ local function BuildMarks(canvas)
 end
 
 -- The invitation, asked before joining.
-local function Ask(sender, rounds, onYes, onNo, level)
-  if not (StaticPopupDialogs and StaticPopup_Show) then
-    io().print(Short(sender) .. " invited you to play Where in the Azeroth?, but this client can't ask: declined.")
-    return onNo()
+-- An invitation (party, raid or whisper): a line in chat with a link to join, saying who, the level and
+-- the rounds, never a popup (the user, 2026-10-02: no spam invites, nothing in the way while
+-- navigating). Not clicked within the lobby's time: declined. A newer one from the same player replaces
+-- theirs still open.
+local invites, inviteN = {}, 0
+function Gm.AnswerInvite(key, yes)
+  local inv = invites[key]
+  if not inv then
+    io().print("That invitation is no longer open.")
+    return false
   end
-  StaticPopupDialogs.AGPS_STREETGUESS_INVITE = StaticPopupDialogs.AGPS_STREETGUESS_INVITE or {
-    text = "%s invites you to play Where in the Azeroth? (%s). Join?",
-    button1 = "Join",
-    button2 = "No thanks",
-    OnAccept = function(self, data) local d = data or self.data if d then d.yes() end end,
-    OnCancel = function(self, data) local d = data or self.data if d then d.no() end end,
-    timeout = Gm.JOIN_SECONDS,
-    whileDead = true,
-    hideOnEscape = true,
-    preferredIndex = 3,
-  }
-  local answered = false
-  local data = {
-    yes = function() if not answered then answered = true onYes() end end,
-    no = function() if not answered then answered = true onNo() end end,
-  }
-  local what = (rounds == 1 and "1 round" or (rounds .. " rounds")) .. ", " .. Gm.LEVEL_NAMES[Gm.Level(level)]
-  local dlg = StaticPopup_Show("AGPS_STREETGUESS_INVITE", Short(sender), what, data)
-  if dlg then dlg.data = data else data.no() end
+  invites[key] = nil
+  if yes then inv.yes() else inv.no() end
+  return true
 end
+
+local function Ask(sender, rounds, onYes, onNo, level)
+  for key, inv in pairs(invites) do
+    if inv.sender == sender then Gm.AnswerInvite(key, false) end
+  end
+  inviteN = inviteN + 1
+  local key = tostring(inviteN)
+  invites[key] = { sender = sender, yes = onYes, no = onNo }
+  io().print(string.format("%s invites you to play: |cff66ccff|Hgarrmission:agpssvinv:%s|h[Join Where in the Azeroth?: %s]|h|r",
+    Short(sender), key, Gm.InviteWhat(rounds, level)))
+  if C_Timer and C_Timer.After then
+    C_Timer.After(Gm.JOIN_SECONDS, function() if invites[key] then invites[key] = nil onNo() end end)
+  end
+end
+Gm.AskInChat = Ask
 
 function Gm.Init(figureButton)
   if gameButton then return end
@@ -2709,7 +2773,7 @@ function Gm.Init(figureButton)
   end
   if hooksecurefunc and SetItemRef then
     hooksecurefunc("SetItemRef", function(link)
-      if type(link) == "string" and link:find("^garrmission:agpssv:") then
+      if type(link) == "string" and link:find("^garrmission:agpssv") then
         local ok, err = pcall(Gm.OnLink, link)
         if not ok then ns.Print("|cffff6060joining failed:|r " .. tostring(err)) end
       end

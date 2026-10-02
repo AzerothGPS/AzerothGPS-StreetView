@@ -56,7 +56,8 @@ class Player:
         io = self.lua.table_from({
             "joinChannel": lambda ch: net.channels.setdefault(ch, set()).add(name),
             "leaveChannel": lambda ch: net.channels.get(ch, set()).discard(name),
-            "post": lambda text, chat, index=None: self.posted.append((text, chat, index)),
+            "post": lambda text, chat, index=None, target=None: self.posted.append((text, chat, index) if target is None
+                                                                                  else (text, chat, index, target)),
             "now": lambda: clock.t,
             "me": lambda: name,
             "send": self.send,
@@ -1040,9 +1041,10 @@ def test_an_open_game_is_joined_from_its_link_in_chat():
     assert a.G.PostLink("SAY")
     assert not a.G.PostLink("GUILD")  # (not again so soon)
     text, chat, _ = a.posted[0]
-    assert chat == "SAY" and text == f"AGPSSV-{g.id}-1"  # (just the code: the link, for the players who can click it)
+    assert chat == "SAY" and text == f"AGPSSV-{g.id}-1-N"  # (just the code, its level last: the link, for the players who can click it)
     shown = b.G.Linkify(text, "P00")  # (chat gives the author without the realm on the same realm)
     assert "|Hgarrmission:agpssv:" + g.id + ":1:P00|h" in shown and "AGPSSV-" not in shown
+    assert "[Join Where in the Azeroth?: Normal, 1 round]" in shown  # (the level and rounds before joining: the user, 2026-10-02)
     link = shown.split("|H")[1].split("|h")[0]
     run(net, clock, 5)
     assert b.G.OnLink(link) and b.game.phase == "joined" and not b.game.startAt
@@ -1111,6 +1113,10 @@ def test_a_link_to_a_host_who_never_answers_gives_up():
 def test_join_codes_parse_only_real_rounds(solo):
     p, _, _ = solo
     assert p.G.ParseJoinCode("hey AGPSSV-123456-3 come") == ("123456", 3)
+    assert p.G.ParseJoinCode("AGPSSV-123456-5-H") == ("123456", 5) and p.G.ParseJoinLevel("AGPSSV-123456-5-H") == "heroic"
+    assert p.G.ParseJoinLevel("AGPSSV-123456-3") is None  # (an older code: no level, the link without it)
+    assert "[Join Where in the Azeroth?]" in p.G.Linkify("AGPSSV-123456-3", "Bob")
+    assert "Mythic, 5 rounds]" in p.G.Linkify("go AGPSSV-123456-5-M go", "Bob") and "-M" not in p.G.Linkify("AGPSSV-123456-5-M", "Bob")
     assert p.G.ParseJoinCode("AGPSSV-123456-4") is None and p.G.ParseJoinCode("hello") is None
     assert p.G.Linkify("no code here", "Bob") == "no code here"
     assert p.G.OnLink("garrmission:other") is False
@@ -1301,3 +1307,24 @@ def test_a_link_joiner_learns_the_level_from_the_host():
     assert b.G.OnLink(link) and b.styles[-1] == "minimap"  # (Normal until the host says)
     run(net, clock, 1)
     assert b.game.level == "heroic" and b.styles[-1] == "zone"
+
+
+def test_party_and_whisper_put_the_link_in_the_chat_box():
+    # the user, 2026-10-02: nothing broadcast by itself; Party and Whisper put the game's link into the chat box (like
+    # linking a map position) for the player to send; whoever clicks it joins, seeing the level and rounds first
+    clock, net = Clock(), Net()
+    a = Player("Ann-Realm", clock, net, group="PARTY")
+    b = Player("Bob-Realm", clock, net, group="PARTY")
+    assert a.G.StartLinked("party", 3, None, "heroic")
+    g = a.game
+    assert g.open and g.phase == "invite" and net.queue == []  # (no invitation sent)
+    assert a.posted == [(f"AGPSSV-{g.id}-3-H", "PARTY", None)]
+    shown = b.G.Linkify(a.posted[0][0], "Ann")
+    assert "Heroic, 3 rounds]" in shown and b.G.OnLink(shown.split("|H")[1].split("|h")[0])
+    c = Player("Cid-Realm", clock, net)
+    assert not c.G.StartLinked("party", 1)  # (not in a party)
+    assert c.G.StartLinked("whisper", 1, " Bob Smith ", "mythic")
+    assert c.posted == [(f"AGPSSV-{c.game.id}-1-M", "WHISPER", None, "Bob Smith")]
+    d = Player("Dan-Realm", clock, net)
+    assert not d.G.StartLinked("whisper", 1, "") and d.game is None
+    assert d.G.StartLinked("solo", 1) and d.game.mode == "solo"  # (solo as before)

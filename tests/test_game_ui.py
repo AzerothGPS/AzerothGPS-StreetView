@@ -333,3 +333,22 @@ def test_shift_click_on_a_boss_opens_its_street_view(ui):
     far = lua.eval('{ kind = "boss", name = "Far Boss", x = 500, y = 1, cont = 20036 }')
     assert S.fn(far) is True and S.err == "No street view of Far Boss yet" and S.hint(far) is None
     assert S.hint(lua.eval('{ kind = "boss", cont = 20389 }')) is None  # (a dungeon without street views: no hint)
+
+
+def test_a_party_invitation_is_a_link_in_chat_not_a_popup():
+    # the user, 2026-10-02: the level and rounds shown before joining, and an invitation a link in chat (party, raid,
+    # whisper) rather than a popup: no spam invites, nothing in the way while navigating
+    clock, net = Clock(), Net()
+    ann = Player("Ann-Realm", clock, net, group="PARTY")
+    bob = Player("Bob-Realm", clock, net, group="PARTY")
+    with_windows(bob)  # (Bob's game asks the real way: Gm.Init set io.ask)
+    lua = bob.lua
+    lua.execute("StaticPopup_Show = function() error('no popups') end")
+    ann.G.Start("party", 3, None, "heroic")
+    net.deliver()
+    line = next(s for s in bob.printed if "invites you" in s)
+    assert "Ann invites you to play:" in line and "[Join Where in the Azeroth?: Heroic, 3 rounds]" in line
+    link = line.split("|H")[1].split("|h")[0]
+    assert bob.game is None  # (nothing until the click)
+    assert bob.G.OnLink(link) and bob.game.phase == "joined" and bob.game.level == "heroic"
+    assert not bob.G.OnLink(link) and "no longer open" in bob.printed[-1]  # (once only)

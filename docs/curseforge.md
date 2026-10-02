@@ -98,8 +98,9 @@ everything is on the wiki.
 ### Notes
 
 StreetView only shows you pictures. It never moves your character, presses keys or plays for you.
-Players in a game only talk through the addon's own messages, and you're always asked before joining
-one.
+Players in a game only talk through the addon's own messages. Invites are links you send yourself (they go
+into your chat box, like linking a map position), and you only ever join by clicking one, which tells you
+the level and the rounds first. No popups.
 
 _AzerothGPS StreetView is a fan-made addon and is not affiliated with or endorsed by Blizzard
 Entertainment. World of Warcraft and Azeroth are trademarks of Blizzard Entertainment, Inc. Pictures of
