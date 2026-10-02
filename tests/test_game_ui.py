@@ -329,6 +329,7 @@ def test_shift_click_on_a_boss_opens_its_street_view(ui):
     boss = lua.eval('{ kind = "boss", name = "Boss", x = 5, y = 1, cont = 20036 }')
     assert S.fn(boss) is True
     assert p.ns.Viewer.Current().p.id == "20036-1-1" and abs(p.ns.Viewer.Heading()) < 1e-6  # (looking at the boss: north)
+    assert p.ns.Viewer.Current().fov == 60  # (zoomed in on him)
     assert S.hint(boss) == "its street view" and S.hint(lua.eval('{ kind = "boss", cont = 20036 }')) == "its street view"
     far = lua.eval('{ kind = "boss", name = "Far Boss", x = 500, y = 1, cont = 20036 }')
     assert S.fn(far) is True and S.err == "No street view of Far Boss yet" and S.hint(far) is None

@@ -17,6 +17,7 @@ local SNAP_UI = 40 -- a view within this many UI units of the pointer is picked 
 local ROAD_UI = 20 -- ... a road within this is highlighted
 local HOVER_EVERY = 0.05 -- seconds between pointer checks while carrying
 local BOSS_YD = 40 -- a dungeon's street view within this many yards of a boss is the boss's (Shift-click)
+local BOSS_FOV = 60 -- ... opened this zoomed in on him (degrees across: the panorama's widest is 110)
 
 local API, button, carry
 local carrying, hover, lastDrop = false, nil, 0
@@ -102,6 +103,7 @@ function F.BossClick(info)
   -- looking at the boss (headings: counter-clockwise from north, x north and y west)
   local heading = (info.x and (info.x - p.x) ^ 2 + (info.y - p.y) ^ 2 > 1) and D.Bearing(p.x, p.y, info.x, info.y) or nil
   ns.Viewer.Open(p, heading)
+  if heading and ns.Viewer.LookAt then ns.Viewer.LookAt(nil, nil, BOSS_FOV) end -- (the boss filling more of the view)
   return true
 end
 
