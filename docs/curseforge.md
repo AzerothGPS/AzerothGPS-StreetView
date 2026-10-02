@@ -22,8 +22,6 @@ the repo is public. The voice is the same as AzerothGPS's page: talk to the play
 
 ## Description
 
-<p align="center"><img src="https://raw.githubusercontent.com/AzerothGPS/AzerothGPS-StreetView/main/assets/logo.png" alt="AzerothGPS StreetView" width="260"></p>
-
 **Ever wanted to stand on a road in Azeroth and just look around?** AzerothGPS StreetView adds
 street-level views to the [AzerothGPS](https://github.com/AzerothGPS/AzerothGPS) map. Drag the little
 figure off the map onto a road and a full 360-degree view of that exact spot pops up. Look around, look
