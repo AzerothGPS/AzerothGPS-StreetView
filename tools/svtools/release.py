@@ -1,11 +1,13 @@
 """Releasing AzerothGPS StreetView to CurseForge (`sv.py release`): the viewer's code and its
 pictures in one addon zip (the user, 2026-09-29: no separate data packs).
 
-The pictures never go into git, so the tag workflow can't release them: it makes a code-only
-GitHub release. This builds the pictures (the packs.json pack `in_viewer`), lays them and the
-real Index.lua over the viewer's code in one zip, checks it, and with --upload sends it to the
-viewer's CurseForge project (packs.json viewer.curseforge_project), requiring AzerothGPS. Every
-upload is recorded in data-releases.jsonl (committed).
+The pictures never go into git, so the zip is built here: this builds the pictures (the packs.json
+pack `in_viewer`), lays them and the real Index.lua over the viewer's code in one zip and checks it.
+--publish (the usual way, as AzerothGPS's releases) attaches it to a new GitHub release v<version>,
+and publishing that release runs .github/workflows/release.yml, which uploads it to the viewer's
+CurseForge project (packs.json viewer.curseforge_project, requiring AzerothGPS) with the repo's
+CF_API_TOKEN secret. --upload sends it to CurseForge from here instead (CF_API_TOKEN set on this PC).
+Every upload or publish is recorded in data-releases.jsonl (committed).
 
 Checks before anything leaves: under the budget; only the viewer's folder, with its toc files,
 Lua, Media and JPEG tiles; nothing personal in the text files; no empty build.
@@ -96,8 +98,31 @@ def changelog_section(path: Path, version: str) -> str:
     return "\n".join(out).strip()
 
 
+def publish(z: Path, version: str, log=print, run=None) -> str:
+    """The GitHub release v<version> of the committed and pushed HEAD, with the zip attached and the
+    CHANGELOG.md section as the notes (its workflow then uploads the zip to CurseForge). Its URL."""
+    import subprocess
+    import tempfile
+    run = run or (lambda cmd: subprocess.run(cmd, cwd=pack.ROOT, capture_output=True, text=True, check=True).stdout)
+    if run(["git", "status", "--porcelain", "--untracked-files=no"]).strip():
+        raise SystemExit("Not published: commit your changes first (the release is made from the pushed HEAD).")
+    run(["git", "fetch", "-q", "origin"])
+    head = run(["git", "rev-parse", "HEAD"]).strip()
+    if head != run(["git", "rev-parse", "origin/main"]).strip():
+        raise SystemExit("Not published: push first (HEAD isn't origin/main).")
+    notes = changelog_section(pack.ROOT / "CHANGELOG.md", version)
+    if not notes:
+        raise SystemExit(f"Not published: no '## {version}' section in CHANGELOG.md.")
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+        f.write(notes)
+    url = run(["gh", "release", "create", f"v{version}", str(z), "--target", head,
+               "--title", f"AzerothGPS StreetView {version}", "--notes-file", f.name]).strip()
+    log(f"  published {url}: its workflow uploads the zip to CurseForge")
+    return url
+
+
 def release_data(build: Path, dist: Path, version: str | None = None, upload: bool = False,
-                 cfg: dict | None = None, log=print, viewer: Path | None = None) -> list[dict]:
+                 cfg: dict | None = None, log=print, viewer: Path | None = None, publish_it: bool = False) -> list[dict]:
     """Build, zip and check the addon (code and pictures); --upload sends it to CurseForge."""
     cfg = cfg or pack.CONFIG
     viewer = viewer or pack.ROOT / "addon" / cfg["viewer"]["name"]
@@ -119,8 +144,16 @@ def release_data(build: Path, dist: Path, version: str | None = None, upload: bo
     log(f"  {z.name}: {z.stat().st_size / 1e6:.1f} MB, {spots} street views"
         + ("" if cfg["viewer"].get("curseforge_project") else "  (no viewer.curseforge_project in packs.json yet)"))
     ready = [{"zip": z, "spots": spots, "version": version}]
+    if publish_it:
+        url = publish(z, version, log)
+        record = pack.ROOT / "data-releases.jsonl"
+        with record.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"addon": name, "version": version, "pictures": data_version, "spots": spots,
+                                "bytes": z.stat().st_size, "github_release": url,
+                                "at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}) + "\n")
+        return ready
     if not upload:
-        log(f"Dry run: {z} is ready. Nothing was uploaded (--upload does that).")
+        log(f"Dry run: {z} is ready. Nothing was uploaded (--publish or --upload does that).")
         return ready
     token = os.environ.get("CF_API_TOKEN")
     project = cfg["viewer"].get("curseforge_project")

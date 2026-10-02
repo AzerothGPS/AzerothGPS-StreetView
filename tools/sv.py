@@ -226,7 +226,9 @@ def main(argv=None) -> None:
     p_rd.add_argument("--agps", type=Path, default=ROOT.parent / "azerothgps", help="the AzerothGPS checkout")
     p_rd.add_argument("--harvester", type=Path, default=ROOT.parent / "streetview-harvester")
     p_r = sub.add_parser("release", aliases=["release-data"], help="the addon with its pictures, zipped for CurseForge")
-    p_r.add_argument("--upload", action="store_true", help="upload to CurseForge (otherwise a dry run)")
+    p_r.add_argument("--publish", action="store_true",
+                     help="the GitHub release v<version> with the zip; its workflow uploads it to CurseForge")
+    p_r.add_argument("--upload", action="store_true", help="upload to CurseForge from here (otherwise a dry run)")
     p_r.add_argument("--version", help="the packs' version (default: today, YYYY.MM.DD)")
     sub.add_parser("landmarks", help="landmarks.json: merge the spots marked in game (/sv mark) and list them")
     sub.add_parser("media")
@@ -286,7 +288,7 @@ def main(argv=None) -> None:
         build_and_report()
     elif a.cmd in ("release", "release-data"):
         from svtools import release
-        release.release_data(BUILD, ROOT / "dist", a.version, upload=a.upload)
+        release.release_data(BUILD, ROOT / "dist", a.version, upload=a.upload, publish_it=a.publish)
     elif a.cmd == "landmarks":
         from svtools import landmarks
         doc = landmarks.load()

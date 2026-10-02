@@ -752,3 +752,33 @@ def test_the_release_notes_are_the_versions_changelog_section(tmp_path):
                  encoding="utf-8")
     assert release.changelog_section(f, "1.0.0") == "The first release!\n\n- one"
     assert release.changelog_section(f, "2.0.0") == ""
+
+
+def test_publish_makes_the_github_release_of_the_pushed_head(tmp_path):
+    # (CurseForge gets the zip from the GitHub release's workflow, as AzerothGPS's releases: the user, 2026-10-02)
+    from svtools import release
+    z = tmp_path / "AzerothGPS_StreetView-1.0.0.zip"
+    z.write_bytes(b"zip")
+    calls = []
+
+    def run(cmd, dirty="", head="abc", origin="abc"):
+        calls.append(cmd)
+        if cmd[:2] == ["git", "status"]:
+            return dirty
+        if cmd[:2] == ["git", "rev-parse"]:
+            return head if cmd[2] == "HEAD" else origin
+        if cmd[:3] == ["gh", "release", "create"]:
+            return "https://github.com/AzerothGPS/AzerothGPS-StreetView/releases/tag/v1.0.0\n"
+        return ""
+
+    url = release.publish(z, "1.0.0", log=lambda *a: None, run=run)
+    assert url.endswith("/v1.0.0")
+    gh = [c for c in calls if c[:2] == ["gh", "release"]][0]
+    assert gh[3] == "v1.0.0" and gh[4] == str(z) and gh[gh.index("--target") + 1] == "abc"
+    import pytest as _p
+    with _p.raises(SystemExit, match="commit"):
+        release.publish(z, "1.0.0", log=lambda *a: None, run=lambda c: run(c, dirty=" M x.lua"))
+    with _p.raises(SystemExit, match="push first"):
+        release.publish(z, "1.0.0", log=lambda *a: None, run=lambda c: run(c, head="def"))
+    with _p.raises(SystemExit, match="CHANGELOG"):
+        release.publish(z, "9.9.9", log=lambda *a: None, run=run)

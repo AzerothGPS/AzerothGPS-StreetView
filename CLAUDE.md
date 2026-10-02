@@ -54,8 +54,11 @@ made beyond offline rendering stay there.
 - HD packs: not made or shipped for now (the user may consider them later). Selling or
   paywalling them would clash with Blizzard's add-on policy (add-ons free) and Fan Content
   Policy (no selling game imagery): flag that if it comes up.
-- Releases: the tag workflow makes a code-only GitHub release; CurseForge gets the one zip (code +
-  pictures) from `sv.cmd release --upload`, only when the user asks.
+- Releases (CurseForge project 1721639), only when the user asks: bump the toc's version and add its
+  `## <version>` section to CHANGELOG.md, commit and push, then `sv.cmd release --publish`. That builds the
+  zip (code and pictures) here, checks it, and makes the GitHub release v<version> with the zip attached;
+  publishing it runs .github/workflows/release.yml, which uploads the zip to CurseForge (requiring AzerothGPS)
+  with the repo's `CF_API_TOKEN` secret, as AzerothGPS's own releases. (`--upload` sends it from this PC instead.)
 
 ## Talking to AzerothGPS
 
@@ -164,7 +167,7 @@ python tools/sv.py import      # the dev addon's capture screenshots -> stitched
 python tools/sv.py watch       # the same on every /reload
 python tools/sv.py pull [--from //PC/agps-work] [--watch 10]  # harvested spots from the capture PC's share (LAN)
 python tools/sv.py pull-media  # the CurseForge/wiki media the capture PC took -> ..\StreetView-media (Dev's docs/media-automation.md)
-python tools/sv.py release     # dry run: build, zip and check the addon with its pictures (--upload: to CurseForge)
+python tools/sv.py release     # dry run: build, zip and check the addon with its pictures (--publish: the GitHub release, then CurseForge)
 python tools/sv.py build       # rebuild the pictures and print the size
 python tools/sv.py media       # regenerate Media/ (Figure.tga, Probe.jpg)
 python -m pytest tests -q

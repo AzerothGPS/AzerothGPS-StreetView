@@ -1,28 +1,30 @@
 name: Release
 
-# A version tag (v0.1.0) builds the viewer's code zip and makes the GitHub release, with that
-# version's CHANGELOG.md section as the notes. CurseForge gets the addon with its pictures, which
-# are never in git: that release is made from a PC with `sv.cmd release --upload` (code and
-# pictures in one zip; the user, 2026-09-29: no separate data packs).
+# The addon zip with its pictures is built on a PC (`sv.cmd release --publish`: the pictures are never in
+# git) and attached to a GitHub release v<version>. Publishing that release runs this: it checks the
+# version, takes the CHANGELOG.md section as the notes, downloads the zip and uploads it to CurseForge
+# (project packs.json viewer.curseforge_project, requiring AzerothGPS), as AzerothGPS's own release does.
 # "Run workflow" by hand does a dry run: it only checks the CurseForge game version.
 on:
-  push:
-    tags: ["v*"]
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Only look up the CurseForge game version (no release, no upload)"
+        description: "Only look up the CurseForge game version (no upload)"
         type: boolean
         default: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: CurseForge game version (dry run)
         if: github.event_name == 'workflow_dispatch'
@@ -32,10 +34,11 @@ jobs:
         run: python3 tools/svtools/curseforge.py --dry-run
 
       - name: Version and changelog
-        if: github.event_name == 'push'
+        if: github.event_name == 'release'
         id: v
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
           TOC=$(grep -m1 '^## Version:' addon/AzerothGPS_StreetView/AzerothGPS_StreetView.toc | sed 's/## Version: *//' | tr -d '\r')
           if [ "$TOC" != "$VERSION" ]; then echo "tag $VERSION but the toc says $TOC"; exit 1; fi
           awk -v v="$VERSION" '
@@ -43,25 +46,29 @@ jobs:
             on { print }
           ' CHANGELOG.md | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > notes.md
           if [ ! -s notes.md ]; then echo "no '## $VERSION' section in CHANGELOG.md"; exit 1; fi
+          PROJECT=$(python3 -c "import json; print(json.load(open('packs.json'))['viewer']['curseforge_project'] or '')")
+          if [ -z "$PROJECT" ]; then echo "no viewer.curseforge_project in packs.json"; exit 1; fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
 
-      - name: Build the zip
-        if: github.event_name == 'push'
-        run: |
-          VERSION="${{ steps.v.outputs.version }}"
-          mkdir -p dist
-          (cd addon && zip -r -q "../dist/AzerothGPS_StreetView-$VERSION.zip" AzerothGPS_StreetView -x '*/.*')
-          # every file the toc lists is in it (Index.lua: the empty one; the pictures ship on CurseForge)
-          grep -v '^#' addon/AzerothGPS_StreetView/AzerothGPS_StreetView.toc | tr -d '\r' | sed '/^\s*$/d' | tr '\\' '/' | while read -r f; do
-            unzip -l "dist/AzerothGPS_StreetView-$VERSION.zip" | grep -q "AzerothGPS_StreetView/$f" || { echo "missing from the zip: $f"; exit 1; }
-          done
-          if unzip -l "dist/AzerothGPS_StreetView-$VERSION.zip" | grep -q "Images/"; then echo "pictures in the viewer zip"; exit 1; fi
-          unzip -l "dist/AzerothGPS_StreetView-$VERSION.zip" | tail -1
-
-      - name: GitHub release
-        if: github.event_name == 'push'
+      - name: The release's zip
+        if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ steps.v.outputs.version }}"
-          gh release create "v$VERSION" "dist/AzerothGPS_StreetView-$VERSION.zip" --title "AzerothGPS StreetView $VERSION (code only)" --notes-file notes.md
+          gh release download "${{ github.event.release.tag_name }}" --pattern "AzerothGPS_StreetView-$VERSION.zip" --dir dist
+          ls -la dist
+          unzip -l "dist/AzerothGPS_StreetView-$VERSION.zip" | grep -q "AzerothGPS_StreetView/AzerothGPS_StreetView.toc" || { echo "not the addon's zip"; exit 1; }
+          unzip -l "dist/AzerothGPS_StreetView-$VERSION.zip" | grep -q "AzerothGPS_StreetView/Images/" || { echo "the zip has no pictures"; exit 1; }
+
+      - name: Upload to CurseForge
+        if: github.event_name == 'release'
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_GAME_VERSION_ID: ${{ vars.CF_GAME_VERSION_ID }}
+        run: |
+          VERSION="${{ steps.v.outputs.version }}"
+          python3 tools/svtools/curseforge.py --project "${{ steps.v.outputs.project }}" \
+            --zip "dist/AzerothGPS_StreetView-$VERSION.zip" --display "AzerothGPS StreetView $VERSION" \
+            --changelog notes.md --requires azerothgps
