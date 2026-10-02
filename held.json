@@ -230,5 +230,17 @@
  "1--1068--4599": {
   "reason": "weak view: the camera wedged between centaur tents, their walls fill the view (2026-10-02, the wildlife smoke test); needs a hand-picked offset",
   "at": 1790957117
+ },
+ "20034-92--144": {
+  "reason": "boss hidden behind cell bars and a pillar; re-spot with line of sight (2026-10-02 boss review)",
+  "at": 1790980491
+ },
+ "20531--8609-1975": {
+  "reason": "C'Thun not visible in the view (no boss model in frame) (2026-10-02 boss review)",
+  "at": 1790980491
+ },
+ "20533-3507--3910": {
+  "reason": "Maexxna's web renders as solid glossy white sheets over the floor; the spider is small (2026-10-02 boss review)",
+  "at": 1790980491
  }
 }
