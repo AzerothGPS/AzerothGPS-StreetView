@@ -77,6 +77,8 @@ Gm.FIT_MAX_YD = 2950 -- the result: guess and answer shown together up to this z
 -- right-click still goes out to the continent); farther apart, the answer alone
 Gm.PAN_SECONDS = 0.9 -- ... the map pans and zooms out to them this smoothly, then the line grows
 Gm.SPOT_ZOOM_YD = 600 -- ... else the spot alone, this zoomed
+-- the user, 2026-10-02: the map left alone through a result, its last this many seconds zoom in on the answer
+Gm.ANSWER_ZOOM_SECONDS, Gm.ANSWER_ZOOM_YD = 5, 200
 Gm.CELEBRATE_MIN = 75 -- the average round score that earns the celebration (solo: the player's; else the winner's)
 Gm.ROUNDS = { 1, 3, 5 }
 -- Difficulty (the user, 2026-10-01): the host or solo player picks one, and every player's map is locked to
@@ -879,7 +881,7 @@ local function NewGame(mode, rounds, host, id)
   if not game.isHost then AddPlayer(me) end
 end
 
-local Look, Result, Over, NextRound, Submit
+local Look, Result, Over, NextRound, Submit, ZoomToAnswer
 
 -- The map for the result: the answer with this player's guess (and, `all`, everyone's) while they
 -- fit on the terrain map together, panned there smoothly; else the answer alone; this player's guess
@@ -917,6 +919,7 @@ local function ShowResult(all)
     if game.reveal and Now() - game.reveal.t0 < 0.05 then game.reveal.t0 = Now() + Gm.PAN_SECONDS end
   else
     io().lookAt(s.cont, x, y, zoom)
+    game.mapSet = { cont = s.cont, x = x, y = y, z = zoom }
   end
 end
 
@@ -970,6 +973,7 @@ Look = function(left)
   game.deadline = Now() + (left or Gm.LOOK_SECONDS)
   game.roundEnd = game.deadline + Gm.GRACE_SECONDS
   game.guess, game.reveal, game.pending = nil, nil, nil
+  game.mapSet, game.zoomedIn = nil, nil
   game.missing = game.spot == nil
   io().world(game.spot) -- (every round starts from the whole world: no hint where to look)
   game.heading = io().random() * 2 * math.pi
@@ -1379,6 +1383,7 @@ function Gm.Tick()
   if ph == "look" and now >= game.deadline then -- the time is up: the guess placed counts
     Submit()
   end
+  ZoomToAnswer(now)
   if ph == "joined" and now >= game.deadline then
     return Over("The game started without you")
   end
@@ -1727,7 +1732,24 @@ function Gm.Animate()
   local e = k < 0.5 and 2 * k * k or 1 - (-2 * k + 2) ^ 2 / 2
   local z = math.exp(math.log(pn.z0) + (math.log(pn.z1) - math.log(pn.z0)) * e) -- (an even zoom speed)
   io().lookAt(pn.cont, pn.x0 + (pn.x1 - pn.x0) * e, pn.y0 + (pn.y1 - pn.y0) * e, z)
-  if k >= 1 then game.pan = nil end
+  if k >= 1 then
+    game.pan = nil
+    game.mapSet = { cont = pn.cont, x = pn.x1, y = pn.y1, z = pn.z1 } -- (where the game put the map)
+  end
+end
+
+-- A result's last Gm.ANSWER_ZOOM_SECONDS: the map zooms in on the answer, unless the player moved it since the
+-- game put it there (dragged, zoomed: then it's theirs for that round). Once a round.
+ZoomToAnswer = function(now)
+  if game.phase ~= "result" or game.zoomedIn or game.pan or not game.mapSet or not game.spot then return end
+  if game.deadline - now > Gm.ANSWER_ZOOM_SECONDS then return end
+  game.zoomedIn = true
+  local m, s = game.mapSet, game.spot
+  local vx, vy, vc, vz = io().view()
+  if not (vx and vz and vc == m.cont) or (vx - m.x) ^ 2 + (vy - m.y) ^ 2 > 4 or math.abs(vz - m.z) > m.z * 0.02 then
+    return
+  end
+  game.pan = { t0 = now, cont = s.cont, x0 = vx, y0 = vy, z0 = vz, x1 = s.x, y1 = s.y, z1 = math.min(vz, Gm.ANSWER_ZOOM_YD) }
 end
 
 -- A marker on the map at world (x, y): "guess" (a player's: their orc, variant `orc`) or "answer"

@@ -1325,3 +1325,55 @@ def test_a_link_game_goes_into_the_chat_box_for_party_raid_or_a_whisper():
     clock.t += 10
     assert a.G.PostLink("WHISPER", None, "Cid Smith")  # (the panel's Target button: a whisper to the target)
     assert a.posted[-1] == (f"AGPSSV-{g.id}-3-H", "WHISPER", None, "Cid Smith")
+
+
+def test_a_result_left_alone_zooms_in_on_the_answer_at_the_end(solo):
+    # the user, 2026-10-02: after a guess the map shows the lines; left alone, the result's last 5 seconds zoom in on
+    # where the answer is; moved by the player, it stays theirs for that round
+    p, clock, net = solo
+    lua = p.lua
+    lua.execute("VIEW = { x = 0, y = 0, c = 0, z = 300 }")
+    V = lua.globals().VIEW
+    p.G.io.view = lua.eval("function() return VIEW.x, VIEW.y, VIEW.c, VIEW.z end")
+    old_look = p.G.io.lookAt
+
+    def lookat(c, x, y, z):
+        old_look(c, x, y, z)
+        V.x, V.y, V.c, V.z = x, y, c, z
+
+    p.G.io.lookAt = lookat
+    p.G.Start("solo", 2)
+    V.x, V.y, V.c, V.z = 0, 0, 0, 300  # (the round starts from the world: the player's map at (0, 0))
+    s = p.game.spot
+    p.G.Guess(s.x + 1000, s.y, s.cont)
+    run(net, clock, 30)
+    for _ in range(12):  # (the pan out to the guess and the answer)
+        clock.t += 0.1
+        p.G.Animate()
+    assert p.game.phase == "result" and p.game.pan is None and p.looked[-1][3] > 600
+    clock.t = p.game.deadline - 5.5
+    p.G.Tick()
+    assert p.game.pan is None  # (not yet)
+    clock.t = p.game.deadline - 4.9
+    p.G.Tick()
+    assert p.game.pan
+    for _ in range(12):
+        clock.t += 0.1
+        p.G.Animate()
+    c, x, y, z = p.looked[-1]
+    assert (c, x, y) == (s.cont, s.x, s.y) and z == pytest.approx(200)  # (in on the answer)
+    # the next round: the player drags the map during the result, so no zoom
+    run(net, clock, 10)
+    assert p.game.round == 2 and p.game.phase == "look"
+    V.x, V.y, V.c, V.z = 0, 0, 0, 300
+    s = p.game.spot
+    p.G.Guess(s.x + 1000, s.y, s.cont)
+    run(net, clock, 30)
+    for _ in range(12):
+        clock.t += 0.1
+        p.G.Animate()
+    V.x = V.x + 400  # (dragged)
+    clock.t = p.game.deadline - 4.9
+    n = len(p.looked)
+    p.G.Tick()
+    assert p.game.pan is None and len(p.looked) == n

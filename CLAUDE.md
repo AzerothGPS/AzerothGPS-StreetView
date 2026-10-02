@@ -91,7 +91,7 @@ title (`Gm.PanelTitle`; the lobby and the end: the game's name and level), one l
 player list only while the street view doesn't show the game (the lobby, or closed);
 only open-world and city spots are used, never instances or caves (the user, 2026-09-29: cities are in, Undercity's level too, placed on its continent by `Gm.OnMap`; any spot with a
 `kind`, which the harvester's meta.json sets and the Index carries, or a level of 20000+ is skipped); street views come only from the map packs every player has (they're exchanged on joining; the
-panel lists who lacks which, or has an older one). **A round's worth** (the user, 2026-10-01): 100 at a spot
+panel lists who lacks which, or has an older one). **The answer up close** (the user, 2026-10-02): a result's map left alone (`game.mapSet`, where the game put it) zooms in on the answer for its last `Gm.ANSWER_ZOOM_SECONDS` (`ZoomToAnswer`, `Gm.ANSWER_ZOOM_YD`); moved by the player, not that round. **A round's worth** (the user, 2026-10-01): 100 at a spot
 by a point of interest, up to 200 far from any (`svtools/worth.py`: AzerothGPS's flight masters and map POIs,
 Data/Pois.lua kinds 1-2, and every landmark; 100 within 100 yd, 200 from 1,000 yd, rounded to 5s; the Index's
 `worth`); the host sends it in P (`game.worths`), so everyone scores alike. `Gm.Score(yd, worth)` gives 0 to the

@@ -40,7 +40,8 @@ AzerothGPS 1.1 or newer. With an older one the map isn't locked.)
    Whatever's placed when the time runs out is what counts. Playing solo, you can hit **Submit guess**
    early.
 4. When time's up, the map pans to the real spot and a dotted line grows from your guess to it. With other
-   players, you see everyone's guesses too.
+   players, you see everyone's guesses too. Leave the map be and, for the last 5 seconds, it zooms in on
+   the answer so you can see exactly where it was (move the map yourself and it stays put).
 5. **10 seconds** later the next round starts.
 
 The street view stays open after each round so you can take another look, and its corner shows
