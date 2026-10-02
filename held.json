@@ -226,5 +226,9 @@
  "0--4768--1120": {
   "reason": "black glossy metal fills the view (env-mapped material rendered black); waits for the material fix (I0 batch, 2026-10-01 contact sheet)",
   "at": 1790901776
+ },
+ "1--1068--4599": {
+  "reason": "weak view: the camera wedged between centaur tents, their walls fill the view (2026-10-02, the wildlife smoke test); needs a hand-picked offset",
+  "at": 1790957117
  }
 }
