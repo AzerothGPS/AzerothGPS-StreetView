@@ -114,5 +114,117 @@
  "0--9112-476": {
   "reason": "weak view: faces a wall, boulder or grass bank; retire or move. 2026-10-01 contact sheet",
   "at": 1790899885
+ },
+ "1-10004-2008": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-10047-1884": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-10164-2190": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-9571-2644": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-9592-2284": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-9922-2287": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-9946-2022": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-9970-2332": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-10090-2431": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-9855-2450": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-10202-2238": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-9538-2525": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-9750-2548": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-1515--4173": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-1833--4411": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-1891--4431": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-2047--4825": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-1901--4773": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-1905--4369": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-1647--3847": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1--1018-212": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "1-1357--4385": {
+  "reason": "a flat pink plane for the floor (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901767
+ },
+ "0--4864--898": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901776
+ },
+ "0--4932--930": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901776
+ },
+ "0--4974--976": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901776
+ },
+ "0--5004--1064": {
+  "reason": "camera inside rock or a tree base: rock, bark or a grass mound all around, nothing to recognize (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901776
+ },
+ "0--4790--1119": {
+  "reason": "black glossy metal fills the view (env-mapped material rendered black); waits for the material fix (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901776
+ },
+ "0--4768--1120": {
+  "reason": "black glossy metal fills the view (env-mapped material rendered black); waits for the material fix (I0 batch, 2026-10-01 contact sheet)",
+  "at": 1790901776
  }
 }
