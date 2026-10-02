@@ -28,6 +28,8 @@ Everyone sees the same countdown, no matter when they joined.
 
 ## The player list
 
+![The player list: who has guessed](https://github.com/user-attachments/assets/f829c029-1d69-4029-a017-9db19214420b)
+
 Once the rounds start, the player list sits in the street view's corner, right under the timer:
 
 - Players are ranked by total, **five at a time**. Scroll the **mouse wheel** over the list to see the
@@ -46,3 +48,7 @@ In the lobby, or if you close the street view, the list shows on the map's panel
   on without them.
 - If the host leaves or goes quiet, the game ends for everyone.
 - A `/reload` doesn't count as leaving. You come right back into the game and catch up on what you missed.
+
+![Everyone's guesses on the map](https://github.com/user-attachments/assets/cacff4cd-8867-4aa7-aca1-963a21cd0a6a)
+
+![A game against bots](images/game-bots-result.gif)

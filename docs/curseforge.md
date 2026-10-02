@@ -1,9 +1,9 @@
 # CurseForge page: AzerothGPS StreetView
 
 What goes on the CurseForge project page (Description, in CurseForge's Markdown editor), with the
-project's settings. Images marked `[image: ...]` come from the media list (`StreetView-media-requests.md`,
-by their ids); upload them to the project's Images tab and swap in their URLs. The voice is the same as
-AzerothGPS's page: talk to the player, keep it casual.
+project's settings. The images are links: screenshots uploaded to issue #1 (`docs/media-links.json` maps each
+file to its link), GIFs from the wiki's `images/` folder, the logo from `assets/`. They open for everyone once
+the repo is public. The voice is the same as AzerothGPS's page: talk to the player, keep it casual.
 
 ## Project settings
 
@@ -22,14 +22,14 @@ AzerothGPS's page: talk to the player, keep it casual.
 
 ## Description
 
-[image: header, the Where in the Azeroth? logo (assets/where-in-the-azeroth.png)]
+![Where in the Azeroth?](https://raw.githubusercontent.com/AzerothGPS/AzerothGPS-StreetView/main/assets/where-in-the-azeroth.png)
 
 **Ever wanted to stand on a road in Azeroth and just look around?** AzerothGPS StreetView adds
 street-level views to the [AzerothGPS](https://github.com/AzerothGPS/AzerothGPS) map. Drag the little
 figure off the map onto a road and a full 360-degree view of that exact spot pops up. Look around, look
 up, zoom in, and follow the arrows on the ground to walk down the road.
 
-[image: S1, GIF: dragging the figure onto a road and the view opening]
+![Dragging the figure onto a road opens its street view](https://raw.githubusercontent.com/wiki/AzerothGPS/AzerothGPS-StreetView/images/sv-drag-open.gif)
 
 ### Go take a look
 
@@ -46,7 +46,7 @@ up, zoom in, and follow the arrows on the ground to walk down the road.
 - **The map follows along:** AzerothGPS shows where you're standing and which way you're looking.
 - **Nothing else to download:** every picture ships inside the addon.
 
-[image: H1, a street view window over a forest road]
+![Booty Bay at dusk in the street view](https://github.com/user-attachments/assets/a488152a-0bad-467f-83fc-bc0218abcb0c)
 
 ### Where in the Azeroth?
 
@@ -54,7 +54,7 @@ Think GeoGuessr, but for Azeroth. You get dropped into a street view with no zon
 coordinates. Look around, work out where you are, and double-click the map. The closer your guess, the
 more points you score.
 
-[image: G3, GIF: a round from the street view to the answer's dotted line]
+![A round of Where in the Azeroth?](https://raw.githubusercontent.com/wiki/AzerothGPS/AzerothGPS-StreetView/images/game-round.gif)
 
 - **Play however you like:** on your own, against four bots named after Classic legends (Thrall, Jaina,
   Hogger, Leeroy...), or with others: the game's link drops into your chat box for your party, raid, a
@@ -76,7 +76,7 @@ more points you score.
 - **Safe to /reload:** the game picks up right where it left off and catches up on what everyone else
   did.
 
-[image: H2, the final results: the street view's corner with the player list, the guesses on the map]
+![Everyone's guesses on the map after a round](https://github.com/user-attachments/assets/cacff4cd-8867-4aa7-aca1-963a21cd0a6a)
 
 ### Getting started
 
@@ -94,6 +94,8 @@ everything is on the wiki.
   later; the top of the map tells you when it works). More bosses, entrances and the stairs between floors
   are on the way. They're in the viewer only, never in the game.
 - **A few more spots:** the Great Forge and some of Darnassus' tree houses are getting a last bit of polish.
+
+![Shift-click a boss on a dungeon's map for his street view](https://raw.githubusercontent.com/wiki/AzerothGPS/AzerothGPS-StreetView/images/dungeon-boss-shift-click.gif)
 
 ### Notes
 

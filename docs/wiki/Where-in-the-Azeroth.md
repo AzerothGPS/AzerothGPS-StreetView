@@ -10,6 +10,8 @@ more points you score.
 
 Click the **Where in the Azeroth?** button above the map's figure and a menu slides out:
 
+![The game's menu](https://github.com/user-attachments/assets/2f97580d-8eab-4693-acad-2b5cc3e21f3b)
+
 | Mode | Who plays |
 |---|---|
 | **Solo** | Then **Solo** again for just you (your average round score is what counts), or **Against Bots** for four opponents named after Classic legends, with a player list just like a party game. Nothing gets sent to anyone. |
@@ -43,6 +45,12 @@ AzerothGPS 1.1 or newer. With an older one the map isn't locked.)
    players, you see everyone's guesses too. Leave the map be and, for the last 5 seconds, it zooms in on
    the answer so you can see exactly where it was (move the map yourself and it stays put).
 5. **10 seconds** later the next round starts.
+
+![A round, from the guess to the answer](images/game-round.gif)
+
+![The corner box during a round](https://github.com/user-attachments/assets/7229d349-bdeb-4c81-ad0c-03160a6e7d71)
+
+![The map zoomed in on the answer](https://github.com/user-attachments/assets/4c452f8e-18fc-46a4-8b7d-ae91f922a35e)
 
 The street view stays open after each round so you can take another look, and its corner shows
 everyone's points. Closed it by accident? **Show Street View** brings it back.
@@ -97,3 +105,5 @@ celebration too: a glow of drifting colors around the street view's corner and t
 The panel's **X** leaves the game (the host's X ends it for everyone). A finished game closes by itself
 after a minute. Need to `/reload`? Go ahead: the game picks up right where it was and catches up on what
 everyone else did while you were gone.
+
+![The end of a game](images/game-win.gif)

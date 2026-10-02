@@ -1,5 +1,7 @@
 ![AzerothGPS StreetView](images/logo.png)
 
+![Booty Bay at dusk](https://github.com/user-attachments/assets/a488152a-0bad-467f-83fc-bc0218abcb0c)
+
 # AzerothGPS StreetView
 
 Ever wanted to stand on a road in Azeroth and just look around? StreetView adds street-level views of
