@@ -743,3 +743,12 @@ ns.Instances[20249] = { name = "Onyxia's Lair", map = 249, raid = true,
     assert bosses.title(data, dict(spot, boss="Lord Roccor")) == "Ragefire Chasm, Lord Roccor"  # (the harvester's name first)
     assert "title = \"Ragefire Chasm, Taragaman the Hungerer\"" in pack.index_lua(
         [dict(spot, z=0, facing=0, poses=[], cube={"pad": 0.08}, title=bosses.title(data, spot))], "v")
+
+
+def test_the_release_notes_are_the_versions_changelog_section(tmp_path):
+    from svtools import release
+    f = tmp_path / "CHANGELOG.md"
+    f.write_text("# Changelog\n\n## 1.0.1\n\nfix\n\n## 1.0.0\n\nThe first release!\n\n- one\n\n## 0.9.0\n\nold\n",
+                 encoding="utf-8")
+    assert release.changelog_section(f, "1.0.0") == "The first release!\n\n- one"
+    assert release.changelog_section(f, "2.0.0") == ""

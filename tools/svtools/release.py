@@ -79,6 +79,23 @@ def toc_version(viewer: Path) -> str:
     return m.group(1) if m else "0"
 
 
+def changelog_section(path: Path, version: str) -> str:
+    """CHANGELOG.md's "## <version>" section (the release notes CurseForge shows), without its heading;
+    empty when there's none."""
+    if not path.exists():
+        return ""
+    out, on = [], False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            if on:
+                break
+            on = line[3:].strip() == version
+            continue
+        if on:
+            out.append(line)
+    return "\n".join(out).strip()
+
+
 def release_data(build: Path, dist: Path, version: str | None = None, upload: bool = False,
                  cfg: dict | None = None, log=print, viewer: Path | None = None) -> list[dict]:
     """Build, zip and check the addon (code and pictures); --upload sends it to CurseForge."""
@@ -113,8 +130,9 @@ def release_data(build: Path, dist: Path, version: str | None = None, upload: bo
 
     gv, what = curseforge.game_version(token)
     log(f"game version: {gv} {what}")
-    notes = (f"AzerothGPS StreetView {version} with {spots} street views (pictures {data_version}). "
-             "Screenshots of World of Warcraft (c) Blizzard Entertainment. Needs AzerothGPS.")
+    notes = changelog_section(pack.ROOT / "CHANGELOG.md", version) + (
+        f"\n\n{spots} street views (pictures {data_version}). Pictures of World of Warcraft (c) Blizzard "
+        "Entertainment. Needs AzerothGPS.")
     res = curseforge.upload(token, project, str(z),
                             curseforge.metadata(f"AzerothGPS StreetView {version}", notes, gv,
                                                 cfg["viewer"].get("curseforge_requires")))

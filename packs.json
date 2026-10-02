@@ -12,7 +12,7 @@
   },
   "viewer": {
     "name": "AzerothGPS_StreetView",
-    "curseforge_project": null,
+    "curseforge_project": 1721639,
     "curseforge_requires": [
       "azerothgps"
     ]
