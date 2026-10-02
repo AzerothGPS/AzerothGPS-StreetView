@@ -1,6 +1,8 @@
 """AzerothGPS StreetView developer tool.
 
-  sv.cmd install [--dev]          copy the viewer with its built pictures into the game's AddOns folder
+  sv.cmd install [--dev] [--private]  copy the viewer with its built pictures into the game's AddOns folder
+                                  (--private: only into the private test client's, the folders in
+                                  %USERPROFILE%\\.agps-installs, not the real game)
                                   (--dev adds the private developer addon AzerothGPS_StreetView_Dev from
                                   the AzerothGPS-StreetView-Dev checkout next to this one: the manual
                                   capture tool, /sv demo against bots, Report picture)
@@ -137,6 +139,22 @@ def install_into(addons: Path, dev: bool) -> None:
         print("Only changed files: /reload in game.")
 
 
+def install_private(dev: bool) -> int:
+    """Only the AddOns folders in EXTRA_INSTALLS (the private test client), never the real game. Returns
+    how many were installed into."""
+    n = 0
+    for extra in extra_addons_dirs():
+        if not extra.is_dir():
+            print(f"-> {extra}: no AddOns folder there (listed in {EXTRA_INSTALLS}); skipped")
+            continue
+        print(f"-> {extra}")
+        install_into(extra, dev)
+        n += 1
+    if not n:
+        print(f"No private AddOns folder to install into (list them in {EXTRA_INSTALLS}).")
+    return n
+
+
 def install_all(wow: Path, dev: bool) -> None:
     """The game folder given, then (for the default game) every AddOns folder in EXTRA_INSTALLS."""
     print(f"-> {wow}")
@@ -184,6 +202,8 @@ def main(argv=None) -> None:
     p_inst = sub.add_parser("install")
     p_inst.add_argument("--dev", "--capture", dest="dev", action="store_true",
                         help="also install the private developer addon (capture, bot demo, Report picture)")
+    p_inst.add_argument("--private", action="store_true",
+                        help="only the private test client's AddOns folders (.agps-installs), not the real game")
     p_imp = sub.add_parser("import")
     p_imp.add_argument("--no-install", action="store_true")
     p_imp.add_argument("--no-stitch", action="store_true", help="skip stitching (faster)")
@@ -226,7 +246,10 @@ def main(argv=None) -> None:
     a = ap.parse_args(argv)
 
     if a.cmd == "install":
-        install_all(a.wow, a.dev)
+        if a.private:
+            install_private(a.dev)
+        else:
+            install_all(a.wow, a.dev)
     elif a.cmd == "import":
         stats = pack.import_captures(a.wow, BUILD)
         k = 0 if a.no_stitch else pack.stitch_points(a.wow, BUILD)

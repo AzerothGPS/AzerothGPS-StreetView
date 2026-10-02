@@ -144,7 +144,7 @@ and Blender only read the client's files; nothing runs the game). Details: `PLAN
 Use the AzerothGPS venv: `%USERPROFILE%\.venvs\azerothgps\Scripts\python.exe`.
 
 ```
-python tools/sv.py install     # copy StreetView with its pictures into the game (--dev: + the private dev addon)
+python tools/sv.py install     # copy StreetView with its pictures into the game (--dev: + the private dev addon; --private: only the private test client's folders)
 python tools/sv.py import      # the dev addon's capture screenshots -> stitched spots -> build/packs, then install
 python tools/sv.py watch       # the same on every /reload
 python tools/sv.py pull [--from //PC/agps-work] [--watch 10]  # harvested spots from the capture PC's share (LAN)

@@ -74,5 +74,45 @@
  "10001-1346-310": {
   "reason": "Undercity: the same sewer tunnel, dim; cities pass by eye 2026-10-01",
   "at": 1790874440
+ },
+ "0--8364-400": {
+  "reason": "too bright: the Keep/Cathedral hall renders are washed out (near-white floors, flat vaults); waits for the exposure fix for no-ambient WMOs (flags 0x41F). 2026-10-01 contact sheet",
+  "at": 1790899885
+ },
+ "0--8400-278": {
+  "reason": "too bright: the Keep/Cathedral hall renders are washed out (near-white floors, flat vaults); waits for the exposure fix for no-ambient WMOs (flags 0x41F). 2026-10-01 contact sheet",
+  "at": 1790899885
+ },
+ "0--8444-470": {
+  "reason": "too bright: the Keep/Cathedral hall renders are washed out (near-white floors, flat vaults); waits for the exposure fix for no-ambient WMOs (flags 0x41F). 2026-10-01 contact sheet",
+  "at": 1790899885
+ },
+ "0--8467-417": {
+  "reason": "too bright: the Keep/Cathedral hall renders are washed out (near-white floors, flat vaults); waits for the exposure fix for no-ambient WMOs (flags 0x41F). 2026-10-01 contact sheet",
+  "at": 1790899885
+ },
+ "0--8543-376": {
+  "reason": "too bright: the Keep/Cathedral hall renders are washed out (near-white floors, flat vaults); waits for the exposure fix for no-ambient WMOs (flags 0x41F). 2026-10-01 contact sheet",
+  "at": 1790899885
+ },
+ "0--8564-896": {
+  "reason": "too bright: the Keep/Cathedral hall renders are washed out (near-white floors, flat vaults); waits for the exposure fix for no-ambient WMOs (flags 0x41F). 2026-10-01 contact sheet",
+  "at": 1790899885
+ },
+ "0--8580-804": {
+  "reason": "too bright, and a canal's water surface drawn across the hall's floor; waits for the exposure and liquid fixes. 2026-10-01 contact sheet",
+  "at": 1790899885
+ },
+ "0--8898-898": {
+  "reason": "weak view: faces a wall, boulder or grass bank; retire or move. 2026-10-01 contact sheet",
+  "at": 1790899885
+ },
+ "0--8926-844": {
+  "reason": "weak view: faces a wall, boulder or grass bank; retire or move. 2026-10-01 contact sheet",
+  "at": 1790899885
+ },
+ "0--9112-476": {
+  "reason": "weak view: faces a wall, boulder or grass bank; retire or move. 2026-10-01 contact sheet",
+  "at": 1790899885
  }
 }

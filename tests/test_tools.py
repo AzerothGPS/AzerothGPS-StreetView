@@ -693,3 +693,17 @@ def test_pull_media_copies_new_and_changed_files_but_not_frames(tmp_path):
     (share / "media" / "hero-viewer.png").write_bytes(b"y" * 12)
     assert pull.pull_media(share, dst)["copied"] == 1
     assert pull.pull_media(share, dst, frames=True)["copied"] == 1  # (the frames, asked for)
+
+
+def test_install_private_skips_the_real_game(tmp_path, monkeypatch):
+    # the user, 2026-10-01: the latest street views into the private server's addon folder only
+    import sv
+    private, missing = tmp_path / "private" / "AddOns", tmp_path / "gone" / "AddOns"
+    private.mkdir(parents=True)
+    lst = tmp_path / ".agps-installs"
+    lst.write_text(f"# the private client\n{private}\n{missing}\n", encoding="utf-8")
+    monkeypatch.setattr(sv, "EXTRA_INSTALLS", lst)
+    into = []
+    monkeypatch.setattr(sv, "install_into", lambda addons, dev: into.append((addons, dev)))
+    monkeypatch.setattr(sv, "install", lambda *a: into.append("the real game"))
+    assert sv.install_private(True) == 1 and into == [(private, True)]
