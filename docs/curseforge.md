@@ -50,7 +50,7 @@ up, zoom in, and follow the arrows on the ground to walk down the road.
 
 ---
 
-<p align="center"><img src="https://raw.githubusercontent.com/AzerothGPS/AzerothGPS-StreetView/main/assets/where-in-the-azeroth.png" alt="Where in the Azeroth?" width="260"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/AzerothGPS/AzerothGPS-StreetView/main/assets/where-in-the-azeroth-300.png" alt="Where in the Azeroth?" width="260"></p>
 
 ### Where in the Azeroth?
 
