@@ -14,8 +14,10 @@
     "name": "AzerothGPS_StreetView",
     "curseforge_project": 1721639,
     "curseforge_requires": [
-      "azerothgps"
-    ]
+      "azerothgps",
+      "azerothgps-streetview-data"
+    ],
+    "about_requires": "the user, 2026-10-03: the pictures a required dependency, so the CurseForge app installs both; the in-game notice covers manual installs"
   },
   "sd": {
     "tile": 512,

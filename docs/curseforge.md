@@ -12,9 +12,9 @@ the repo is public. The voice is the same as AzerothGPS's page: talk to the play
   play Where in the Azeroth?, a GeoGuessr-style guessing game for up to 10 players.
 - **Game:** World of Warcraft, the WoW Forever (Classic 1.60) flavor
 - **Categories:** Map & Minimap (main), Minigames, Quests & Leveling
-- **Required dependency:** AzerothGPS
-- **The pictures:** a project of their own, AzerothGPS StreetView Data (`docs/curseforge-data.md`), which
-  requires this one. Link it from the description's install steps.
+- **Required dependencies:** AzerothGPS, and AzerothGPS StreetView Data (the pictures, a project of their own:
+  `docs/curseforge-data.md`; the user, 2026-10-03: required, so the CurseForge app installs both). Each upload
+  sets them (packs.json `viewer.curseforge_requires`).
 - **License:** All Rights Reserved
 - **Avatar:** `assets/logo.png`
 - **AzerothGPS link** in the description: its GitHub page for now; swap in its CurseForge page once it has one.
