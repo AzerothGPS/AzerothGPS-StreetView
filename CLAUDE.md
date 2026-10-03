@@ -37,20 +37,24 @@ made beyond offline rendering stay there.
 
 ## Size and shipping (the user: always consider the CurseForge limit)
 
-- **One addon** (the user, 2026-09-29; split into two and back on 2026-10-03, keeping the alert): the pictures
-  ship inside AzerothGPS_StreetView itself, no separate data packs. `packs.json` has a single pack
-  `AzerothGPS_StreetView` (`in_viewer`, every continent); the build writes its pictures and real `Index.lua` to
-  `build/packs/AzerothGPS_StreetView/`, and `sv.cmd install` / `sv.cmd release` lay them over the viewer's code
-  (git has an empty `Index.lua` stub, loaded last by the toc). `install` removes the old
-  Kalimdor/EasternKingdoms/Data pack folders (`pack.LEGACY_PACKS`); `check_zip` refuses a second toc.
-  CurseForge refuses files of 2 GB or more: budget 1.8 GB for the whole zip; `build_packs` refuses more, and every
-  build prints the projection to all planned spots.
-- **No pictures found** (the user, 2026-10-03: a copy with the empty stub only, GitHub's source zip, an install
-  cut short): Core.lua `ns.NeedData`/`ns.ShowDataNotice`: a chat line at login and the "Street View Pictures
-  Missing" popup (AzerothGPS.Window: reinstall from CurseForge, `ns.PAGE_URL` to copy) on every way in: dragging or
-  clicking the figure, `/sv here|open`, a boss's Shift-click (its hint still shows in a dungeon), Where in the
-  Azeroth?'s button, `Gm.Start`, a game's link, an invitation accepted (Game.lua `NoData`, `io.noData`);
-  `test_without_the_pictures_every_way_in_shows_the_notice`.
+- **Two addons, two CurseForge projects** (the user, 2026-10-03, after one addon since 2026-09-29): the viewer
+  AzerothGPS_StreetView (code only, project 1721639) and the pictures, **AzerothGPS_StreetView_DataPack** (an
+  **unlisted** project: not in search or on the profile, but linkable and usable as a dependency; `packs.json`
+  `data`), so a code update doesn't download a gigabyte again. Both from this repo. StreetView's project requires
+  AzerothGPS and the DataPack in its Default Relations (the CurseForge app installs all three); uploads send no
+  relations (`curseforge_requires` empty). `packs.json` has a single pack of the DataPack's name (every continent);
+  the build writes its toc (depends on the viewer), `Index.lua` and pictures to
+  `build/packs/AzerothGPS_StreetView_DataPack/`, and `sv.cmd install` puts it beside the viewer. The viewer has no
+  `Index.lua`; `D.Load` reads `AzerothGPS_StreetViewPacks` at PLAYER_LOGIN. `install` removes the old
+  Kalimdor/EasternKingdoms/Data pack folders (`pack.LEGACY_PACKS`, never the DataPack); `check_zip` refuses a second
+  toc, pictures in the viewer's zip, or a DataPack zip without them. CurseForge refuses files of 2 GB or more:
+  budget 1.8 GB for the DataPack's zip; `build_packs` refuses more, and every build prints the projection.
+- **Without the DataPack** (Core.lua `ns.NeedData`/`ns.ShowDataNotice`, `ns.DataState`: missing, turned off, or
+  loaded with no views): a chat line at login and the "Street View Pictures Missing" popup (`ns.DATAPACK_URL` to
+  copy: `curseforge.com/projects/<data.curseforge_project>`, StreetView's page until that's set; a test keeps them in
+  step) on every way in: dragging or clicking the figure, `/sv here|open`, a boss's Shift-click (its hint still
+  shows in a dungeon), Where in the Azeroth?'s button, `Gm.Start`, a game's link, an invitation accepted (Game.lua
+  `NoData`, `io.noData`); `test_without_the_pictures_every_way_in_shows_the_notice`.
 - **Without AzerothGPS** (the user, 2026-10-03): the toc has `## OptionalDeps: AzerothGPS`, not `Dependencies` (a
   required one leaves StreetView unloaded, nothing said), so at PLAYER_LOGIN `ns.CheckAzerothGPS` shows "AzerothGPS
   Needed" (missing or turned off: then nothing else starts) or "AzerothGPS Too Old" (API version under
@@ -68,11 +72,14 @@ made beyond offline rendering stay there.
 - HD packs: not made or shipped for now (the user may consider them later). Selling or
   paywalling them would clash with Blizzard's add-on policy (add-ons free) and Fan Content
   Policy (no selling game imagery): flag that if it comes up.
-- Releases (CurseForge project 1721639), only when the user asks: bump the toc's version and add its
-  `## <version>` section to CHANGELOG.md, commit and push, then `sv.cmd release --publish`. That builds the
-  zip (code and pictures) here, checks it, and makes the GitHub release v<version> with the zip attached;
-  publishing it runs .github/workflows/release.yml, which uploads the zip to CurseForge (AzerothGPS required by the project's Default Relations, not the upload)
-  with the repo's `CF_API_TOKEN` secret, as AzerothGPS's own releases. (`--upload` sends it from this PC instead.)
+- Releases, only when the user asks. **The viewer** (project 1721639): bump the toc's version and add its
+  `## <version>` section to CHANGELOG.md, commit and push, then `sv.cmd release --publish`: it zips and checks the
+  code (no pictures) and makes the GitHub release v<version> with the zip attached. **The pictures**
+  (`data.curseforge_project`): a `## <YYYY.MM.DD>` section in CHANGELOG-DataPack.md (the notes), then
+  `sv.cmd release-data --publish` builds and zips them here (GitHub release data-v<YYYY.MM.DD>; no project id yet:
+  the workflow skips CurseForge, the user uploads by hand). Publishing either runs .github/workflows/release.yml, which picks the project by the tag and
+  uploads the zip with the repo's `CF_API_TOKEN` secret. (`--upload` sends from this PC instead.) Page texts:
+  `docs/curseforge.md`, `docs/curseforge-datapack.md`.
 
 ## Talking to AzerothGPS
 
@@ -185,12 +192,13 @@ and Blender only read the client's files; nothing runs the game). Details: the D
 Use the AzerothGPS venv: `%USERPROFILE%\.venvs\azerothgps\Scripts\python.exe`.
 
 ```
-python tools/sv.py install     # copy StreetView with its pictures into the game (--dev: + the private dev addon; --extras: only the extra AddOns folders, not the main game)
+python tools/sv.py install     # copy StreetView and its DataPack (the pictures) into the game (--dev: + the private dev addon; --extras: only the extra AddOns folders, not the main game)
 python tools/sv.py import      # the dev addon's capture screenshots -> stitched spots -> build/packs, then install
 python tools/sv.py watch       # the same on every /reload
 python tools/sv.py pull [--from //PC/agps-work] [--watch 10]  # harvested spots from the capture PC's share (LAN)
 python tools/sv.py pull-media  # the CurseForge/wiki media the capture PC took -> ..\StreetView-media (Dev's docs/media-automation.md)
-python tools/sv.py release     # dry run: build, zip and check the addon with its pictures (--publish: the GitHub release, then CurseForge)
+python tools/sv.py release     # dry run: zip and check the viewer, its code (--publish: the GitHub release, then CurseForge)
+python tools/sv.py release-data  # dry run: build, zip and check the DataPack (--publish: the GitHub release data-v<date>, then CurseForge)
 python tools/sv.py build       # rebuild the pictures and print the size
 python tools/sv.py media       # regenerate Media/ (Figure.tga, Probe.jpg)
 python -m pytest tests -q

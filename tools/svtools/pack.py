@@ -23,8 +23,10 @@ from PIL import Image
 from .savedvars import load_savedvariables
 
 ROOT = Path(__file__).resolve().parents[2]
-LEGACY_PACK = "AzerothGPS_StreetView_Data"  # (the single pack of the first builds)
-# addons of earlier layouts, removed from the game by `sv.cmd install` (the pictures are in the viewer now)
+LEGACY_PACK = "AzerothGPS_StreetView_Data"  # (the single pack of the first builds; also the name of the pictures'
+# own addon for a few hours on 2026-10-03)
+DATA_PACK = "AzerothGPS_StreetView_DataPack"  # (the pictures' own addon since 2026-10-03: the user, its own CurseForge project)
+# addons of earlier layouts, removed from the game by `sv.cmd install` (never the DataPack)
 LEGACY_PACKS = [LEGACY_PACK, "AzerothGPS_StreetView_Kalimdor", "AzerothGPS_StreetView_EasternKingdoms"]
 IMAGE_SIZE = (1024, 512)  # 2:1, powers of two (the game needs power-of-two textures)
 JPEG_QUALITY = 85  # (single views)
@@ -47,12 +49,12 @@ def is_manual(point: dict) -> bool:
 
 
 def pack_for(cfg: dict, point: dict) -> dict | None:
-    """The SD pack a point belongs in (by continent), or None. The pack inside the viewer takes
-    every level the others don't (city levels such as Undercity's 10001, instances later)."""
+    """The SD pack a point belongs in (by continent). The first pack takes every level the others
+    don't (city levels such as Undercity's 10001, the instances)."""
     for pk in cfg["sd"]["packs"]:
         if int(point["cont"]) in pk["continents"]:
             return pk
-    return next((pk for pk in cfg["sd"]["packs"] if pk.get("in_viewer")), None)
+    return cfg["sd"]["packs"][0] if cfg["sd"]["packs"] else None
 
 
 SHOT_EXTS = (".jpg", ".jpeg", ".tga", ".png")
@@ -153,17 +155,19 @@ def index_lua(points: list[dict], version: str, name: str = LEGACY_PACK) -> str:
     return "\n".join(lines)
 
 
-def toc(version: str, title: str = "AzerothGPS StreetView Data") -> str:
+def toc(version: str, title: str = "AzerothGPS StreetView DataPack") -> str:
     return "\n".join([
         "## Interface: 16001",
         f"## Title: {title}",
         "## Notes: Street view pictures for AzerothGPS StreetView. Screenshots of World of Warcraft (c) Blizzard Entertainment.",
         "## Author: AzerothGPS",
+        "## X-License: All Rights Reserved",
+        "## X-Copyright: Copyright (c) 2026 AzerothGPS",
         f"## Version: {version}",
         # (a dependency of the viewer: the game lists the pack under it; the viewer reads the
         # packs at login, after every add-on has loaded, so it doesn't list them itself)
         "## Dependencies: AzerothGPS_StreetView",
-        "## IconTexture: Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Figure",
+        "## IconTexture: Interface\\AddOns\\AzerothGPS_StreetView\\Media\\Logo",
         "",
         "Index.lua",
         "",
@@ -583,7 +587,7 @@ def build_packs(build: Path, version: str | None = None, cfg: dict | None = None
         if pk.get("in_viewer"):  # (the viewer's own toc lists Index.lua)
             (out / f"{pk['name']}.toc").unlink(missing_ok=True)
         else:
-            (out / f"{pk['name']}.toc").write_text(toc(version, f"AzerothGPS StreetView: {pk['title']}"), encoding="utf-8")
+            (out / f"{pk['name']}.toc").write_text(toc(version), encoding="utf-8")
         from . import worth as worth_
         pois = worth_.load_pois()  # (each spot's worth in Where in the Azeroth?: by its points of interest)
         mine = [dict(p, worth=worth_.worth(pois, p)) for p in mine]

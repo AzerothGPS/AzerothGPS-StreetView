@@ -9,9 +9,9 @@ update AzerothGPS (the note shows its CurseForge page; the CurseForge app instal
 or turn it on in the AddOns list if it's off, then restart the game.
 
 **"Street View Pictures Missing" pops up.**
-Your copy of StreetView has no pictures in it. That happens with GitHub's "source code" download, or an
-install that got cut short. Reinstall **AzerothGPS StreetView** from CurseForge (the note shows its page),
-then restart the game completely.
+The pictures are a download of their own, **AzerothGPS StreetView DataPack**. The CurseForge app installs it
+with StreetView; installed by hand, get it from the page the note shows, then restart the game completely.
+Already installed? It may be turned off: enable it in the AddOns list at the character select screen.
 
 **The street view is black, or says the picture is missing.**
 Restart the game completely: new picture files only load on a full start, not on a `/reload`. `/sv probe`

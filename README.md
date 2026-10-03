@@ -20,10 +20,12 @@ direction you look show on the map.
 
 Street views cover the open world of the Eastern Kingdoms, Kalimdor and Zephras Isle, a spot about
 every 200 yards along the roads (over 1,600 in all), plus the capitals' streets and halls (Stormwind,
-Orgrimmar, Ironforge, Darnassus, Thunder Bluff, the Undercity) and a few dozen famous spots, and they
-all ship inside the addon. In a dungeon, Shift-click a boss on its map (AzerothGPS 1.1 or newer) to see
-him standing in his room. (A copy without the pictures, such as GitHub's source code, says so and points
-to the CurseForge download.)
+Orgrimmar, Ironforge, Darnassus, Thunder Bluff, the Undercity) and a few dozen famous spots. In a
+dungeon, Shift-click a boss on its map (AzerothGPS 1.1 or newer) to see him standing in his room.
+
+The pictures are a download of their own, **AzerothGPS StreetView DataPack** (about 1.2 GB), which the
+CurseForge app installs along with StreetView. That keeps StreetView's own updates small. Without it,
+StreetView says where to get it.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/wiki/AzerothGPS/AzerothGPS-StreetView/images/sv-drag-open.gif" alt="Dragging the figure onto a road opens its street view" width="400">
@@ -102,11 +104,11 @@ clicking its link. Players are named as the game shows them: WoW Forever's first
   AzerothGPS/streetview-harvester.
 - `tools/sv.py`: install the addons; import manual captures (`import`) or points exported by
   the harvester on the capture PC (`import-harvest <folder>`) into the pictures.
-- `packs.json`: how the pictures ship (inside the viewer: continents, tile sizes, spacing, the
-  CurseForge project, the size budget).
+- `packs.json`: how the pictures ship (their own addon, AzerothGPS_StreetView_DataPack: continents,
+  tile sizes, spacing, both CurseForge projects, the size budget).
 - `build/` (git-ignored): `master/<id>/` each spot's tiles at full resolution,
-  `packs/AzerothGPS_StreetView/` the shipped pictures and their `Index.lua`, laid over the
-  viewer's code (whose `Index.lua` in git is an empty stub) by `install` and `release`.
+  `packs/AzerothGPS_StreetView_DataPack/` the DataPack (its toc, `Index.lua` and the shipped
+  pictures), put beside the viewer by `install` and zipped by `release-data`.
 - `tests/`: `python -m pytest tests -q`.
 
 ## Taking example views on your own PC (manual)
@@ -138,14 +140,22 @@ path, for example `C:\Users\<you>\OneDrive\Documents\Claude\AzerothGPS-StreetVie
 
 ## Releases
 
-One addon on CurseForge: the viewer's code and every picture together.
+Two addons, two CurseForge projects: the viewer (its code, small) and the pictures,
+AzerothGPS_StreetView_DataPack (an unlisted project the viewer's requires), so a code update doesn't
+download the pictures again. Dependencies are the projects' Default Relations on CurseForge.
 
-1. Bump `## Version` in the viewer's toc, add a `## <version>` section to `CHANGELOG.md`, commit and push.
-2. `sv.cmd release --publish` builds the pictures, lays them over the code in one zip, checks it (under
-   the budget, only addon files, one toc, nothing personal) and makes the GitHub release `v<version>`
-   with it; its workflow (`.github/workflows/release.yml`) uploads the zip to CurseForge, requiring
-   AzerothGPS. Without `--publish` it's a dry run; `--upload` sends it from this PC instead
-   (`CF_API_TOKEN` set). Releases are logged in `data-releases.jsonl`.
+1. **The viewer:** bump `## Version` in its toc, add a `## <version>` section to `CHANGELOG.md`, commit
+   and push, then `sv.cmd release --publish`. It zips and checks the code (no pictures, one toc, nothing
+   personal) and makes the GitHub release `v<version>`; its workflow (`.github/workflows/release.yml`)
+   uploads the zip to `viewer.curseforge_project`.
+2. **The pictures** (when they change): add a `## <YYYY.MM.DD>` section to `CHANGELOG-DataPack.md`
+   (its release notes), then `sv.cmd release-data --publish` builds them, zips and checks
+   them (under the budget, only addon files) and makes the GitHub release `data-v<YYYY.MM.DD>`; the
+   workflow uploads it to `data.curseforge_project` (the pictures are never in git; with no project id
+   there yet, it's the GitHub release only, for uploading to CurseForge by hand).
+
+Without `--publish` either one is a dry run; `--upload` sends from this PC instead (`CF_API_TOKEN` set).
+Releases are logged in `data-releases.jsonl`.
 
 The zip must stay under CurseForge's 2 GB limit (budget 1.8 GB): shipping a spot every ~200 yards
 puts every continent at about 0.85 GB. Every build prints the size and its projection to all

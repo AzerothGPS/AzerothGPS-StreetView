@@ -12,8 +12,9 @@ the repo is public. The voice is the same as AzerothGPS's page: talk to the play
   play Where in the Azeroth?, a GeoGuessr-style guessing game for up to 10 players.
 - **Game:** World of Warcraft, the WoW Forever (Classic 1.60) flavor
 - **Categories:** Map & Minimap (main), Minigames, Quests & Leveling
-- **Required dependency:** AzerothGPS, set in the project's Default Relations (so the CurseForge app installs
-  it too); uploads don't send relations of their own.
+- **Required dependencies** (the project's Default Relations, so the CurseForge app installs them too; uploads
+  send no relations of their own): AzerothGPS, and AzerothGPS StreetView DataPack (the pictures, an unlisted
+  project: `docs/curseforge-datapack.md`).
 - **License:** All Rights Reserved
 - **Avatar:** `assets/logo.png`
 - **AzerothGPS link** in the description: its GitHub page for now; swap in its CurseForge page once it has one.
@@ -45,7 +46,8 @@ up, zoom in, and follow the arrows on the ground to walk down the road.
 - **Look anywhere:** drag the picture around, and the mouse wheel zooms.
 - **Walk the roads:** click the white arrows on the ground to hop to the next spot.
 - **The map follows along:** AzerothGPS shows where you're standing and which way you're looking.
-- **Nothing else to download:** every picture ships inside the addon.
+- **The pictures come along:** they're in **AzerothGPS StreetView DataPack**, which the CurseForge app
+  installs with StreetView. It updates on its own, so StreetView's updates stay tiny.
 
 <p align="center"><img src="https://github.com/user-attachments/assets/a488152a-0bad-467f-83fc-bc0218abcb0c" alt="Booty Bay at dusk in the street view" width="820"></p>
 
@@ -85,7 +87,8 @@ more points you score.
 
 ### Getting started
 
-1. Install **AzerothGPS** and **AzerothGPS StreetView**, then restart the game.
+1. Install **AzerothGPS StreetView** (the CurseForge app brings AzerothGPS and the pictures, AzerothGPS
+   StreetView DataPack, along), then restart the game.
 2. Open the AzerothGPS map and drag the figure onto a road.
 3. Feel like playing? Click **Where in the Azeroth?** above the figure.
 

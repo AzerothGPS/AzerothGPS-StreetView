@@ -12,7 +12,7 @@ from pathlib import Path
 from PIL import Image, ImageStat
 
 ROOT = Path(__file__).resolve().parents[1]
-PACK = ROOT / "build" / "packs" / "AzerothGPS_StreetView"
+PACK = ROOT / "build" / "packs" / "AzerothGPS_StreetView_DataPack"  # (the pictures' own addon)
 FACES = "FRBLUD"
 FLAT_STD = 6.0
 

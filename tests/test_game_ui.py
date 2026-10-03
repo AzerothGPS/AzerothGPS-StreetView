@@ -400,9 +400,9 @@ def test_the_map_follows_the_arrows_and_goes_back_on_close(ui):
 
 
 def test_without_the_pictures_every_way_in_shows_the_notice(ui):
-    # the user, 2026-10-03: the pictures ship inside the addon; a copy without them (GitHub's source code, an install
-    # cut short) shows the same notice on the figure, a boss's Shift-click and Where in the Azeroth? (its button, a
-    # link, an invitation), and goes no further
+    # the user, 2026-10-03: the pictures are a download of their own, AzerothGPS_StreetView_DataPack (an unlisted
+    # CurseForge project StreetView's requires); without them the figure, a boss's Shift-click and Where in the
+    # Azeroth? (its button, a link, an invitation) show the same notice, and go no further
     p, clock, net, panel, lua = ui
     game_button = [f for f in lua.eval("FRAMES_MADE").values()
                    if f._kind == "Button" and f._w == 28 and f._scripts["OnClick"] is not None][0]
@@ -418,12 +418,26 @@ def test_without_the_pictures_every_way_in_shows_the_notice(ui):
         local f = CreateFrame("Frame", name) f.top, f.title = -30, title f:Hide() return f
       end
     """)
-    # the notice: AzerothGPS's popup window, what to do and the addon's page to copy
+    # why: not installed, turned off, or loaded with nothing in it
+    lua.execute('C_AddOns = { GetAddOnInfo = function() return "AzerothGPS_StreetView_DataPack", "", "", false, "MISSING" end,'
+                ' IsAddOnLoaded = function() return false end }')
+    assert p.ns.DataState() == "missing"
+    lua.execute('C_AddOns.GetAddOnInfo = function() return "AzerothGPS_StreetView_DataPack", "", "", false, "DISABLED" end')
+    assert p.ns.DataState() == "disabled" and "turned off" in p.ns.DataNoticeText("disabled")
+    lua.execute('C_AddOns.IsAddOnLoaded = function() return true end')
+    assert p.ns.DataState() == "empty" and "Reinstall" in p.ns.DataNoticeText("empty")
+    lua.execute('C_AddOns = nil')
+    assert p.ns.DataState() == "missing"
+    # the notice: AzerothGPS's popup window, the download's name and its page to copy
     p.ns.ShowDataNotice()
     w = lua.globals().AzerothGPSStreetViewDataNotice
     assert w._shown and w.title == "Street View Pictures Missing"
-    assert "reinstall" in w.text._text and "restart the game" in w.text._text
-    assert w.box._text == p.ns.PAGE_URL == "https://www.curseforge.com/projects/1721639"  # (by id: any address)
+    assert "AzerothGPS StreetView DataPack" in w.text._text and "restart the game" in w.text._text
+    assert w.box._text == p.ns.DATAPACK_URL
+    # (by project id, whatever its address; the DataPack's own once packs.json has it, StreetView's until then)
+    import json
+    data_id = json.loads((ADDON.parents[1] / "packs.json").read_text(encoding="utf-8"))["data"]["curseforge_project"]
+    assert p.ns.DATAPACK_URL == f"https://www.curseforge.com/projects/{data_id or 1721639}"
     w.Hide(w)
     # every way in shows it, and goes no further
     show = p.ns.ShowDataNotice

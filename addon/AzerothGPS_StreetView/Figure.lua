@@ -203,7 +203,7 @@ function F.Init()
     if ns.HasData() then
       GameTooltip:AddLine(string.format("%d views installed.", D.count), 0.6, 0.6, 0.6)
     else
-      GameTooltip:AddLine("No street view pictures found: reinstall AzerothGPS StreetView.", 1, 0.5, 0.3, true)
+      GameTooltip:AddLine("Pictures not installed: " .. ns.DATA_TITLE .. ".", 1, 0.5, 0.3, true)
     end
     GameTooltip:Show()
   end)

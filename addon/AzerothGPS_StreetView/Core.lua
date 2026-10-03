@@ -34,6 +34,9 @@ end
 -- Pages to copy (the game can't open links): CurseForge's by project id, which takes you to the project
 -- whatever its address.
 ns.PAGE_URL = "https://www.curseforge.com/projects/1721639" -- (this addon)
+-- (the DataPack's own project once it has an id, packs.json data.curseforge_project; until then this addon's page,
+-- which lists it as a dependency)
+ns.DATAPACK_URL = "https://www.curseforge.com/projects/1721639"
 ns.AZEROTHGPS_URL = "https://www.curseforge.com/projects/1712208" -- (AzerothGPS)
 ns.MIN_API = 12 -- AzerothGPS's API version this addon needs (AzerothGPS 1.1.0: a boss's Shift-click)
 
@@ -131,18 +134,43 @@ function ns.Notice(name, title, text, url)
   return f
 end
 
--- No pictures found (the user, 2026-10-03): they ship inside this addon, but a copy without them (GitHub's source
--- code, an install cut short) has only the empty Index.lua. Then the figure, a boss's Shift-click, /sv here|open and
--- Where in the Azeroth? (its button, a game's link, an invitation) show this notice and stop.
+-- The pictures are a download of their own (the user, 2026-10-03): the addon AzerothGPS_StreetView_DataPack, an
+-- unlisted CurseForge project of its own that StreetView's project requires, so a code update doesn't download a
+-- gigabyte again. Without it, the figure, a boss's Shift-click, /sv here|open and Where in the Azeroth? (its button,
+-- a game's link, an invitation) show this notice and stop.
+ns.DATA_ADDON = "AzerothGPS_StreetView_DataPack"
+ns.DATA_TITLE = "AzerothGPS StreetView DataPack"
+
 function ns.HasData() return D.count > 0 end
 
-function ns.DataNoticeText()
-  return "No street view pictures were found. They come with AzerothGPS StreetView from CurseForge (a copy of "
-    .. "the source code from GitHub has none): reinstall it from the page below, then restart the game completely."
+-- Why there are no pictures: "missing" (not installed, or installed while the game ran), "disabled" (turned off
+-- in the AddOns list) or "empty" (loaded, but no views in it: a broken copy).
+function ns.DataState()
+  local info = (C_AddOns and C_AddOns.GetAddOnInfo) or _G.GetAddOnInfo
+  if not info then return "missing" end
+  local ok, name, _, _, loadable, reason = pcall(info, ns.DATA_ADDON)
+  if not ok or not name or reason == "MISSING" then return "missing" end
+  local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded or _G.IsAddOnLoaded or function() return false end)(ns.DATA_ADDON)
+  if loaded then return "empty" end
+  if reason == "DISABLED" or loadable == false then return "disabled" end
+  return "missing"
+end
+
+function ns.DataNoticeText(state)
+  if state == "disabled" then
+    return ns.DATA_TITLE .. " (the street view pictures) is installed but turned off. Turn it on in the AddOns list "
+      .. "(the AddOns button at the character select screen), then log in again."
+  elseif state == "empty" then
+    return ns.DATA_TITLE .. " has no street views in it. Reinstall it from the page below, then restart the game "
+      .. "completely."
+  end
+  return "Street views need their pictures, a separate download: " .. ns.DATA_TITLE .. ". The CurseForge app "
+    .. "installs it with StreetView; or get it from the page below. Then restart the game completely."
 end
 
 function ns.ShowDataNotice()
-  return ns.Notice("AzerothGPSStreetViewDataNotice", "Street View Pictures Missing", ns.DataNoticeText(), ns.PAGE_URL)
+  return ns.Notice("AzerothGPSStreetViewDataNotice", "Street View Pictures Missing", ns.DataNoticeText(ns.DataState()),
+    ns.DATAPACK_URL)
 end
 
 -- AzerothGPS missing, turned off or too old (the user, 2026-10-03): the toc lists it as an optional dependency, so
@@ -287,7 +315,7 @@ ev:SetScript("OnEvent", function(_, event, arg1, arg2)
     local agps = ns.CheckAzerothGPS()
     if agps == "missing" or agps == "disabled" then return end -- (no map to show anything on)
     if not ns.HasData() then -- (once a login, in chat; the notice itself only when a street view is asked for)
-      Print(ns.DataNoticeText() .. " " .. ns.PAGE_URL)
+      Print(ns.DataNoticeText(ns.DataState()) .. " " .. ns.DATAPACK_URL)
     end
     -- after AzerothGPS has built its map (its PLAYER_LOGIN runs first; one frame later to be sure)
     C_Timer.After(0, function()

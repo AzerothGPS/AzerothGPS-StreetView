@@ -6,8 +6,10 @@ The first public release! Here's what's in it.
 
 ### Street View
 - **Over 1,600 street views** along the roads of the Eastern Kingdoms, Kalimdor and Zephras Isle, about
-  one every 200 yards. Each one is a full 360-degree panorama, and they all ship inside the addon, so
-  there's nothing else to download.
+  one every 200 yards. Each one is a full 360-degree panorama.
+- **The pictures come in their own download,** AzerothGPS StreetView DataPack (about 1.2 GB). The
+  CurseForge app installs it with StreetView, and it updates only when new street views come out, so
+  StreetView's own updates stay small. Without it, StreetView tells you where to get it.
 - **The cities are in:** walk the streets of Stormwind, Orgrimmar, Darnassus and Thunder Bluff, wander
   the Undercity's halls and canals, and head down into Ironforge.
 - **Step inside:** Stormwind Keep and the Cathedral, the inns, Thunder Bluff's tents, Orgrimmar's halls and
