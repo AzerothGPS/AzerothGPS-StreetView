@@ -65,9 +65,14 @@ jobs:
             ' CHANGELOG.md | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > notes.md
           fi
           if [ ! -s notes.md ]; then echo "no release notes for $TAG"; exit 1; fi
-          read -r PROJECT TITLE REQUIRES < <(python3 -c "
+          # (one value a line: an empty one can't shift the others, as it did on the DataPack's first release, its
+          # title taken for the project id)
+          { read -r PROJECT; read -r TITLE; read -r REQUIRES; } < <(python3 -c "
           import json; c = json.load(open('packs.json'))['$KEY']
-          print(c.get('curseforge_project') or '', (c.get('title') or 'AzerothGPS StreetView').replace(' ', '_'), ','.join(c.get('curseforge_requires') or []))")
+          print(c.get('curseforge_project') or '')
+          print(c.get('title') or 'AzerothGPS StreetView')
+          print(','.join(c.get('curseforge_requires') or []))")
+          if [ -n "$PROJECT" ] && ! [[ "$PROJECT" =~ ^[0-9]+$ ]]; then echo "the project id isn't a number: $PROJECT"; exit 1; fi
           if [ -z "$PROJECT" ] && [ "$KEY" = data ]; then
             # (the DataPack before its CurseForge project has an id: the GitHub release only, uploaded by hand)
             echo "::notice::no data.curseforge_project in packs.json: the GitHub release only, no CurseForge upload"
@@ -75,7 +80,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
-          echo "title=${TITLE//_/ }" >> "$GITHUB_OUTPUT"
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
           echo "requires=$REQUIRES" >> "$GITHUB_OUTPUT"
 
       - name: The release's zip
