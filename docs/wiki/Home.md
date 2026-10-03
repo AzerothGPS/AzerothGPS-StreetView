@@ -7,7 +7,7 @@
 Ever wanted to stand on a road in Azeroth and just look around? StreetView adds street-level views of
 World of Warcraft: Forever to the [AzerothGPS](https://github.com/AzerothGPS/AzerothGPS) map. And once
 you've had a look around, there's **Where in the Azeroth?**, a guessing game you can play on your own or
-with up to 40 people.
+with up to 10 people.
 
 - Drag the little figure off the AzerothGPS map onto a road and you're standing right there.
 - Follow the arrows on the ground to walk down the road, through the cities too.

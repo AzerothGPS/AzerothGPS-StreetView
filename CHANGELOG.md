@@ -33,7 +33,8 @@ The first public release! Here's what's in it.
 - **Play it your way:** Solo, Against Bots (four opponents named after Classic legends like Thrall, Jaina
   Proudmoore and Hogger, all played inside your own game), or Link: the game's link goes into your chat box
   for your party, raid, a whisper, say, guild or a channel, you send it, and whoever clicks it joins. It
-  shows the level and rounds up front, and there are no popups. Up to 40 players.
+  shows the level and rounds up front, and there are no popups. Up to 10 players, and the game paces its
+  messages so nobody misses a street view; its hidden chat channel is left as soon as the game ends.
 - **Three levels:** Normal (the terrain map), Heroic (the world map with every zone revealed) and Mythic
   (the world map with nothing revealed). The host picks, and everyone's map is locked to it for the game.
 - 1, 3 or 5 rounds of 30 seconds, 10 seconds between rounds, and a 30-second lobby that everyone sees

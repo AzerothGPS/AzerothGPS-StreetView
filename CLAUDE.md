@@ -81,9 +81,18 @@ a note printed).
 Link (2026-09-30) is an open game: the host posts a plain-text code `AGPSSV-<id>-<rounds>` in say,
 guild, the group or a numbered channel (panel buttons; chat needs the click); other players' chat
 filter turns it into a `garrmission:agpssv:` link, and a click joins the game's hidden channel
-`AGPSSV<id>` (messages go there) and whispers J to the host, who takes up to 40 (same realm and
+`AGPSSV<id>` (messages go there) and whispers J to the host, who takes up to 10 (`Gm.MAX_PLAYERS`; same realm and
 faction). Every game's lobby counts down 30 s for everyone who joined (I and W carry the seconds left);
 the host can start sooner, and a party's starts once everyone answered.
+**Addon message throttle** (the user, 2026-10-02): the client lets a prefix send 10 messages in a burst, then 1 a
+second, and drops the rest silently (`SendAddonMessage` returns 3, AddonMessageThrottle; 8 is the server's channel
+throttle); a game's start once sent a K per player, the roster and P at once, and with 9+ players round 1's street
+view was lost. Every message goes through `Send`'s queue (`Gm.Pump`: `Gm.SEND_BURST` 8, then `Gm.SEND_RATE` a
+second; the round's P/G/N/F/X/R first; 3, 8 or 11 (an encounter's lockdown) tried again, `Gm.SEND_TRIES`); whispers outside an instance aren't
+throttled and go straight out. Games are capped at 10 players to stay well under it. Never call `io().send`
+directly. **Game channels are left** `Gm.LEAVE_SECONDS` after the game ends (its F or X sent first), and
+`Gm.SweepChannels` leaves any other `AGPSSV<digits>` channel (after a reload, every 30 s): channels per character
+are few. The tests' `Net` throttles like the client (`net.dropped`).
 A street view pops up for 30 s (no zone name or coordinates, no walking on, not marked on the map); in that
 time the player double-clicks the map to place a guess (again to move it), and the one placed when the time
 runs out counts. **The game's details are in the street view's top-right corner** (the user, 2026-10-01: the

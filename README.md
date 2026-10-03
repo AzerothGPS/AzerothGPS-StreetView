@@ -47,7 +47,7 @@ closer you were, the more points you get.
 - **Modes:** Solo (by yourself, or Against Bots: four opponents named after famous characters of
   Classic Azeroth, played inside your own game) and Link: the game's link goes into your chat box for
   your party, raid, a whisper to your target, say, guild or a numbered channel; you send it, and whoever
-  clicks it joins (it shows the level and rounds first), up to 40 players on your realm and faction.
+  clicks it joins (it shows the level and rounds first), up to 10 players on your realm and faction.
   Nothing is sent without you, and there are no popups.
 - **Rounds:** 1, 3 or 5. Each street view shows for 30 seconds, its top-right corner showing the level,
   the round, the time left, what the round is worth and the player list (- folds it to the time left); the

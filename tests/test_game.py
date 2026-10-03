@@ -94,7 +94,13 @@ class Player:
         self.styles.append(style)
 
     def send(self, msg, chat, target=None):
+        # (the client's throttle: 10 a prefix in a burst, then 1 a second; past it a message is dropped, result 3.
+        # Whispers outside instances aren't throttled)
+        if chat != "WHISPER" and not self.net.allow(self.name, self.clock.t):
+            self.net.dropped.append((self.name, msg))
+            return 3
         self.net.queue.append((self.name, msg, chat, target))
+        return 0
 
     def ask(self, sender, rounds, yes, no, level=None):
         self.asked_level = level
@@ -108,6 +114,17 @@ class Player:
 class Net:
     def __init__(self):
         self.players, self.queue, self.channels = {}, [], {}
+        self.buckets, self.dropped = {}, []
+
+    def allow(self, sender, now, burst=10, rate=1.0):
+        """The client's addon message throttle, per sender (one prefix)."""
+        tokens, at = self.buckets.get(sender, (burst, now))
+        tokens = min(burst, tokens + (now - at) * rate)
+        if tokens < 1:
+            self.buckets[sender] = (tokens, now)
+            return False
+        self.buckets[sender] = (tokens - 1, now)
+        return True
 
     def seen(self, sender):
         """The sender's name as the others' messages carry it."""
@@ -343,7 +360,7 @@ def test_a_big_game_counts_who_guessed_and_pins_your_row():
     ps[0].G.Start("party", 1)
     net.deliver()
     net.deliver()
-    run(net, clock, 1)
+    run(net, clock, 5)  # (the joins' notices used the burst: the round's start goes out over a few seconds, Send)
     g = ps[6]
     assert g.game.phase == "look" and hud(g)[2] == ["worth up to 100", "0 of 7 guessed"]  # (more than the list shows)
     rows = board(g)
@@ -927,21 +944,22 @@ def test_the_street_view_stays_up_after_the_round_until_leaving(solo):
     assert p.closed == 1
 
 
-def test_a_raid_of_40_with_long_names_all_know_each_other():
+def test_a_full_game_of_10_with_long_names_all_know_each_other():
     # (the roster doesn't fit in one addon message: it goes in parts, each under 255 bytes)
     clock, net = Clock(), Net()
-    names = [f"Longplayername{i:02d}-Argentdawnrealm" for i in range(40)]
+    names = [f"Longplayername{i:02d}-Argentdawnrealm" for i in range(10)]
     ps = [Player(n, clock, net, group="RAID") for n in names]
     sent = []
     orig = ps[0].send
     ps[0].send = lambda msg, chat, target=None: (sent.append(msg), orig(msg, chat, target))
     ps[0].G.io.send = ps[0].send
     assert ps[0].G.Start("party", 1)
-    run(net, clock, 2)
+    run(net, clock, 8)  # (the roster and the packs go out a second apart once the burst is used: Send)
     assert all(len(m) <= 255 for m in sent)
+    assert net.dropped == []  # (nothing over the client's throttle)
     assert sum(1 for m in sent if m.startswith("L:")) > 1
     for p in ps:
-        assert p.game.phase == "look" and len(p.game.order) == 40, p.name
+        assert p.game.phase == "look" and len(p.game.order) == 10, p.name
     for i, p in enumerate(ps):
         p.G.Guess(300, 300 + i * 50, 0)
     run(net, clock, 35)
@@ -1075,16 +1093,17 @@ def test_an_open_game_turns_late_and_extra_players_away():
     assert b.game.phase == "over" and "over" in b.game.reason
     b.G.Leave()
     a.G.Leave()
-    # full: the 40 players
-    ps, clock, net = open_game(41)
+    # full: the 10 players (the user, 2026-10-02: 10, well under the addon message allowance)
+    ps, clock, net = open_game(11)
     link = f"garrmission:agpssv:{ps[0].game.id}:1:P00-Realm"
     for p in ps[1:]:
         assert p.G.OnLink(link)
         net.deliver()
-    assert ps[40].game.phase == "over" and "full" in ps[40].game.reason
-    run(net, clock, 1)
-    assert ps[0].game.phase == "look" and len(ps[0].game.order) == 40  # (full: it started)
-    assert all(p.game.phase == "look" for p in ps[1:40])
+    assert ps[10].game.phase == "over" and "full" in ps[10].game.reason
+    run(net, clock, 6)
+    assert ps[0].game.phase == "look" and len(ps[0].game.order) == 10  # (full: it started)
+    assert net.dropped == []  # (nothing over the client's throttle)
+    assert all(p.game.phase == "look" for p in ps[1:10])
 
 
 def test_a_link_clicked_as_the_game_starts_stays_out_of_it():
@@ -1377,3 +1396,39 @@ def test_a_result_left_alone_zooms_in_on_the_answer_at_the_end(solo):
     n = len(p.looked)
     p.G.Tick()
     assert p.game.pan is None and len(p.looked) == n
+
+
+def test_a_game_never_sends_past_the_clients_addon_message_throttle():
+    # the user, 2026-10-02: the client lets a prefix send 10 in a burst, then 1 a second, and drops the rest silently;
+    # a game's start sent a pack line per player, the roster and the street view at once (9+ players lost round 1).
+    # Everything goes through a queue now, the round's own messages first; a full game of 10 drops nothing
+    clock, net = Clock(), Net()
+    ps = [Player(f"P{i:02d}-Realm", clock, net, group="RAID") for i in range(10)]
+    assert ps[0].G.Start("party", 3)
+    run(net, clock, 8)
+    assert all(p.game.phase == "look" and p.game.spot for p in ps)
+    for i, p in enumerate(ps):
+        p.G.Guess(300, 300 + i * 40, 0)
+    run(net, clock, 140)  # (3 rounds end about 128 s in; the game closes 60 s after)
+    assert net.dropped == [] and all(p.game.phase == "over" for p in ps)
+    assert all(all(p.game.players[q.name].scores[3] is not None for q in ps) for p in ps)
+    assert ps[0].G.Queued() == 0
+
+
+def test_game_channels_are_left_when_the_game_ends_and_swept_after():
+    # the user, 2026-10-02: no hidden game channel left behind: left at the game's end (its F or X sent first), and
+    # any other "AGPSSV<digits>" one (a /reload whose game wasn't taken up again) swept away
+    (a, b), clock, net = open_game(2)
+    left = {p.name: [] for p in (a, b)}
+    for p in (a, b):
+        p.G.io.leaveChannel = (lambda p: lambda ch: (left[p.name].append(ch), net.channels.get(ch, set()).discard(p.name)))(p)
+    ch = a.game.chanName
+    b.G.OnLink(f"garrmission:agpssv:{a.game.id}:1:P00-Realm")
+    run(net, clock, 1)
+    a.G.StartNow()
+    run(net, clock, 60)
+    assert a.game.phase == "over" and b.game.phase == "over"
+    assert left[a.name] == [ch] and left[b.name] == [ch]  # (left as it ended, not 60 s later at its close)
+    # a stray channel from before a reload: swept, the game's own kept
+    b.G.io.channels = b.lua.eval('function() return { "General", "AGPSSV123456", "AGPSSV99", "Trade" } end')
+    assert b.G.SweepChannels() == 2 and sorted(left[b.name][1:]) == ["AGPSSV123456", "AGPSSV99"]

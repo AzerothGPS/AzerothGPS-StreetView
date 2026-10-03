@@ -9,7 +9,7 @@ the repo is public. The voice is the same as AzerothGPS's page: talk to the play
 
 - **Name:** AzerothGPS StreetView
 - **Summary** (the one-liner, up to 255 characters): Stand on any road in Azeroth and look around, then
-  play Where in the Azeroth?, a GeoGuessr-style guessing game for up to 40 players.
+  play Where in the Azeroth?, a GeoGuessr-style guessing game for up to 10 players.
 - **Game:** World of Warcraft, the WoW Forever (Classic 1.60) flavor
 - **Categories:** Map & Minimap (main), Minigames, Quests & Leveling
 - **Required dependency:** AzerothGPS
@@ -62,7 +62,7 @@ more points you score.
 
 - **Play however you like:** on your own, against four bots named after Classic legends (Thrall, Jaina,
   Hogger, Leeroy...), or with others: the game's link drops into your chat box for your party, raid, a
-  friend by whisper, guild or any channel, you hit Enter, and whoever clicks it joins. **Up to 40 players.**
+  friend by whisper, guild or any channel, you hit Enter, and whoever clicks it joins. **Up to 10 players.**
 - **Pick your difficulty:** Normal plays on the terrain map, Heroic on the world map with every zone
   revealed, and Mythic on the bare world map with nothing revealed at all. Everyone in the game gets the
   same one.

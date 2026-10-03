@@ -15,11 +15,17 @@ Pick **Link** (then a level and the rounds) to host a game. Nothing gets sent un
 2. Players with StreetView see **[Join Where in the Azeroth?: Heroic, 3 rounds]** in chat, so they know the
    level and the rounds before they click. One click and they're in, no popups. Players without the addon
    just see a short code.
-3. Up to **40 players** can join. The game starts when the lobby's countdown ends, when it's full, or
+3. Up to **10 players** can join. The game starts when the lobby's countdown ends, when it's full, or
    when you click **Start now**.
 
 Link games work on your realm and faction (they run on a hidden chat channel of their own). Click too
-late and you're told the game already started, is full, or is over.
+late and you're told the game already started, is full, or is over. Everyone leaves that hidden channel
+by themselves a few seconds after the game ends (and any left over from a /reload goes too), so it never
+takes up one of your channel slots.
+
+Why 10 players? The game client lets an addon send only about 10 messages at once, then 1 a second.
+StreetView paces its messages to stay under that, and 10 players keeps every round's messages well
+within it, so nobody misses a street view.
 
 ## The lobby
 

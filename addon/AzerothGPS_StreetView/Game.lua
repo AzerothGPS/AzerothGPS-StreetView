@@ -57,7 +57,8 @@ Gm.BOT_NAMES = { "Thrall", "Jaina Proudmoore", "Sylvanas Windrunner", "Cairne Bl
   "Mathias Shaw" }
 -- ... how far off a bot's guess lands (yards), one skill each: some are good at this, some aren't
 Gm.BOT_SKILL_YD = { 60, 250, 700, 1600, 4000 }
-Gm.MAX_PLAYERS = 40 -- an open game (the link posted in chat) takes this many, then starts
+Gm.MAX_PLAYERS = 10 -- an open game (the link posted in chat) takes this many, then starts (the user, 2026-10-02:
+-- 10, well under the addon message allowance: Gm.SEND_BURST)
 Gm.LINK_ANSWER_SECONDS = 10 -- a link clicked: no word from its host this long, the game is gone
 Gm.POST_COOLDOWN = 5 -- the link posted: again after this long (no spamming the channels)
 Gm.PROPOSE_SECONDS = 3 -- ... and this long for the players to say they have the next street view
@@ -717,7 +718,14 @@ Gm.io = {
       if not index or index == 0 then return end
       target = index
     end
-    C_ChatInfo.SendAddonMessage(Gm.PREFIX, msg, chatType, target)
+    return C_ChatInfo.SendAddonMessage(Gm.PREFIX, msg, chatType, target)
+  end,
+  inInstance = function() return IsInInstance and IsInInstance() and true or false end,
+  -- the chat channels joined, by name (GetChannelList: id, name, disabled for each)
+  channels = function()
+    local out, list = {}, GetChannelList and { GetChannelList() } or {}
+    for i = 2, #list, 3 do out[#out + 1] = list[i] end
+    return out
   end,
   -- an open game's hidden chat channel (its addon messages; never shown in a chat window)
   joinChannel = function(name) if JoinTemporaryChannel then JoinTemporaryChannel(name) end end,
@@ -833,7 +841,97 @@ end
 -- tests' io and older ones may lack them).
 function Gm.ChannelName(id) return "AGPSSV" .. id end
 local function JoinChannel(name) if io().joinChannel then io().joinChannel(name) end end
-local function LeaveChannel(g) if g and g.open and g.chanName and io().leaveChannel then io().leaveChannel(g.chanName) end end
+
+-- Every addon message goes through a queue (the user, 2026-10-02): the client lets a prefix send 10 in a burst, then
+-- 1 a second, and drops the rest without a word (a game's start sent a K per player, the roster and the round's P at
+-- once: 9 players or more lost round 1's street view). At most Gm.SEND_BURST at once, Gm.SEND_RATE a second after
+-- that; the round's own messages first (P, G, N, F, X, R; then the players' S, Y, O, M, Q; the rest after); one the
+-- client still refuses for its throttle (io.send's result: 3 the prefix's, 8 the channel's, 11 an encounter's lockdown) is tried again.
+Gm.SEND_BURST, Gm.SEND_RATE, Gm.SEND_TRIES = 8, 1, 10
+local URGENT = { P = 1, G = 1, N = 1, F = 1, X = 1, R = 1, S = 2, Y = 2, O = 2, M = 2, Q = 2, L = 2 }
+local THROTTLED = { [3] = true, [8] = true, [11] = true } -- (Enum.SendAddonMessageResult: AddonMessageThrottle,
+-- ChannelThrottle, AddOnMessageLockdown: an encounter in an instance)
+local outq, tokens, tokensAt, toLeave = {}, nil, nil, {}
+
+local function Refill()
+  local now = Now()
+  if not tokens then tokens, tokensAt = Gm.SEND_BURST, now end
+  tokens = math.min(Gm.SEND_BURST, tokens + math.max(0, now - tokensAt) * Gm.SEND_RATE)
+  tokensAt = now
+end
+
+-- Channels left once their time comes (toLeave: name = when) and nothing queued is still to go to them (a game's X or
+-- F queued as it ends). A game's own is left Gm.LEAVE_SECONDS after it ends: its last messages sent and on their way.
+Gm.LEAVE_SECONDS = 3
+local function LeaveWaiting()
+  local now = Now()
+  for name, at in pairs(toLeave) do
+    local busy = now < at
+    for _, m in ipairs(outq) do
+      if m.target == name then busy = true end
+    end
+    if not busy then
+      toLeave[name] = nil
+      if io().leaveChannel then io().leaveChannel(name) end
+    end
+  end
+end
+
+function Gm.Pump()
+  Refill()
+  while outq[1] and tokens >= 1 do
+    local m = table.remove(outq, 1)
+    local res = io().send(m.msg, m.chat, m.target)
+    tokens = tokens - 1
+    if THROTTLED[res] then -- (another addon's messages, or the server's channel throttle: again shortly)
+      m.tries = m.tries + 1
+      if m.tries < Gm.SEND_TRIES then table.insert(outq, 1, m) end
+      tokens = 0
+      break
+    end
+  end
+  if next(toLeave) then LeaveWaiting() end
+end
+function Gm.Queued() return #outq end
+
+local function Send(msg, chatType, target)
+  -- (a whisper outside an instance isn't throttled by the client: straight out, unless refused)
+  if chatType == "WHISPER" and not (io().inInstance and io().inInstance()) then
+    local res = io().send(msg, chatType, target)
+    if not THROTTLED[res] then return end
+  end
+  local pri = URGENT[msg:sub(1, 1)] or 3
+  local at = #outq + 1
+  for i, m in ipairs(outq) do
+    if m.pri > pri then
+      at = i
+      break
+    end
+  end
+  table.insert(outq, at, { msg = msg, chat = chatType, target = target, pri = pri, tries = 0 })
+  Gm.Pump()
+end
+
+local function LeaveChannel(g)
+  if g and g.open and g.chanName then
+    toLeave[g.chanName] = Now() + Gm.LEAVE_SECONDS
+  end
+end
+
+-- Leave every game channel ("AGPSSV" and digits) but the game's own: one left behind by a /reload whose game wasn't
+-- taken up again, or by a game that ended without its X (the user, 2026-10-02). After a reload and every 30 s.
+function Gm.SweepChannels()
+  if not (io().channels and io().leaveChannel) then return 0 end
+  local mine, n = game and game.chanName, 0
+  for _, name in ipairs(io().channels() or {}) do
+    if type(name) == "string" and name:match("^AGPSSV%d+$") and name ~= mine and not toLeave[name] then
+      toLeave[name] = Now()
+      n = n + 1
+    end
+  end
+  if n > 0 then LeaveWaiting() end
+  return n
+end
 -- (the target that goes with game.channel: an open game's channel name, else none)
 local function ChanTarget() return game.open and game.chanName or nil end
 
@@ -844,12 +942,12 @@ local function ToOthers(...)
   local msg = Gm.Encode(...)
   if game.bots then return BotsHear(msg) end -- (a game against bots: nothing leaves this client)
   if game.mode == "party" then
-    io().send(msg, game.channel, ChanTarget())
+    Send(msg, game.channel, ChanTarget())
   else
     for _, name in ipairs(game.order) do
-      if name ~= game.me then io().send(msg, "WHISPER", name) end
+      if name ~= game.me then Send(msg, "WHISPER", name) end
     end
-    if game.phase == "invite" and game.target then io().send(msg, "WHISPER", game.target) end
+    if game.phase == "invite" and game.target and not game.players[game.target] then Send(msg, "WHISPER", game.target) end
   end
 end
 
@@ -926,6 +1024,7 @@ end
 -- The game ends (reason: why, when it didn't run its rounds). The panel stays until its X.
 Over = function(reason)
   if not game then return end
+  LeaveChannel(game) -- (nothing more comes over it: the final result stays up from what's here)
   game.phase = "over"
   game.reason = reason
   game.closeAt = Now() + Gm.OVER_SECONDS
@@ -1029,10 +1128,11 @@ local function Begin()
     ToOthers("X", game.id)
     return Over("There's no map pack every player has")
   end
-  for _, name in ipairs(game.order) do ToOthers("K", game.id, name, Gm.PackField(game.packs[name] or {})) end
   Gm.AssignLooks(game, game.order, function(n) return io().random(1, n) end)
-  SendRoster()
+  -- (the round's street view first, then the roster, the packs last: they go out over a few seconds, Send)
   NextRound()
+  SendRoster()
+  for _, name in ipairs(game.order) do ToOthers("K", game.id, name, Gm.PackField(game.packs[name] or {})) end
 end
 
 -- Everyone asked has answered the invitation.
@@ -1259,7 +1359,7 @@ function Gm.JoinLink(host, id, rounds)
   game.askedAt = Now()
   game.deadline = Now() + Gm.JOIN_SECONDS + 10
   game.heardHost = Now()
-  io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me]), host), "WHISPER", host)
+  Send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me]), host), "WHISPER", host)
   Hold() -- (Normal until the host's W says the level)
   io().showMap()
   Changed()
@@ -1368,7 +1468,13 @@ local function AllScored()
 end
 
 -- The clock: called often (the panel's driver; tests call it with their time).
+local sweptAt
 function Gm.Tick()
+  if outq[1] or next(toLeave) then Gm.Pump() end
+  if not sweptAt or Now() - sweptAt >= 30 then
+    sweptAt = Now()
+    Gm.SweepChannels()
+  end
   if not game then return end
   if game.bots and game.phase ~= "over" then
     BotsTick()
@@ -1450,7 +1556,7 @@ end
 -- guesses since, and from the host the round as it is: its street view (P), its look with the seconds left
 -- (G), its end (N) or the game's (F). Whispered to them alone: the others have it all.
 local function Resync(to, from)
-  local function Say(...) io().send(Gm.Encode(...), "WHISPER", to) end
+  local function Say(...) Send(Gm.Encode(...), "WHISPER", to) end
   local mine = game.players[game.me]
   for r = math.max(1, from), game.round do
     local sc, g = mine and mine.scores[r], mine and mine.guesses[r]
@@ -1489,11 +1595,11 @@ function Gm.OnMessage(msg, channel, sender)
     local left, heard = tonumber(f[4]) or Gm.JOIN_SECONDS, Now() -- (the lobby's countdown)
     local level = Gm.Level(f[5])
     if game and game.phase ~= "over" then
-      io().send(Gm.Encode("B", id), reply, to)
+      Send(Gm.Encode("B", id), reply, to)
       return
     end
     io().ask(sender, rounds, function()
-      if game and game.phase ~= "over" then return io().send(Gm.Encode("B", id), reply, to) end
+      if game and game.phase ~= "over" then return Send(Gm.Encode("B", id), reply, to) end
       NewGame(channel == "WHISPER" and "whisper" or "party", rounds, sender, id)
       game.level = level
       game.channel = channel ~= "WHISPER" and channel or nil
@@ -1503,17 +1609,17 @@ function Gm.OnMessage(msg, channel, sender)
       game.startAt = heard + left
       game.deadline = game.startAt + 10 -- (no word from the host by then: it started without us)
       game.heardHost = Now()
-      io().send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me]), sender), reply, to) -- (the host as seen here)
+      Send(Gm.Encode("J", id, Gm.PackField(game.packs[game.me]), sender), reply, to) -- (the host as seen here)
       Hold()
       io().showMap()
       Changed()
     end, function()
-      io().send(Gm.Encode("D", id), reply, to)
+      Send(Gm.Encode("D", id), reply, to)
     end, level)
     return
   end
   if kind == "J" and channel == "WHISPER" and id and (not game or id ~= game.id or game.phase == "over") then
-    return io().send(Gm.Encode("U", id, "over"), "WHISPER", sender) -- (a link to a game that's over)
+    return Send(Gm.Encode("U", id, "over"), "WHISPER", sender) -- (a link to a game that's over)
   end
   if not game or id ~= game.id then return end
   if sender == game.host then game.heardHost = Now() end
@@ -1524,9 +1630,9 @@ function Gm.OnMessage(msg, channel, sender)
   end
   if game.isHost then
     if kind == "J" and game.open and game.phase ~= "invite" and not game.players[sender] then
-      io().send(Gm.Encode("U", game.id, "started"), "WHISPER", sender)
+      Send(Gm.Encode("U", game.id, "started"), "WHISPER", sender)
     elseif kind == "J" and game.open and #game.order >= Gm.MAX_PLAYERS and not game.players[sender] then
-      io().send(Gm.Encode("U", game.id, "full"), "WHISPER", sender)
+      Send(Gm.Encode("U", game.id, "full"), "WHISPER", sender)
     elseif kind == "J" and game.phase == "invite" then
       if f[3] and f[3] ~= game.me and Gm.SameRoot(f[3], game.me) then Rename(game.me, f[3]) end -- (as the others see us)
       AddPlayer(sender)
@@ -1539,7 +1645,7 @@ function Gm.OnMessage(msg, channel, sender)
           game.deadline = Now() + 3
           ToOthers("W", game.id, SecondsLeft(), "", game.level)
         end
-        io().send(Gm.Encode("W", game.id, SecondsLeft(), sender, game.level), "WHISPER", sender)
+        Send(Gm.Encode("W", game.id, SecondsLeft(), sender, game.level), "WHISPER", sender)
       else
         ToOthers("W", game.id, SecondsLeft(), sender, game.level) -- (sender: the one who joined, as seen here)
       end
@@ -1561,6 +1667,8 @@ function Gm.OnMessage(msg, channel, sender)
     end
     if sender ~= game.host and kind ~= "S" and kind ~= "Q" and kind ~= "Y" then return end -- (the host runs the game)
     if game.phase == "over" then return end -- (turned away or ended: a round starting doesn't bring it back)
+    -- (an open game's joiner not taken in yet, the host's W not here: its rounds aren't this player's)
+    if game.open and game.phase == "joined" and not game.startAt and (kind == "P" or kind == "G" or kind == "N") then return end
     if kind == "W" and game.phase == "joined" then -- (the lobby's seconds left)
       if f[3] and f[3] ~= game.me and not game.nameSet and Gm.SameRoot(f[3], game.me) then Rename(game.me, f[3]) end
       if f[3] == game.me then game.nameSet = true end
@@ -1616,7 +1724,7 @@ function Gm.OnMessage(msg, channel, sender)
       game.worths = game.worths or {}
       game.worths[round] = Gm.Worth({ worth = tonumber(f[4]) or (D.byId[f[3]] and D.byId[f[3]].worth) })
       local reply = game.mode == "whisper" and "WHISPER" or game.channel
-      io().send(Gm.Encode(game.spot and "O" or "M", game.id, round), reply, game.mode == "whisper" and game.host or ChanTarget())
+      Send(Gm.Encode(game.spot and "O" or "M", game.id, round), reply, game.mode == "whisper" and game.host or ChanTarget())
       Changed()
     elseif kind == "G" and round == game.round and game.phase ~= "look" and game.phase ~= "wait" then
       Look(tonumber(f[3])) -- (the seconds left: the host's answer to R; a round already on isn't started again)
@@ -2761,7 +2869,14 @@ function Gm.Init(figureButton)
   local driver = CreateFrame("Frame")
   driver:SetScript("OnUpdate", function(_, dt)
     t = t + dt
-    if not game then return end
+    if not game then
+      acc = acc + dt
+      if acc >= 0.5 then
+        acc = 0
+        pcall(Gm.Tick) -- (the queue and the channel sweep go on between games)
+      end
+      return
+    end
     acc = acc + dt
     if acc >= 0.1 then
       acc = 0
@@ -2790,4 +2905,5 @@ function Gm.TryResume()
     local ok, err = pcall(Gm.Resume, s)
     if not ok then ns.Print("|cffff6060the game couldn't go on after the /reload:|r " .. tostring(err)) end
   end
+  Gm.SweepChannels() -- (a game channel from before the reload, its game not taken up again)
 end
