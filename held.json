@@ -238,13 +238,5 @@
  "20533-3507--3910": {
   "reason": "Maexxna's web renders as solid glossy white sheets over the floor; the spider is small (2026-10-02 boss review)",
   "at": 1790980491
- },
- "0--10394--4313": {
-  "reason": "wildlife render too dark under the canopy (leaf shadows); 2026-10-03 review, until the leaf-density re-render",
-  "at": 1791019208
- },
- "0--10642--3982": {
-  "reason": "a big creature 4.7 yd from the camera fills the view; 2026-10-03 review, until the re-render with the nearness rule",
-  "at": 1791019208
  }
 }
