@@ -6,14 +6,18 @@ The first public release! Here's what's in it.
 
 ### Street View
 - **Over 1,600 street views** along the roads of the Eastern Kingdoms, Kalimdor and Zephras Isle, about
-  one every 200 yards. Each one is a full 360-degree panorama, and they all ship inside the addon, so
-  there's nothing else to download.
+  one every 200 yards. Each one is a full 360-degree panorama.
+- **The pictures are their own download:** get **AzerothGPS StreetView Data** too (about 1.2 GB). It
+  updates separately, so an update of StreetView itself stays small. Without it, StreetView tells you
+  where to get it.
 - **The cities are in:** walk the streets of Stormwind, Orgrimmar, Darnassus and Thunder Bluff, wander
   the Undercity's halls and canals, and head down into Ironforge.
 - **Step inside:** Stormwind Keep and the Cathedral, the inns, Thunder Bluff's tents, Orgrimmar's halls and
   Ironforge's, lit the way they glow in the game.
-- **The first dungeon boss:** Shift-click Taragaman the Hungerer on Ragefire Chasm's map to see him in his
-  room (needs AzerothGPS 1.1.0 or later). More bosses to come.
+- **Every dungeon and raid boss:** 205 of them, in 26 dungeons and raids from Ragefire Chasm to
+  Naxxramas. Shift-click a boss on its dungeon's map to see them in their room (needs AzerothGPS 1.1.0
+  or later).
+- **Wildlife:** the creatures that live along the roads are out and about in the street views.
 - **A few dozen famous spots,** picked by hand and framed on their best view: Booty Bay, Gadgetzan,
   Lakeshire, the Crossroads, Light's Hope Chapel and plenty more.
 - Drag the figure off the AzerothGPS map onto a road to open the nearest street view. The road network

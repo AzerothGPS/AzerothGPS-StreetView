@@ -3,6 +3,11 @@
 **The figure or the game button doesn't show on the map.**
 StreetView needs a recent AzerothGPS. Update it, then restart the game.
 
+**"Street View Pictures Missing" pops up.**
+The pictures are a download of their own: install **AzerothGPS StreetView Data** from CurseForge (the note
+shows its page), then restart the game completely. Already installed? It may be turned off: enable it in
+the AddOns list at the character select screen.
+
 **The street view is black, or says the picture is missing.**
 Restart the game completely: new picture files only load on a full start, not on a `/reload`. `/sv probe`
 checks that your client can show the pictures.
@@ -32,9 +37,8 @@ Click the **-** in its corner. It shrinks down to just the timer, and **+** brin
 No. It only shows pictures and the map. It never moves your character or presses keys for you.
 
 **Does it work in dungeons?**
-It's starting to. Open a dungeon's map in AzerothGPS and Shift-click a boss to see him in his room. So far
-that's Taragaman in Ragefire Chasm, with more on the way (see [[Coverage]]). It needs AzerothGPS 1.1.0 or
-later, and the top of the map says "Shift-click a boss: its street view" when it works. Dungeon spots
+Yes, for the bosses. Open a dungeon's map in AzerothGPS and Shift-click a boss to see him in his room:
+every dungeon and raid boss is in (see [[Coverage]]). It needs AzerothGPS 1.1.0 or later, and the top of the map says "Shift-click a boss: its street view" when it works. Dungeon spots
 never come up in Where in the Azeroth?. `/sv here` can't find you inside a dungeon, because the game hides
 your position there.
 

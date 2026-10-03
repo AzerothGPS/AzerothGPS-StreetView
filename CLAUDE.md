@@ -1,7 +1,7 @@
 # AzerothGPS StreetView
 
 Companion addon to AzerothGPS (sibling checkout `../azerothgps`, public repo
-AzerothGPS/AzerothGPS). This repo is **private**: https://github.com/AzerothGPS/AzerothGPS-StreetView.
+AzerothGPS/AzerothGPS). This repo is **public** (since 2026-10-02): https://github.com/AzerothGPS/AzerothGPS-StreetView.
 The full project plan is `docs/PLAN.md` in the private Dev repo (AzerothGPS-StreetView-Dev, checked out next
 to this one); this repo is public, so the plan, the capture setup and anything about how the pictures are
 made beyond offline rendering stay there.
@@ -37,13 +37,19 @@ made beyond offline rendering stay there.
 
 ## Size and shipping (the user: always consider the CurseForge limit)
 
-- **One addon** (the user, 2026-09-29): the pictures ship inside AzerothGPS_StreetView itself, no
-  separate data packs. `packs.json` has a single pack `AzerothGPS_StreetView` (`in_viewer`, every
-  continent); the build writes its pictures and real `Index.lua` to `build/packs/AzerothGPS_StreetView/`,
-  and `sv.cmd install` / `sv.cmd release` lay them over the viewer's code (git has an empty `Index.lua`
-  stub, loaded last by the toc). `install` removes the old Kalimdor/EasternKingdoms/Data pack folders
-  (`pack.LEGACY_PACKS`). CurseForge refuses files of 2 GB or more: budget 1.8 GB for the whole zip;
-  `build_packs` refuses more, and every build prints the projection to all planned spots.
+- **Two addons** (the user, 2026-10-03, reversing the one-addon decision of 2026-09-29): the pictures are a
+  download of their own, the addon **AzerothGPS_StreetView_Data** (its own CurseForge project, `packs.json`
+  `data`), so a code update doesn't download them again. `packs.json` has a single pack of that name (every
+  continent); the build writes its toc (depends on the viewer), `Index.lua` and pictures to
+  `build/packs/AzerothGPS_StreetView_Data/`, and `sv.cmd install` puts it beside the viewer. The viewer has no
+  `Index.lua`; `D.Load` reads `AzerothGPS_StreetViewPacks` at PLAYER_LOGIN. **Without the pictures** (Core.lua
+  `ns.NeedData`/`ns.ShowDataNotice`, `ns.DATA_URL`): a chat line at login, and the "Street View Pictures Missing"
+  popup (AzerothGPS.Window: why, missing or turned off, and the page to copy) on every way in: dragging or clicking
+  the figure, `/sv here|open`, a boss's Shift-click (its hint still shows in a dungeon), Where in the Azeroth?'s
+  button, `Gm.Start`, a game's link, an invitation accepted (Game.lua `NoData`, `io.noData`);
+  `test_without_the_pictures_every_way_in_says_where_to_get_them`. `install` removes the old Kalimdor/
+  EasternKingdoms pack folders (`pack.LEGACY_PACKS`, never the Data one). CurseForge refuses files of 2 GB or
+  more: budget 1.8 GB for the pictures' zip; `build_packs` refuses more, and every build prints the projection.
 - **Shipped every ~200 yd** (the user, 2026-09-29): the capture renders every 100 yd into the master,
   `pack.ship_points` thins the packs to `ship_spacing_yd` (a spot is kept unless a kept one is within
   150 yd; neighbors end up ~180-200 yd apart), and the arrows reach `D.NEXT_RANGE` = 310 yd. That puts
@@ -54,11 +60,13 @@ made beyond offline rendering stay there.
 - HD packs: not made or shipped for now (the user may consider them later). Selling or
   paywalling them would clash with Blizzard's add-on policy (add-ons free) and Fan Content
   Policy (no selling game imagery): flag that if it comes up.
-- Releases (CurseForge project 1721639), only when the user asks: bump the toc's version and add its
-  `## <version>` section to CHANGELOG.md, commit and push, then `sv.cmd release --publish`. That builds the
-  zip (code and pictures) here, checks it, and makes the GitHub release v<version> with the zip attached;
-  publishing it runs .github/workflows/release.yml, which uploads the zip to CurseForge (requiring AzerothGPS)
-  with the repo's `CF_API_TOKEN` secret, as AzerothGPS's own releases. (`--upload` sends it from this PC instead.)
+- Releases, only when the user asks. **The viewer** (CurseForge project 1721639): bump the toc's version and add
+  its `## <version>` section to CHANGELOG.md, commit and push, then `sv.cmd release --publish`: it zips and checks
+  the code (no pictures) and makes the GitHub release v<version> with the zip attached. **The pictures**
+  (`data.curseforge_project`): `sv.cmd release-data --publish` builds and zips them here (data-v<YYYY.MM.DD>).
+  Publishing either runs .github/workflows/release.yml, which picks the project by the tag and uploads the zip to
+  CurseForge with the repo's `CF_API_TOKEN` secret (the viewer requiring AzerothGPS, the pictures the viewer).
+  (`--upload` sends from this PC instead.) Page texts: `docs/curseforge.md`, `docs/curseforge-data.md`.
 
 ## Talking to AzerothGPS
 
@@ -171,12 +179,13 @@ and Blender only read the client's files; nothing runs the game). Details: the D
 Use the AzerothGPS venv: `%USERPROFILE%\.venvs\azerothgps\Scripts\python.exe`.
 
 ```
-python tools/sv.py install     # copy StreetView with its pictures into the game (--dev: + the private dev addon; --extras: only the extra AddOns folders, not the main game)
+python tools/sv.py install     # copy StreetView and its pictures (AzerothGPS_StreetView_Data) into the game (--dev: + the private dev addon; --extras: only the extra AddOns folders, not the main game)
 python tools/sv.py import      # the dev addon's capture screenshots -> stitched spots -> build/packs, then install
 python tools/sv.py watch       # the same on every /reload
 python tools/sv.py pull [--from //PC/agps-work] [--watch 10]  # harvested spots from the capture PC's share (LAN)
 python tools/sv.py pull-media  # the CurseForge/wiki media the capture PC took -> ..\StreetView-media (Dev's docs/media-automation.md)
-python tools/sv.py release     # dry run: build, zip and check the addon with its pictures (--publish: the GitHub release, then CurseForge)
+python tools/sv.py release     # dry run: zip and check the viewer, its code (--publish: the GitHub release, then CurseForge)
+python tools/sv.py release-data  # dry run: build, zip and check the pictures (--publish: the GitHub release data-v<date>, then CurseForge)
 python tools/sv.py build       # rebuild the pictures and print the size
 python tools/sv.py media       # regenerate Media/ (Figure.tga, Probe.jpg)
 python -m pytest tests -q

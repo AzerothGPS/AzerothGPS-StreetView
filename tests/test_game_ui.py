@@ -77,6 +77,9 @@ def with_windows(p):
     lua.execute(FRAMES)
     p.ns.db = lua.eval("{ viewer = {} }")
     load = lua.eval("function(src, name) return assert(load(src, '@' .. name)) end")
+    lua.execute("SlashCmdList = SlashCmdList or {}")
+    load((ADDON / "Core.lua").read_text(encoding="utf-8"), "Core.lua")("AzerothGPS_StreetView", p.ns)
+    p.ns.db = lua.eval("{ viewer = {} }")
     load((ADDON / "Viewer.lua").read_text(encoding="utf-8"), "Viewer.lua")("AzerothGPS_StreetView", p.ns)
     p.G.Init(lua.eval("CreateFrame('Button')"))
     panels = []
@@ -394,3 +397,60 @@ def test_the_map_follows_the_arrows_and_goes_back_on_close(ui):
     V.Open(p.D.byId["1-100-100"], west)
     frame._scripts["OnHide"](frame)
     assert len(M.calls) == n
+
+
+def test_without_the_pictures_every_way_in_says_where_to_get_them(ui):
+    # the user, 2026-10-03: the pictures are a download of their own (AzerothGPS_StreetView_Data); without them the
+    # figure, a boss's Shift-click and Where in the Azeroth? (its button, a link, an invitation) show the same notice
+    p, clock, net, panel, lua = ui
+    game_button = [f for f in lua.eval("FRAMES_MADE").values()
+                   if f._kind == "Button" and f._w == 28 and f._scripts["OnClick"] is not None][0]
+    p.D.Load(lua.eval("{}"))
+    assert not p.ns.HasData()
+    lua.execute("""
+      SHIFT, ROADS, NOTICES = {}, 0, 0
+      AzerothGPS.OnIconShiftClick = function(owner, fn, hint) SHIFT.fn, SHIFT.hint = fn, hint end
+      AzerothGPS.LocateWorld = function() end
+      AzerothGPS.ShowRoads = function() ROADS = ROADS + 1 end
+      UIErrorsFrame = { AddMessage = function() end }
+      AzerothGPS.Window = function(name, w, h, title)
+        local f = CreateFrame("Frame", name) f.top, f.title = -30, title f:Hide() return f
+      end
+    """)
+    # why: not installed, turned off, or loaded with nothing in it
+    lua.execute('C_AddOns = { GetAddOnInfo = function() return "AzerothGPS_StreetView_Data", "", "", false, "MISSING" end,'
+                ' IsAddOnLoaded = function() return false end }')
+    assert p.ns.DataState() == "missing"
+    lua.execute('C_AddOns.GetAddOnInfo = function() return "AzerothGPS_StreetView_Data", "", "", false, "DISABLED" end')
+    assert p.ns.DataState() == "disabled" and "turned off" in p.ns.DataNoticeText("disabled")
+    lua.execute('C_AddOns.IsAddOnLoaded = function() return true end')
+    assert p.ns.DataState() == "empty"
+    lua.execute('C_AddOns = nil')
+    assert p.ns.DataState() == "missing"
+    # the notice: AzerothGPS's popup window, the download's name and its page to copy
+    p.ns.ShowDataNotice()
+    w = lua.globals().AzerothGPSStreetViewDataNotice
+    assert w._shown and w.title == "Street View Pictures Missing"
+    assert "AzerothGPS StreetView Data" in w.text._text and "restart the game" in w.text._text
+    assert w.box._text == p.ns.DATA_URL and w.box._shown
+    w.Hide(w)
+    # every way in shows it, and goes no further
+    show = p.ns.ShowDataNotice
+    p.ns.ShowDataNotice = lua.eval("function(show) return function() NOTICES = NOTICES + 1 show() end end")(show)
+    G = lua.globals()
+    load = lua.eval("function(src, name) return assert(load(src, '@' .. name)) end")
+    load((ADDON / "Figure.lua").read_text(encoding="utf-8"), "Figure.lua")("AzerothGPS_StreetView", p.ns)
+    p.ns.Figure.Init()
+    p.ns.Figure.Pick()  # (dragging the figure)
+    assert G.NOTICES == 1 and G.ROADS == 0
+    boss = lua.eval('{ kind = "boss", name = "Boss", x = 5, y = 1, cont = 20036 }')
+    assert G.SHIFT.hint(boss) == "its street view"  # (still offered in a dungeon: the click says where to get them)
+    assert G.SHIFT.fn(boss) is True and G.NOTICES == 2 and p.ns.Viewer.Current() is None
+    p.ns.Here()  # (/sv here, the figure's plain click)
+    assert G.NOTICES == 3
+    p.G.io.noData = lua.eval("function() NOTICES = NOTICES + 1 end")  # (the real io's: ns.ShowDataNotice)
+    game_button._scripts["OnClick"](game_button)  # (Where in the Azeroth?'s button: no menu)
+    assert G.NOTICES == 4
+    assert not p.G.Start("solo", 3) and G.NOTICES == 5 and p.game is None
+    assert not p.G.OnLink("garrmission:agpssv:123456:3:Ann-Realm") and G.NOTICES == 6 and p.game is None
+    assert lua.globals().AzerothGPSStreetViewDataNotice._shown

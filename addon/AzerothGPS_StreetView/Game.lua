@@ -762,8 +762,17 @@ Gm.io = {
   follow = function() end, showMap = function() end, world = function() end, view = function() end,
   mapState = function() end, changed = function() end, ask = function() end,
   print = function(...) if ns.Print then ns.Print(...) end end,
+  -- no pictures installed: the notice saying where to get them (Core.lua)
+  noData = function() if ns.ShowDataNotice then ns.ShowDataNotice() end end,
 }
 local io = function() return Gm.io end
+
+-- No street views installed (the pictures are a download of their own, the user 2026-10-03): the notice, true.
+local function NoData()
+  if next(D.byId) ~= nil then return false end
+  if io().noData then io().noData() else io().print("No street views are installed.") end
+  return true
+end
 
 function Gm.Current() return game end
 function Gm.Active() return game ~= nil end
@@ -1174,10 +1183,7 @@ function Gm.Start(mode, rounds, target, level)
       return false
     end
   end
-  if next(D.byId) == nil then
-    io().print("No street views are installed.")
-    return false
-  end
+  if NoData() then return false end
   NewGame(mode, rounds)
   game.level = Gm.Level(level)
   game.before = io().mapState()
@@ -1347,10 +1353,7 @@ function Gm.JoinLink(host, id, rounds)
     if game.id ~= id then io().print("A game is already on.") end
     return false
   end
-  if next(D.byId) == nil then
-    io().print("No street views are installed.")
-    return false
-  end
+  if NoData() then return false end
   NewGame("party", rounds, host, id)
   game.open, game.channel, game.chanName = true, "CHANNEL", Gm.ChannelName(id)
   JoinChannel(game.chanName)
@@ -1600,6 +1603,7 @@ function Gm.OnMessage(msg, channel, sender)
     end
     io().ask(sender, rounds, function()
       if game and game.phase ~= "over" then return Send(Gm.Encode("B", id), reply, to) end
+      if NoData() then return Send(Gm.Encode("D", id), reply, to) end -- (no pictures: declined)
       NewGame(channel == "WHISPER" and "whisper" or "party", rounds, sender, id)
       game.level = level
       game.channel = channel ~= "WHISPER" and channel or nil
@@ -2589,6 +2593,7 @@ local function BuildButton(parent, figure)
       if game.phase == "over" then Gm.Leave() else io().print("A game is on: its X leaves it.") end
       return
     end
+    if NoData() then return end
     if fly:IsShown() and fly.target > 0 then HideMenu() else ShowMenu("mode") end
   end)
   gameButton:SetScript("OnEnter", function(self)

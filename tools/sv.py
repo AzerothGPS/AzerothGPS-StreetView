@@ -18,15 +18,17 @@
                                   ..\\StreetView-media (new and changed files; --frames: recordings' frames too)
   sv.cmd build                    rebuild the pictures (build/packs/) and print their size
   sv.cmd roads                    road sync: retire spots whose road is gone, list spots for new roads
-  sv.cmd release [--upload]       zip the addon with its pictures for CurseForge and check it (a dry run);
-                                  --upload sends it (needs CF_API_TOKEN and viewer.curseforge_project in packs.json)
+  sv.cmd release [--publish]      zip the viewer (its code) for CurseForge and check it (a dry run); --publish:
+                                  the GitHub release v<version>, whose workflow uploads it (--upload: from here)
+  sv.cmd release-data [--publish] build and zip the pictures (AzerothGPS_StreetView_Data) and check them;
+                                  --publish: the GitHub release data-v<YYYY.MM.DD>, uploaded the same way
   sv.cmd landmarks                landmarks.json (famous stops that always ship): merge the spots marked
                                   in game with the dev addon's /sv mark, and list them
   sv.cmd media                    regenerate the addon's own art (Media/)
   sv.cmd compare --name N --render ID   a spot as rendered and as captured in the game (on the private
                                   game folder, --capture-wow), for the dev addon's Compare; then install --dev
 
-The pictures ship inside the viewer addon (packs.json, under CurseForge's limit). The game folder
+The pictures ship in their own addon, AzerothGPS_StreetView_Data (packs.json, under CurseForge's limit). The game folder
 defaults to C:\\Program Files (x86)\\World of Warcraft\\_classic_beta_ (set AGPS_WOW or pass
 --wow); every install also goes into each AddOns folder listed in %USERPROFILE%\\.agps-installs (shared
 with AzerothGPS's install-addon: a second test install, say). sv.cmd runs
@@ -102,7 +104,7 @@ def install(wow: Path, dev: bool) -> None:
 
 
 def install_into(addons: Path, dev: bool) -> None:
-    # the viewer: its code with the built pictures and Index.lua laid over it (one addon)
+    # the viewer (its code), and beside it each built pack: the pictures' addon, AzerothGPS_StreetView_Data
     viewer = [ROOT / "addon" / "AzerothGPS_StreetView"]
     parts = []
     for pk in pack.CONFIG["sd"]["packs"]:
@@ -123,7 +125,7 @@ def install_into(addons: Path, dev: bool) -> None:
             if (addons / old).exists():
                 shutil.rmtree(addons / old)
                 print(f"removed the old {old} (it's in AzerothGPS_StreetView_Dev now)")
-    for old in pack.LEGACY_PACKS:  # (earlier layouts: the pictures are in the viewer now)
+    for old in pack.LEGACY_PACKS:  # (earlier layouts)
         if (addons / old).exists():
             shutil.rmtree(addons / old)
             print(f"removed the old {old}")
@@ -225,11 +227,16 @@ def main(argv=None) -> None:
     p_rd = sub.add_parser("roads", help="road sync: retire spots whose road is gone, list spots for new roads")
     p_rd.add_argument("--agps", type=Path, default=ROOT.parent / "azerothgps", help="the AzerothGPS checkout")
     p_rd.add_argument("--harvester", type=Path, default=ROOT.parent / "streetview-harvester")
-    p_r = sub.add_parser("release", aliases=["release-data"], help="the addon with its pictures, zipped for CurseForge")
+    p_r = sub.add_parser("release", help="the viewer (its code), zipped for CurseForge")
     p_r.add_argument("--publish", action="store_true",
                      help="the GitHub release v<version> with the zip; its workflow uploads it to CurseForge")
     p_r.add_argument("--upload", action="store_true", help="upload to CurseForge from here (otherwise a dry run)")
-    p_r.add_argument("--version", help="the packs' version (default: today, YYYY.MM.DD)")
+    p_r.add_argument("--version", help="the viewer's version (default: its toc's)")
+    p_rdata = sub.add_parser("release-data", help="the pictures (AzerothGPS_StreetView_Data), zipped for CurseForge")
+    p_rdata.add_argument("--publish", action="store_true",
+                         help="the GitHub release data-v<version> with the zip; its workflow uploads it to CurseForge")
+    p_rdata.add_argument("--upload", action="store_true", help="upload to CurseForge from here (otherwise a dry run)")
+    p_rdata.add_argument("--version", help="the pictures' version (default: today, YYYY.MM.DD)")
     sub.add_parser("landmarks", help="landmarks.json: merge the spots marked in game (/sv mark) and list them")
     sub.add_parser("media")
     p_w = sub.add_parser("watch")
@@ -286,7 +293,10 @@ def main(argv=None) -> None:
         print(roads.report(result))
         print(f"written: {BUILD / 'road-diff.json'} (retired: out of the packs; add: the harvester's render list)")
         build_and_report()
-    elif a.cmd in ("release", "release-data"):
+    elif a.cmd == "release":
+        from svtools import release
+        release.release_viewer(ROOT / "dist", a.version, upload=a.upload, publish_it=a.publish)
+    elif a.cmd == "release-data":
         from svtools import release
         release.release_data(BUILD, ROOT / "dist", a.version, upload=a.upload, publish_it=a.publish)
     elif a.cmd == "landmarks":

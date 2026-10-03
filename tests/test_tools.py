@@ -14,7 +14,7 @@ from svtools import pack  # noqa: E402
 
 lupa = pytest.importorskip("lupa")
 
-KAL = "AzerothGPS_StreetView"  # (the pictures ship inside the viewer)
+KAL = "AzerothGPS_StreetView_Data"  # (the pictures' own addon: the user, 2026-10-03)
 
 
 def test_capture_sequence_covers_every_view_once():
@@ -96,7 +96,7 @@ def test_import_and_build_pack(tmp_path):
     assert ns.Data.Load() == 1
     p = ns.Data.byId["1-1629--4373"]
     assert p.zone == "Razor Hill" and p.facing == pytest.approx(1.5)
-    assert ns.Data.ImagePath(p, 0, 0) == "Interface\\AddOns\\AzerothGPS_StreetView\\Images\\1-1629--4373\\y000_p+00.jpg"
+    assert ns.Data.ImagePath(p, 0, 0) == "Interface\\AddOns\\AzerothGPS_StreetView_Data\\Images\\1-1629--4373\\y000_p+00.jpg"
     assert ns.Data.HasPose(p, 1, 0) and not ns.Data.HasPose(p, 3, 0)
 
 
@@ -321,17 +321,19 @@ def test_compare_stitches_window_grabs_by_their_names(tmp_path, monkeypatch):
     assert len(seen) == 40 and {s.ring for s in seen} == {"nadir", "down", "level", "up", "zenith"}
 
 
-def test_every_point_has_one_pack_inside_the_viewer():
+def test_every_point_has_one_pack_the_pictures_own_addon():
     cfg = pack.CONFIG
-    for cont in (0, 1, 2991, 10001):  # (and Undercity's level)
-        assert pack.pack_for(cfg, {"cont": cont}) is not None
+    for cont in (0, 1, 2991, 10001, 20047):  # (and Undercity's level, a dungeon)
+        assert pack.pack_for(cfg, {"cont": cont})["name"] == KAL
     assert len({c for p in cfg["sd"]["packs"] for c in p["continents"]}) == sum(len(p["continents"]) for p in cfg["sd"]["packs"])
-    # one addon (the user, 2026-09-29): the pictures and their Index.lua ship inside the viewer,
-    # whose toc loads Index.lua last (after Data.lua defines the reader)
-    assert [(p["name"], p.get("in_viewer")) for p in cfg["sd"]["packs"]] == [("AzerothGPS_StreetView", True)]
+    # the pictures a download of their own (the user, 2026-10-03): one pack, AzerothGPS_StreetView_Data, its own
+    # CurseForge project; the viewer's toc has no Index.lua (the viewer reads the packs at login)
+    assert [(p["name"], p.get("in_viewer")) for p in cfg["sd"]["packs"]] == [(KAL, None)]
+    assert cfg["data"]["name"] == KAL and cfg["data"]["curseforge_project"] != cfg["viewer"]["curseforge_project"]
     viewer = (ROOT / "addon" / "AzerothGPS_StreetView" / "AzerothGPS_StreetView.toc").read_text(encoding="utf-8")
     files = [l.strip() for l in viewer.splitlines() if l.strip() and not l.startswith("#")]
-    assert files[-1] == "Index.lua" and files.index("Data.lua") < files.index("Index.lua")
+    assert "Index.lua" not in files and not (ROOT / "addon" / "AzerothGPS_StreetView" / "Index.lua").exists()
+    assert KAL not in pack.LEGACY_PACKS  # (`install` removes these: never the pictures' addon)
     assert "AzerothGPS_StreetView_Kalimdor" in pack.LEGACY_PACKS and "AzerothGPS_StreetView_EasternKingdoms" in pack.LEGACY_PACKS
     # the developer addon (private repo) depends on the viewer, listed under it with its own icon
     # (the figure with a gear, 2026-10-01: also its minimap button's)
@@ -372,7 +374,9 @@ def test_pack_scales_down_and_respects_the_budget(tmp_path):
     assert reports[KAL]["points"] == 3  # (every continent in the one pack)
     tile = build / "packs" / KAL / "Images" / "0-7-7" / "cube"
     assert Image.open(tile / "F00.jpg").size == (64, 64) and Image.open(tile / "U00.jpg").size == (32, 32)
-    assert not (build / "packs" / KAL / f"{KAL}.toc").exists()  # (the viewer's own toc loads it)
+    toc = (build / "packs" / KAL / f"{KAL}.toc").read_text(encoding="utf-8")  # (an addon of its own)
+    assert "## Dependencies: AzerothGPS_StreetView\n" in toc and "## Version: 2026.10.01" in toc
+    assert "## Title: AzerothGPS StreetView Data" in toc and toc.rstrip().endswith("Index.lua")
     assert "packs (limit" in pack.budget(list(reports.values()), cfg)
     cfg["budget_bytes"] = 1000
     with pytest.raises(SystemExit):
@@ -404,11 +408,22 @@ def test_release_zips_are_checked(tmp_path):
     with zipfile.ZipFile(z) as f:
         names = f.namelist()
         index = f.read(f"{KAL}/Index.lua").decode("utf-8")
-    # one addon: the viewer's code with the built pictures and Index.lua laid over its stub
-    for n in (f"{KAL}/{KAL}.toc", f"{KAL}/Viewer.lua", f"{KAL}/Game.lua", f"{KAL}/Images/1-5-5/cube/F00.jpg"):
+    # two addons (the user, 2026-10-03): the pictures' zip has its toc, Index.lua and the pictures, no code
+    for n in (f"{KAL}/{KAL}.toc", f"{KAL}/Index.lua", f"{KAL}/Images/1-5-5/cube/F00.jpg"):
         assert n in names, n
-    assert "1-5-5" in index and names.count(f"{KAL}/Index.lua") == 1
-    assert release.check_zip(z, KAL, cfg["budget_bytes"]) == []
+    assert not any(n.endswith(("Viewer.lua", "Game.lua")) for n in names)
+    assert "1-5-5" in index and 'root = "Interface\\\\AddOns\\\\AzerothGPS_StreetView_Data\\\\Images' in index
+    assert release.check_zip(z, KAL, cfg["budget_bytes"], pictures=True) == []
+    # ... and the viewer's, its code and media without a picture
+    V = "AzerothGPS_StreetView"
+    vz = release.release_viewer(tmp_path / "dist", "1.2.3", cfg=cfg, log=lambda *_: None)[0]["zip"]
+    with zipfile.ZipFile(vz) as f:
+        vnames = f.namelist()
+    assert vz.name == f"{V}-1.2.3.zip" and f"{V}/{V}.toc" in vnames and f"{V}/Game.lua" in vnames
+    assert not any("/Images/" in n for n in vnames) and f"{V}/Index.lua" not in vnames
+    assert release.check_zip(vz, V, cfg["budget_bytes"], pictures=False) == []
+    assert any("pictures in the viewer" in p for p in release.check_zip(z, KAL, cfg["budget_bytes"], pictures=False))
+    assert any("no pictures" in p for p in release.check_zip(vz, V, cfg["budget_bytes"], pictures=True))
     bad = tmp_path / "bad.zip"
     with zipfile.ZipFile(bad, "w") as f:
         f.writestr("P/Index.lua", 'x = "C:\\Users\\someone\\WoW"')

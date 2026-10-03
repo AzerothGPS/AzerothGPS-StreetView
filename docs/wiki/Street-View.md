@@ -39,5 +39,5 @@ map yourself along the way, it stays where you put it.
 
 - Every picture is a full 360-degree panorama rendered from the game world: about one every 200 yards
   along the roads, the streets of the cities and inside their buildings, a few dozen famous spots framed by
-  hand, and the first dungeon boss.
+  hand, and every dungeon and raid boss.
 - Left and right look swapped on your client? `/sv flipyaw` turns the views the other way.

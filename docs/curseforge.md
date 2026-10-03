@@ -13,6 +13,8 @@ the repo is public. The voice is the same as AzerothGPS's page: talk to the play
 - **Game:** World of Warcraft, the WoW Forever (Classic 1.60) flavor
 - **Categories:** Map & Minimap (main), Minigames, Quests & Leveling
 - **Required dependency:** AzerothGPS
+- **The pictures:** a project of their own, AzerothGPS StreetView Data (`docs/curseforge-data.md`), which
+  requires this one. Link it from the description's install steps.
 - **License:** All Rights Reserved
 - **Avatar:** `assets/logo.png`
 - **AzerothGPS link** in the description: its GitHub page for now; swap in its CurseForge page once it has one.
@@ -44,7 +46,8 @@ up, zoom in, and follow the arrows on the ground to walk down the road.
 - **Look anywhere:** drag the picture around, and the mouse wheel zooms.
 - **Walk the roads:** click the white arrows on the ground to hop to the next spot.
 - **The map follows along:** AzerothGPS shows where you're standing and which way you're looking.
-- **Nothing else to download:** every picture ships inside the addon.
+- **The pictures come separately:** grab **AzerothGPS StreetView Data** too (about 1.2 GB). It updates on
+  its own, so StreetView's own updates stay tiny. Forgot it? StreetView tells you where to get it.
 
 <p align="center"><img src="https://github.com/user-attachments/assets/a488152a-0bad-467f-83fc-bc0218abcb0c" alt="Booty Bay at dusk in the street view" width="820"></p>
 
@@ -84,7 +87,8 @@ more points you score.
 
 ### Getting started
 
-1. Install **AzerothGPS** and **AzerothGPS StreetView**, then restart the game.
+1. Install **AzerothGPS**, **AzerothGPS StreetView** and its pictures, **AzerothGPS StreetView Data**, then
+   restart the game.
 2. Open the AzerothGPS map and drag the figure onto a road.
 3. Feel like playing? Click **Where in the Azeroth?** above the figure.
 
@@ -101,10 +105,9 @@ everything is on the **[wiki](https://github.com/AzerothGPS/AzerothGPS-StreetVie
 
 ### What's next
 
-- **Dungeons, boss by boss:** Shift-click a boss on a dungeon's map and see him standing in his room.
-  The first one, Taragaman the Hungerer in Ragefire Chasm, is already in (with AzerothGPS 1.1.0 or
-  later; the top of the map tells you when it works). More bosses, entrances and the stairs between floors
-  are on the way. They're in the viewer only, never in the game.
+- **Dungeons, beyond the bosses:** every dungeon and raid boss is in already (Shift-click one on its
+  dungeon's map, with AzerothGPS 1.1.0 or later). The entrances and the stairs between floors are next.
+  They're in the viewer only, never in the game.
 - **A few more spots:** the Great Forge and some of Darnassus' tree houses are getting a last bit of polish.
 
 <p align="center"><img src="https://raw.githubusercontent.com/wiki/AzerothGPS/AzerothGPS-StreetView/images/dungeon-boss-shift-click.gif" alt="Shift-click a boss on a dungeon's map for his street view" width="640"></p>
