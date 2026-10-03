@@ -3,7 +3,9 @@ name: Release
 # The addon zip with its pictures is built on a PC (`sv.cmd release --publish`: the pictures are never in
 # git) and attached to a GitHub release v<version>. Publishing that release runs this: it checks the
 # version, takes the CHANGELOG.md section as the notes, downloads the zip and uploads it to CurseForge
-# (project packs.json viewer.curseforge_project, requiring AzerothGPS), as AzerothGPS's own release does.
+# (project packs.json viewer.curseforge_project), as AzerothGPS's own release does. AzerothGPS is required by the
+# project's Default Relations on CurseForge (set by the user, 2026-10-03), which every file gets; the upload sends
+# no relations of its own (a wrong slug would fail it).
 # "Run workflow" by hand does a dry run: it only checks the CurseForge game version.
 on:
   release:
@@ -71,4 +73,4 @@ jobs:
           VERSION="${{ steps.v.outputs.version }}"
           python3 tools/svtools/curseforge.py --project "${{ steps.v.outputs.project }}" \
             --zip "dist/AzerothGPS_StreetView-$VERSION.zip" --display "AzerothGPS StreetView $VERSION" \
-            --changelog notes.md --requires azerothgps
+            --changelog notes.md

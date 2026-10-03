@@ -13,9 +13,8 @@
   "viewer": {
     "name": "AzerothGPS_StreetView",
     "curseforge_project": 1721639,
-    "curseforge_requires": [
-      "azerothgps"
-    ]
+    "curseforge_requires": [],
+    "about_requires": "AzerothGPS is a Required Dependency in the CurseForge project's Default Relations (the user, 2026-10-03), which every file gets; uploads send no relations of their own (a wrong slug would fail the upload)"
   },
   "sd": {
     "tile": 512,

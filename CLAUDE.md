@@ -64,7 +64,7 @@ made beyond offline rendering stay there.
 - Releases (CurseForge project 1721639), only when the user asks: bump the toc's version and add its
   `## <version>` section to CHANGELOG.md, commit and push, then `sv.cmd release --publish`. That builds the
   zip (code and pictures) here, checks it, and makes the GitHub release v<version> with the zip attached;
-  publishing it runs .github/workflows/release.yml, which uploads the zip to CurseForge (requiring AzerothGPS)
+  publishing it runs .github/workflows/release.yml, which uploads the zip to CurseForge (AzerothGPS required by the project's Default Relations, not the upload)
   with the repo's `CF_API_TOKEN` secret, as AzerothGPS's own releases. (`--upload` sends it from this PC instead.)
 
 ## Talking to AzerothGPS
