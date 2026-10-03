@@ -5,7 +5,7 @@
 ## X-License: All Rights Reserved
 ## X-Copyright: Copyright (c) 2026 AzerothGPS
 ## Version: 1.0.0
-## Dependencies: AzerothGPS
+## OptionalDeps: AzerothGPS
 ## SavedVariables: AzerothGPSStreetViewDB
 ## IconTexture: Interface\AddOns\AzerothGPS_StreetView\Media\Logo
 

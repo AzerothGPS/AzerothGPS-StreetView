@@ -423,7 +423,7 @@ def test_without_the_pictures_every_way_in_shows_the_notice(ui):
     w = lua.globals().AzerothGPSStreetViewDataNotice
     assert w._shown and w.title == "Street View Pictures Missing"
     assert "reinstall" in w.text._text and "restart the game" in w.text._text
-    assert w.box._text == p.ns.PAGE_URL and p.ns.PAGE_URL.endswith("/azerothgps-streetview")
+    assert w.box._text == p.ns.PAGE_URL == "https://www.curseforge.com/projects/1721639"  # (by id: any address)
     w.Hide(w)
     # every way in shows it, and goes no further
     show = p.ns.ShowDataNotice
@@ -445,3 +445,29 @@ def test_without_the_pictures_every_way_in_shows_the_notice(ui):
     assert not p.G.Start("solo", 3) and G.NOTICES == 5 and p.game is None
     assert not p.G.OnLink("garrmission:agpssv:123456:3:Ann-Realm") and G.NOTICES == 6 and p.game is None
     assert lua.globals().AzerothGPSStreetViewDataNotice._shown
+
+
+def test_without_azerothgps_a_notice_says_so(ui):
+    # the user, 2026-10-03: installed without AzerothGPS, a popup says so (the toc lists it as an optional dependency,
+    # so StreetView still loads: a required one left it unloaded, nothing said); turned off or too old too
+    p, clock, net, panel, lua = ui
+    toc = (ADDON / "AzerothGPS_StreetView.toc").read_text(encoding="utf-8")
+    assert "## OptionalDeps: AzerothGPS" in toc and "## Dependencies:" not in toc
+    G = lua.globals()
+    lua.execute("AzerothGPS.version = 12")
+    assert p.ns.CheckAzerothGPS() is None and G.AzerothGPSStreetViewNeedsAzerothGPS is None  # (all is well)
+    lua.execute("AzerothGPS.version = 11")
+    assert p.ns.AzerothGPSState() == "old" and "1.1.0 or later" in p.ns.AzerothGPSNoticeText("old")
+    saved = G.AzerothGPS
+    lua.execute("AzerothGPS = nil")
+    lua.execute('C_AddOns = { GetAddOnInfo = function() return "AzerothGPS", "", "", false, "DISABLED" end }')
+    assert p.ns.AzerothGPSState() == "disabled" and "turned off" in p.ns.AzerothGPSNoticeText("disabled")
+    lua.execute('C_AddOns = { GetAddOnInfo = function() return nil, nil, nil, false, "MISSING" end }')
+    lua.execute("PRINTED = {} print = function(...) PRINTED[#PRINTED + 1] = table.concat({ ... }, ' ') end")
+    assert p.ns.CheckAzerothGPS() == "missing"
+    # the notice made here, in AzerothGPS's window style (its own Window isn't there): what's needed and its page
+    w = G.AzerothGPSStreetViewNeedsAzerothGPS
+    assert w._shown and "needs AzerothGPS" in w.text._text and "restart the game" in w.text._text
+    assert w.box._text == p.ns.AZEROTHGPS_URL == "https://www.curseforge.com/projects/1712208"
+    assert any("needs AzerothGPS" in m for m in G.PRINTED.values())  # (and in chat)
+    G.AzerothGPS = saved

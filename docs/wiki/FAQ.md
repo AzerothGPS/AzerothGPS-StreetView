@@ -3,6 +3,11 @@
 **The figure or the game button doesn't show on the map.**
 StreetView needs a recent AzerothGPS. Update it, then restart the game.
 
+**"AzerothGPS Needed" or "AzerothGPS Too Old" pops up.**
+StreetView shows its street views on the AzerothGPS map, so it needs AzerothGPS 1.1.0 or later. Install or
+update AzerothGPS (the note shows its CurseForge page; the CurseForge app installs it along with StreetView),
+or turn it on in the AddOns list if it's off, then restart the game.
+
 **"Street View Pictures Missing" pops up.**
 Your copy of StreetView has no pictures in it. That happens with GitHub's "source code" download, or an
 install that got cut short. Reinstall **AzerothGPS StreetView** from CurseForge (the note shows its page),

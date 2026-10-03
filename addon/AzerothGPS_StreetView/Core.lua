@@ -31,11 +31,109 @@ local function InitDB()
   D.yawSign = db.yawSign == -1 and -1 or 1
 end
 
+-- Pages to copy (the game can't open links): CurseForge's by project id, which takes you to the project
+-- whatever its address.
+ns.PAGE_URL = "https://www.curseforge.com/projects/1721639" -- (this addon)
+ns.AZEROTHGPS_URL = "https://www.curseforge.com/projects/1712208" -- (AzerothGPS)
+ns.MIN_API = 12 -- AzerothGPS's API version this addon needs (AzerothGPS 1.1.0: a boss's Shift-click)
+
+-- A popup window: AzerothGPS's own (every popup looks like its map window without the logo, AzerothGPS.Window),
+-- else the same look made here (AzerothGPS missing or too old to have it).
+function ns.Window(name, w, h, title)
+  local API = _G.AzerothGPS
+  if type(API) == "table" and API.Window then return API.Window(name, w, h, title) end
+  local f = CreateFrame("Frame", name, UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+  f:SetSize(w, h)
+  f:SetPoint("CENTER")
+  f:SetFrameStrata("DIALOG")
+  f:SetToplevel(true)
+  f:SetClampedToScreen(true)
+  f:EnableMouse(true)
+  f:SetMovable(true)
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", function(self) self:StartMoving() end)
+  f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+  if name and UISpecialFrames then table.insert(UISpecialFrames, name) end -- (Escape closes it)
+  local bg = f:CreateTexture(nil, "BACKGROUND")
+  bg:SetPoint("TOPLEFT", 3, -3)
+  bg:SetPoint("BOTTOMRIGHT", -3, 3)
+  bg:SetColorTexture(0.05, 0.05, 0.06, 0.95)
+  local ok, chrome = pcall(CreateFrame, "Frame", nil, f, "PortraitFrameTemplate")
+  if ok and chrome and chrome.NineSlice then
+    chrome:SetAllPoints()
+    chrome:SetFrameLevel(f:GetFrameLevel())
+    chrome:EnableMouse(false)
+    if chrome.Bg then chrome.Bg:Hide() end
+    if chrome.TopTileStreaks then chrome.TopTileStreaks:Hide() end
+    if chrome.SetBorder then pcall(chrome.SetBorder, chrome, "ButtonFrameTemplateNoPortrait") end
+    if chrome.PortraitContainer then chrome.PortraitContainer:Hide() end
+    if chrome.portrait then chrome.portrait:Hide() end
+    if chrome.CloseButton then chrome.CloseButton:SetScript("OnClick", function() f:Hide() end) end
+    if chrome.SetTitle then
+      chrome:SetTitle(title or "")
+    elseif chrome.TitleContainer and chrome.TitleContainer.TitleText then
+      chrome.TitleContainer.TitleText:SetText(title or "")
+    end
+    f.top = -30
+  else
+    if f.SetBackdrop then
+      f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+      f:SetBackdropColor(0.05, 0.05, 0.06, 0.95)
+      f:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    end
+    local t = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    t:SetPoint("TOP", 0, -8)
+    t:SetText(title or "")
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", 2, 2)
+    close:SetScript("OnClick", function() f:Hide() end)
+    f.top = -28
+  end
+  f:Hide()
+  return f
+end
+
+-- A notice: the text, a page's address to copy, and OK. One window per name, made the first time.
+local notices = {}
+function ns.Notice(name, title, text, url)
+  local f = notices[name]
+  if not f then
+    f = ns.Window(name, 380, 200, title)
+    f.text = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    f.text:SetPoint("TOPLEFT", 18, f.top - 10)
+    f.text:SetPoint("TOPRIGHT", -18, f.top - 10)
+    f.text:SetJustifyH("LEFT")
+    f.text:SetSpacing(2)
+    -- the page's address, to copy: selected on a click, never changed
+    local box = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+    box:SetSize(320, 22)
+    box:SetPoint("BOTTOM", 0, 50)
+    box:SetAutoFocus(false)
+    box:SetScript("OnTextChanged", function(self, user) if user then self:SetText(f.url) self:HighlightText() end end)
+    box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+    box:SetScript("OnEscapePressed", function(self) self:ClearFocus() f:Hide() end)
+    f.box = box
+    local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("BOTTOM", box, "TOP", 0, 4)
+    hint:SetText("Click, then Ctrl+C to copy")
+    local ok = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    ok:SetSize(90, 24)
+    ok:SetPoint("BOTTOM", 0, 16)
+    ok:SetText("OK")
+    ok:SetScript("OnClick", function() f:Hide() end)
+    notices[name] = f
+  end
+  f.url = url
+  f.text:SetText(text)
+  f.box:SetText(url)
+  f.box:SetCursorPosition(0)
+  f:Show()
+  return f
+end
+
 -- No pictures found (the user, 2026-10-03): they ship inside this addon, but a copy without them (GitHub's source
 -- code, an install cut short) has only the empty Index.lua. Then the figure, a boss's Shift-click, /sv here|open and
 -- Where in the Azeroth? (its button, a game's link, an invitation) show this notice and stop.
-ns.PAGE_URL = "https://www.curseforge.com/wow/addons/azerothgps-streetview"
-
 function ns.HasData() return D.count > 0 end
 
 function ns.DataNoticeText()
@@ -43,43 +141,46 @@ function ns.DataNoticeText()
     .. "the source code from GitHub has none): reinstall it from the page below, then restart the game completely."
 end
 
-local notice
 function ns.ShowDataNotice()
-  local text = ns.DataNoticeText()
+  return ns.Notice("AzerothGPSStreetViewDataNotice", "Street View Pictures Missing", ns.DataNoticeText(), ns.PAGE_URL)
+end
+
+-- AzerothGPS missing, turned off or too old (the user, 2026-10-03): the toc lists it as an optional dependency, so
+-- this addon still loads without it and says so (a required one would leave it unloaded, nothing said). nil when
+-- it's there and new enough; else "missing", "disabled" or "old".
+function ns.AzerothGPSState()
   local API = _G.AzerothGPS
-  if not (API and API.Window) then
-    Print(text .. " " .. ns.PAGE_URL)
-    return
+  if type(API) == "table" then
+    return (tonumber(API.version) or 0) < ns.MIN_API and "old" or nil
   end
-  if not notice then
-    notice = API.Window("AzerothGPSStreetViewDataNotice", 380, 200, "Street View Pictures Missing")
-    notice.text = notice:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    notice.text:SetPoint("TOPLEFT", 18, notice.top - 10)
-    notice.text:SetPoint("TOPRIGHT", -18, notice.top - 10)
-    notice.text:SetJustifyH("LEFT")
-    notice.text:SetSpacing(2)
-    -- the page's address, to copy (the game can't open links): selected on a click, never changed
-    local box = CreateFrame("EditBox", nil, notice, "InputBoxTemplate")
-    box:SetSize(320, 22)
-    box:SetPoint("BOTTOM", 0, 50)
-    box:SetAutoFocus(false)
-    box:SetScript("OnTextChanged", function(self, user) if user then self:SetText(ns.PAGE_URL) self:HighlightText() end end)
-    box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
-    box:SetScript("OnEscapePressed", function(self) self:ClearFocus() notice:Hide() end)
-    box:SetText(ns.PAGE_URL)
-    box:SetCursorPosition(0)
-    notice.box = box
-    local hint = notice:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("BOTTOM", box, "TOP", 0, 4)
-    hint:SetText("Click, then Ctrl+C to copy")
-    local ok = CreateFrame("Button", nil, notice, "UIPanelButtonTemplate")
-    ok:SetSize(90, 24)
-    ok:SetPoint("BOTTOM", 0, 16)
-    ok:SetText("OK")
-    ok:SetScript("OnClick", function() notice:Hide() end)
+  local info = (C_AddOns and C_AddOns.GetAddOnInfo) or _G.GetAddOnInfo
+  local ok, name, _, loadable, reason
+  if info then ok, name, _, _, loadable, reason = pcall(info, "AzerothGPS") end
+  if ok and name and reason ~= "MISSING" and (reason == "DISABLED" or loadable == false) then return "disabled" end
+  return "missing"
+end
+
+function ns.AzerothGPSNoticeText(state)
+  if state == "old" then
+    return "AzerothGPS StreetView needs a newer AzerothGPS (1.1.0 or later). Update AzerothGPS from the page below, "
+      .. "then restart the game. Until then some of StreetView may not work."
+  elseif state == "disabled" then
+    return "AzerothGPS StreetView needs AzerothGPS, which is installed but turned off. Turn it on in the AddOns list "
+      .. "(the AddOns button at the character select screen), then log in again."
   end
-  notice.text:SetText(text)
-  notice:Show()
+  return "AzerothGPS StreetView needs AzerothGPS: the street views open from its map. Install AzerothGPS from the "
+    .. "page below (the CurseForge app installs it with StreetView), then restart the game."
+end
+
+-- At login: the notice when AzerothGPS isn't there or is too old. The state, or nil when all is well.
+function ns.CheckAzerothGPS()
+  local state = ns.AzerothGPSState()
+  if state then
+    ns.Notice("AzerothGPSStreetViewNeedsAzerothGPS", state == "old" and "AzerothGPS Too Old" or "AzerothGPS Needed",
+      ns.AzerothGPSNoticeText(state), ns.AZEROTHGPS_URL)
+    Print(ns.AzerothGPSNoticeText(state))
+  end
+  return state
 end
 
 -- true with pictures installed; else the notice, false
@@ -183,6 +284,8 @@ ev:SetScript("OnEvent", function(_, event, arg1, arg2)
     InitDB()
   elseif event == "PLAYER_LOGIN" then
     D.Load()
+    local agps = ns.CheckAzerothGPS()
+    if agps == "missing" or agps == "disabled" then return end -- (no map to show anything on)
     if not ns.HasData() then -- (once a login, in chat; the notice itself only when a street view is asked for)
       Print(ns.DataNoticeText() .. " " .. ns.PAGE_URL)
     end

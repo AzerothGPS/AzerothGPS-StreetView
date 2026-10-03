@@ -51,6 +51,13 @@ made beyond offline rendering stay there.
   clicking the figure, `/sv here|open`, a boss's Shift-click (its hint still shows in a dungeon), Where in the
   Azeroth?'s button, `Gm.Start`, a game's link, an invitation accepted (Game.lua `NoData`, `io.noData`);
   `test_without_the_pictures_every_way_in_shows_the_notice`.
+- **Without AzerothGPS** (the user, 2026-10-03): the toc has `## OptionalDeps: AzerothGPS`, not `Dependencies` (a
+  required one leaves StreetView unloaded, nothing said), so at PLAYER_LOGIN `ns.CheckAzerothGPS` shows "AzerothGPS
+  Needed" (missing or turned off: then nothing else starts) or "AzerothGPS Too Old" (API version under
+  `ns.MIN_API` 12, AzerothGPS 1.1.0), with `ns.AZEROTHGPS_URL` to copy. Popups go through `ns.Notice` / `ns.Window`:
+  AzerothGPS.Window when there, else the same look built in Core.lua. CurseForge auto-installs AzerothGPS through
+  the project's Default Relations (Required Dependency), not the toc. Pages are linked by project id
+  (`curseforge.com/projects/<id>`). `test_without_azerothgps_a_notice_says_so`.
 - **Shipped every ~200 yd** (the user, 2026-09-29): the capture renders every 100 yd into the master,
   `pack.ship_points` thins the packs to `ship_spacing_yd` (a spot is kept unless a kept one is within
   150 yd; neighbors end up ~180-200 yd apart), and the arrows reach `D.NEXT_RANGE` = 310 yd. That puts
