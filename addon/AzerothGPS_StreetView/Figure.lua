@@ -90,7 +90,7 @@ local function BossSpot(info)
 end
 
 function F.BossClick(info)
-  if not ns.NeedData() then return true end -- (no pictures installed: where to get them)
+  if not ns.NeedData() then return true end -- (no pictures found: the notice)
   if Playing() then
     UIErrorsFrame:AddMessage("Not during a game of Where in the Azeroth?", 1, 0.82, 0)
     return true
@@ -108,7 +108,7 @@ end
 
 function F.BossHint(info)
   if BossSpot(info) then return "its street view" end
-  -- (no pictures installed: the hint still shows in a dungeon, and the click says where to get them)
+  -- (no pictures found: the hint still shows in a dungeon, and the click shows the notice)
   if not ns.HasData() and info and type(info.cont) == "number" and info.cont >= 20000 then return "its street view" end
 end
 
@@ -117,7 +117,7 @@ function F.Pick()
     UIErrorsFrame:AddMessage("Not during a game of Where in the Azeroth?", 1, 0.82, 0)
     return
   end
-  if not ns.NeedData() then return end -- (no pictures installed: where to get them)
+  if not ns.NeedData() then return end -- (no pictures found: the notice)
   carrying = true
   hover = nil
   button.icon:SetAlpha(0.25)
@@ -203,7 +203,7 @@ function F.Init()
     if ns.HasData() then
       GameTooltip:AddLine(string.format("%d views installed.", D.count), 0.6, 0.6, 0.6)
     else
-      GameTooltip:AddLine("Pictures not installed: " .. ns.DATA_TITLE .. ".", 1, 0.5, 0.3, true)
+      GameTooltip:AddLine("No street view pictures found: reinstall AzerothGPS StreetView.", 1, 0.5, 0.3, true)
     end
     GameTooltip:Show()
   end)

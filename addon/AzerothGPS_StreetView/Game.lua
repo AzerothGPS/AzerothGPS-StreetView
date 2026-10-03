@@ -762,12 +762,12 @@ Gm.io = {
   follow = function() end, showMap = function() end, world = function() end, view = function() end,
   mapState = function() end, changed = function() end, ask = function() end,
   print = function(...) if ns.Print then ns.Print(...) end end,
-  -- no pictures installed: the notice saying where to get them (Core.lua)
+  -- no pictures found: the notice (Core.lua)
   noData = function() if ns.ShowDataNotice then ns.ShowDataNotice() end end,
 }
 local io = function() return Gm.io end
 
--- No street views installed (the pictures are a download of their own, the user 2026-10-03): the notice, true.
+-- No street view pictures found (the user, 2026-10-03): the notice (Core.lua), true.
 local function NoData()
   if next(D.byId) ~= nil then return false end
   if io().noData then io().noData() else io().print("No street views are installed.") end

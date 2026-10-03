@@ -14,3 +14,4 @@ Core.lua
 Viewer.lua
 Figure.lua
 Game.lua
+Index.lua

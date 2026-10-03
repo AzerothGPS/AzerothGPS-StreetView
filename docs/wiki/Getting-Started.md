@@ -5,11 +5,10 @@
 1. Grab [AzerothGPS](https://github.com/AzerothGPS/AzerothGPS) first. StreetView needs it, and a recent
    one: the game's levels need AzerothGPS 1.1 or newer.
 2. Install **AzerothGPS StreetView** from CurseForge, or unzip it into
-   `World of Warcraft\_classic_beta_\Interface\AddOns`.
-3. Install its pictures, **AzerothGPS StreetView Data** (about 1.2 GB), the same way. They're a download
-   of their own so that StreetView's updates stay small, and they update separately when new street
-   views come out. Without them, StreetView shows a note saying where to get them.
-4. Restart the game completely. New picture files only load on a full start, not on a `/reload`.
+   `World of Warcraft\_classic_beta_\Interface\AddOns`. All the pictures come inside the addon, so
+   there's nothing else to download. (GitHub's "source code" zip has no pictures: StreetView says so
+   and shows where to get the full addon.)
+3. Restart the game completely. New picture files only load on a full start, not on a `/reload`.
 
 ## Your first look around
 

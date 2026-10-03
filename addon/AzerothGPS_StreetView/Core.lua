@@ -31,47 +31,28 @@ local function InitDB()
   D.yawSign = db.yawSign == -1 and -1 or 1
 end
 
--- The pictures are a download of their own (the user, 2026-10-03): the addon AzerothGPS_StreetView_Data, a
--- CurseForge project of its own, so a code update doesn't download a gigabyte again. Without it, the figure, a
--- boss's Shift-click, /sv here and Where in the Azeroth? (its button, a game's link) show this notice and stop.
-ns.DATA_ADDON = "AzerothGPS_StreetView_Data"
-ns.DATA_TITLE = "AzerothGPS StreetView Data"
-ns.DATA_URL = "https://www.curseforge.com/wow/addons/azerothgps-streetview-data"
+-- No pictures found (the user, 2026-10-03): they ship inside this addon, but a copy without them (GitHub's source
+-- code, an install cut short) has only the empty Index.lua. Then the figure, a boss's Shift-click, /sv here|open and
+-- Where in the Azeroth? (its button, a game's link, an invitation) show this notice and stop.
+ns.PAGE_URL = "https://www.curseforge.com/wow/addons/azerothgps-streetview"
 
 function ns.HasData() return D.count > 0 end
 
--- Why there are no pictures: "missing" (not installed, or installed while the game ran), "disabled" (turned
--- off in the AddOns list) or "empty" (loaded, but no views in it).
-function ns.DataState()
-  local info = (C_AddOns and C_AddOns.GetAddOnInfo) or _G.GetAddOnInfo
-  if not info then return "missing" end
-  local ok, name, _, _, loadable, reason = pcall(info, ns.DATA_ADDON)
-  if not ok or not name or reason == "MISSING" then return "missing" end
-  local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded or _G.IsAddOnLoaded or function() return false end)(ns.DATA_ADDON)
-  if loaded then return "empty" end
-  if reason == "DISABLED" or loadable == false then return "disabled" end
-  return "missing"
-end
-
-function ns.DataNoticeText(state)
-  if state == "disabled" then
-    return ns.DATA_TITLE .. " is installed but turned off. Turn it on in the AddOns list (the character select "
-      .. "screen's AddOns button), then log in again."
-  end
-  return "Street views need their pictures, a separate download: " .. ns.DATA_TITLE .. ". Install it with the "
-    .. "CurseForge app, or from the page below, then restart the game."
+function ns.DataNoticeText()
+  return "No street view pictures were found. They come with AzerothGPS StreetView from CurseForge (a copy of "
+    .. "the source code from GitHub has none): reinstall it from the page below, then restart the game completely."
 end
 
 local notice
 function ns.ShowDataNotice()
-  local text = ns.DataNoticeText(ns.DataState())
+  local text = ns.DataNoticeText()
   local API = _G.AzerothGPS
   if not (API and API.Window) then
-    Print(text .. " " .. ns.DATA_URL)
+    Print(text .. " " .. ns.PAGE_URL)
     return
   end
   if not notice then
-    notice = API.Window("AzerothGPSStreetViewDataNotice", 380, 190, "Street View Pictures Missing")
+    notice = API.Window("AzerothGPSStreetViewDataNotice", 380, 200, "Street View Pictures Missing")
     notice.text = notice:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     notice.text:SetPoint("TOPLEFT", 18, notice.top - 10)
     notice.text:SetPoint("TOPRIGHT", -18, notice.top - 10)
@@ -82,10 +63,10 @@ function ns.ShowDataNotice()
     box:SetSize(320, 22)
     box:SetPoint("BOTTOM", 0, 50)
     box:SetAutoFocus(false)
-    box:SetScript("OnTextChanged", function(self, user) if user then self:SetText(ns.DATA_URL) self:HighlightText() end end)
+    box:SetScript("OnTextChanged", function(self, user) if user then self:SetText(ns.PAGE_URL) self:HighlightText() end end)
     box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
     box:SetScript("OnEscapePressed", function(self) self:ClearFocus() notice:Hide() end)
-    box:SetText(ns.DATA_URL)
+    box:SetText(ns.PAGE_URL)
     box:SetCursorPosition(0)
     notice.box = box
     local hint = notice:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -98,7 +79,6 @@ function ns.ShowDataNotice()
     ok:SetScript("OnClick", function() notice:Hide() end)
   end
   notice.text:SetText(text)
-  notice.box:SetShown(ns.DataState() ~= "disabled")
   notice:Show()
 end
 
@@ -204,7 +184,7 @@ ev:SetScript("OnEvent", function(_, event, arg1, arg2)
   elseif event == "PLAYER_LOGIN" then
     D.Load()
     if not ns.HasData() then -- (once a login, in chat; the notice itself only when a street view is asked for)
-      Print(ns.DataNoticeText(ns.DataState()) .. " " .. ns.DATA_URL)
+      Print(ns.DataNoticeText() .. " " .. ns.PAGE_URL)
     end
     -- after AzerothGPS has built its map (its PLAYER_LOGIN runs first; one frame later to be sure)
     C_Timer.After(0, function()

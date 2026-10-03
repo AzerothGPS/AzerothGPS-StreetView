@@ -1,5 +1,5 @@
 {
-  "about": "How AzerothGPS StreetView ships its pictures: a download of their own (the user, 2026-10-03), the addon AzerothGPS_StreetView_Data, a CurseForge project of its own beside the viewer's, so an update of the viewer's code doesn't download the pictures again. The build writes the pictures (SD tiles scaled from build/master), their Index.lua and toc into build/packs/AzerothGPS_StreetView_Data/; `sv.cmd install` puts it beside the viewer in the game; `sv.cmd release` zips the viewer's code, `sv.cmd release-data` the pictures (both: --publish for the GitHub release whose workflow uploads to CurseForge). Without the pictures the viewer says where to get them (Core.lua ns.NeedData). The pack's zip stays under budget_bytes (CurseForge refuses files of 2 GB or more). 'spacing_yd' is how far apart the capture renders spots (the master keeps them all); 'ship_spacing_yd' how far apart the shipped ones are (pack.ship_points; 200 yd, the user 2026-09-29). 'planned' is the shipped spots expected, for projecting the full size. HD packs are not made or shipped for now.",
+  "about": "How AzerothGPS StreetView ships its pictures: inside the viewer addon itself (the user, 2026-09-29: one addon, no separate data packs). The build writes the pictures (SD tiles scaled from build/master) and the real Index.lua into build/packs/AzerothGPS_StreetView/; `sv.cmd install` lays them over the viewer's code in the game, and `sv.cmd release` zips code and pictures together for CurseForge (the pictures never go into git, so the tag workflow only makes a code-only GitHub release). The zip stays under budget_bytes (CurseForge refuses files of 2 GB or more). 'spacing_yd' is how far apart the capture renders spots (the master keeps them all); 'ship_spacing_yd' how far apart the shipped ones are (pack.ship_points; 200 yd, the user 2026-09-29). 'planned' is the shipped spots expected, for projecting the full size. HD packs are not made or shipped for now.",
   "budget_bytes": 1800000000,
   "spacing_yd": 100,
   "ship_spacing_yd": 200,
@@ -14,10 +14,8 @@
     "name": "AzerothGPS_StreetView",
     "curseforge_project": 1721639,
     "curseforge_requires": [
-      "azerothgps",
-      "azerothgps-streetview-data"
-    ],
-    "about_requires": "the user, 2026-10-03: the pictures a required dependency, so the CurseForge app installs both; the in-game notice covers manual installs"
+      "azerothgps"
+    ]
   },
   "sd": {
     "tile": 512,
@@ -25,23 +23,16 @@
     "quality": 75,
     "packs": [
       {
-        "name": "AzerothGPS_StreetView_Data",
+        "name": "AzerothGPS_StreetView",
         "title": "every continent",
         "continents": [
           1,
           2991,
           0
         ],
-        "planned": 1407
+        "planned": 1407,
+        "in_viewer": true
       }
-    ]
-  },
-  "data": {
-    "name": "AzerothGPS_StreetView_Data",
-    "title": "AzerothGPS StreetView Data",
-    "curseforge_project": null,
-    "curseforge_requires": [
-      "azerothgps-streetview"
     ]
   }
 }

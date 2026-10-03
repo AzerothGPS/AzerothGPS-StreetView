@@ -12,9 +12,7 @@ the repo is public. The voice is the same as AzerothGPS's page: talk to the play
   play Where in the Azeroth?, a GeoGuessr-style guessing game for up to 10 players.
 - **Game:** World of Warcraft, the WoW Forever (Classic 1.60) flavor
 - **Categories:** Map & Minimap (main), Minigames, Quests & Leveling
-- **Required dependencies:** AzerothGPS, and AzerothGPS StreetView Data (the pictures, a project of their own:
-  `docs/curseforge-data.md`; the user, 2026-10-03: required, so the CurseForge app installs both). Each upload
-  sets them (packs.json `viewer.curseforge_requires`).
+- **Required dependency:** AzerothGPS
 - **License:** All Rights Reserved
 - **Avatar:** `assets/logo.png`
 - **AzerothGPS link** in the description: its GitHub page for now; swap in its CurseForge page once it has one.
@@ -46,8 +44,7 @@ up, zoom in, and follow the arrows on the ground to walk down the road.
 - **Look anywhere:** drag the picture around, and the mouse wheel zooms.
 - **Walk the roads:** click the white arrows on the ground to hop to the next spot.
 - **The map follows along:** AzerothGPS shows where you're standing and which way you're looking.
-- **The pictures come separately:** grab **AzerothGPS StreetView Data** too (about 1.2 GB). It updates on
-  its own, so StreetView's own updates stay tiny. Forgot it? StreetView tells you where to get it.
+- **Nothing else to download:** every picture ships inside the addon.
 
 <p align="center"><img src="https://github.com/user-attachments/assets/a488152a-0bad-467f-83fc-bc0218abcb0c" alt="Booty Bay at dusk in the street view" width="820"></p>
 
@@ -87,8 +84,7 @@ more points you score.
 
 ### Getting started
 
-1. Install **AzerothGPS**, **AzerothGPS StreetView** and its pictures, **AzerothGPS StreetView Data**, then
-   restart the game.
+1. Install **AzerothGPS** and **AzerothGPS StreetView**, then restart the game.
 2. Open the AzerothGPS map and drag the figure onto a road.
 3. Feel like playing? Click **Where in the Azeroth?** above the figure.
 
