@@ -8,16 +8,19 @@ name: Release
 #   with the release's notes.
 # Dependencies are the projects' Default Relations on CurseForge (StreetView requires AzerothGPS and the DataPack),
 # which every file gets; packs.json's curseforge_requires are empty, so the uploads send none.
-# "Run workflow" by hand does a dry run: it only checks the CurseForge game version.
+# "Run workflow" by hand: with a release's tag, uploads that release's zip to CurseForge (an upload that didn't happen
+# when it was published: the DataPack's first, made before its project had an id, 2026-10-03; CurseForge's website
+# refuses files that big, its API doesn't); without one, a dry run that only checks the CurseForge game version.
+# (A run by hand reads packs.json from main, not from the tag.)
 on:
   release:
     types: [published]
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Only look up the CurseForge game version (no upload)"
-        type: boolean
-        default: true
+      tag:
+        description: "A release's tag to upload to CurseForge (v1.0.0, data-v2026.10.03); empty: a dry run"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -31,19 +34,20 @@ jobs:
           ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: CurseForge game version (dry run)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_GAME_VERSION_ID: ${{ vars.CF_GAME_VERSION_ID }}
         run: python3 tools/svtools/curseforge.py --dry-run
 
       - name: Which addon, version and notes
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.tag != ''
         id: v
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ github.event.release.tag_name }}"
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           if [ "${TAG#data-v}" != "$TAG" ]; then
             VERSION="${TAG#data-v}"
             KEY=data
@@ -75,12 +79,12 @@ jobs:
           echo "requires=$REQUIRES" >> "$GITHUB_OUTPUT"
 
       - name: The release's zip
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           ZIP="${{ steps.v.outputs.name }}-${{ steps.v.outputs.version }}.zip"
-          gh release download "${{ github.event.release.tag_name }}" --pattern "$ZIP" --dir dist
+          gh release download "${{ steps.v.outputs.tag }}" --pattern "$ZIP" --dir dist
           ls -la dist
           unzip -l "dist/$ZIP" | grep -q "${{ steps.v.outputs.name }}/${{ steps.v.outputs.name }}.toc" || { echo "not the addon's zip"; exit 1; }
           if [ "${{ steps.v.outputs.name }}" = "AzerothGPS_StreetView_DataPack" ]; then
@@ -90,7 +94,7 @@ jobs:
           fi
 
       - name: Upload to CurseForge
-        if: github.event_name == 'release' && steps.v.outputs.project != ''
+        if: (github.event_name == 'release' || inputs.tag != '') && steps.v.outputs.project != ''
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_GAME_VERSION_ID: ${{ vars.CF_GAME_VERSION_ID }}

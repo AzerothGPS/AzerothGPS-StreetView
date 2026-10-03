@@ -38,7 +38,7 @@ made beyond offline rendering stay there.
 ## Size and shipping (the user: always consider the CurseForge limit)
 
 - **Two addons, two CurseForge projects** (the user, 2026-10-03, after one addon since 2026-09-29): the viewer
-  AzerothGPS_StreetView (code only, project 1721639) and the pictures, **AzerothGPS_StreetView_DataPack** (an
+  AzerothGPS_StreetView (code only, project 1721639) and the pictures, **AzerothGPS_StreetView_DataPack** (project 1724916, an
   **unlisted** project: not in search or on the profile, but linkable and usable as a dependency; `packs.json`
   `data`), so a code update doesn't download a gigabyte again. Both from this repo. StreetView's project requires
   AzerothGPS and the DataPack in its Default Relations (the CurseForge app installs all three); uploads send no
@@ -76,8 +76,8 @@ made beyond offline rendering stay there.
   `## <version>` section to CHANGELOG.md, commit and push, then `sv.cmd release --publish`: it zips and checks the
   code (no pictures) and makes the GitHub release v<version> with the zip attached. **The pictures**
   (`data.curseforge_project`): a `## <YYYY.MM.DD>` section in CHANGELOG-DataPack.md (the notes), then
-  `sv.cmd release-data --publish` builds and zips them here (GitHub release data-v<YYYY.MM.DD>; no project id yet:
-  the workflow skips CurseForge, the user uploads by hand). Publishing either runs .github/workflows/release.yml, which picks the project by the tag and
+  `sv.cmd release-data --publish` builds and zips them here (GitHub release data-v<YYYY.MM.DD>; the first,
+  2026.10.03, the user uploaded to CurseForge by hand; without a project id the workflow skips CurseForge). Publishing either runs .github/workflows/release.yml, which picks the project by the tag and
   uploads the zip with the repo's `CF_API_TOKEN` secret. (`--upload` sends from this PC instead.) Page texts:
   `docs/curseforge.md`, `docs/curseforge-datapack.md`.
 

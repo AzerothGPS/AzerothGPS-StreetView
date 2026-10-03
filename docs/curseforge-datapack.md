@@ -8,7 +8,7 @@ dependency; StreetView's project requires it (Default Relations).
 
 ## Project settings
 
-- **Name:** AzerothGPS StreetView DataPack
+- **Name:** AzerothGPS StreetView DataPack (project 1724916)
 - **Summary** (up to 255 characters): The street view pictures for AzerothGPS StreetView: over 1,800
   panoramas of Azeroth's roads, cities and dungeon bosses. Needs AzerothGPS StreetView.
 - **Game:** World of Warcraft, the WoW Forever (Classic 1.60) flavor

@@ -151,8 +151,7 @@ download the pictures again. Dependencies are the projects' Default Relations on
 2. **The pictures** (when they change): add a `## <YYYY.MM.DD>` section to `CHANGELOG-DataPack.md`
    (its release notes), then `sv.cmd release-data --publish` builds them, zips and checks
    them (under the budget, only addon files) and makes the GitHub release `data-v<YYYY.MM.DD>`; the
-   workflow uploads it to `data.curseforge_project` (the pictures are never in git; with no project id
-   there yet, it's the GitHub release only, for uploading to CurseForge by hand).
+   workflow uploads it to `data.curseforge_project` (the pictures are never in git).
 
 Without `--publish` either one is a dry run; `--upload` sends from this PC instead (`CF_API_TOKEN` set).
 Releases are logged in `data-releases.jsonl`.

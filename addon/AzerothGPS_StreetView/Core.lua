@@ -34,9 +34,7 @@ end
 -- Pages to copy (the game can't open links): CurseForge's by project id, which takes you to the project
 -- whatever its address.
 ns.PAGE_URL = "https://www.curseforge.com/projects/1721639" -- (this addon)
--- (the DataPack's own project once it has an id, packs.json data.curseforge_project; until then this addon's page,
--- which lists it as a dependency)
-ns.DATAPACK_URL = "https://www.curseforge.com/projects/1721639"
+ns.DATAPACK_URL = "https://www.curseforge.com/projects/1724916" -- (the DataPack: packs.json data.curseforge_project)
 ns.AZEROTHGPS_URL = "https://www.curseforge.com/projects/1712208" -- (AzerothGPS)
 ns.MIN_API = 12 -- AzerothGPS's API version this addon needs (AzerothGPS 1.1.0: a boss's Shift-click)
 
